@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.context;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ServiceRegistry {
@@ -10,5 +11,9 @@ public interface ServiceRegistry {
     default <T> T get(Class<T> type) {
         return find(type).orElseThrow(() -> new IllegalStateException("Service not registered: " + type.getName()));
     }
+
+    List<Class<?>> serviceTypes();
+
+    List<Object> services();
 }
 

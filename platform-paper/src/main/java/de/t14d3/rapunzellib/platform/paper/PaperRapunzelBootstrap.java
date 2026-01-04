@@ -42,6 +42,9 @@ public final class PaperRapunzelBootstrap {
         Scheduler scheduler = new PaperScheduler(plugin);
 
         DefaultRapunzelContext ctx = new DefaultRapunzelContext(PlatformId.PAPER, logger, dataDir, resources, scheduler);
+        if (scheduler instanceof AutoCloseable closeable) {
+            ctx.registerCloseable(closeable);
+        }
 
         ConfigService configService = new SnakeYamlConfigService(resources, logger);
         ctx.register(ConfigService.class, configService);

@@ -24,6 +24,12 @@ rootProject.name = "RapunzelLib"
 include(
     "api",
     "common",
+    "commands",
+    "commands-paper",
+    "commands-fabric",
+    "events",
+    "events-paper",
+    "events-fabric",
     "network",
     "database-spool",
     "platform-paper",

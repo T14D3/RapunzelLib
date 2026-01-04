@@ -9,7 +9,7 @@ plugins {
 }
 
 
-val shade: Configuration? by configurations.creating {
+val shade: Configuration by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
     extendsFrom(
@@ -38,9 +38,9 @@ dependencies {
 
 tasks {
     withType<ShadowJar>().configureEach {
-        configurations = listOf(shade)
+        configurations.set(listOf(shade))
         archiveClassifier.set("dev-shaded")
-        relocate("org.yaml.snakeyaml", "de.t14d3.rapunzellib.libs.snakeyaml")
+        relocate("org.yaml.snakeyaml", "de.t14d3.rapunzellib.libs.snakeyaml")   
         relocate("com.google.gson", "de.t14d3.rapunzellib.libs.gson")
     }
 

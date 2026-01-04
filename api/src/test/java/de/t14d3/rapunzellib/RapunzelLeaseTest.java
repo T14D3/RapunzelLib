@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -142,6 +143,16 @@ final class RapunzelLeaseTest {
             if (instance == null) return Optional.empty();
             return Optional.of(type.cast(instance));
         }
+
+        @Override
+        public List<Class<?>> serviceTypes() {
+            return services.keySet().stream().toList();
+        }
+
+        @Override
+        public List<Object> services() {
+            return services.values().stream().toList();
+        }
     }
 
     private static final class InlineScheduler implements Scheduler {
@@ -165,6 +176,12 @@ final class RapunzelLeaseTest {
 
         @Override
         public ScheduledTask runRepeating(Duration initialDelay, Duration period, Runnable task) {
+            task.run();
+            return new NoopTask();
+        }
+
+        @Override
+        public ScheduledTask runRepeatingAsync(Duration initialDelay, Duration period, Runnable task) {
             task.run();
             return new NoopTask();
         }

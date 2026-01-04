@@ -6,6 +6,12 @@ RapunzelLib is a Java 21 library for Minecraft plugins/mods that share code acro
 
 - `api` - platform-neutral interfaces and value types
 - `common` - default context + common implementations (e.g. YAML MiniMessage messages)
+- `commands` - Brigadier helpers (e.g. list-argument parsing) + platform-neutral `RCommandSource`
+- `commands-paper` - optional Paper adapters (e.g. Bukkit sender → `RCommandSource`)
+- `commands-fabric` - optional Fabric adapters (e.g. `CommandSourceStack` → `RCommandSource`)
+- `events` - platform-neutral game action events (sync cancellable + sync/async observers)
+- `events-paper` - Paper bridge (Bukkit/Paper listeners → Rapunzel events)
+- `events-fabric` - Fabric bridge (Fabric callbacks → Rapunzel events)
 - `platform-paper` - Paper bootstrap + wrappers + scheduler + plugin-messaging transport
 - `platform-velocity` - Velocity bootstrap + wrappers + scheduler + plugin-messaging transport + proxy-side responders
 - `platform-fabric` - Fabric bootstrap + wrappers + scheduler (network defaults to in-memory)
@@ -413,6 +419,51 @@ if (q.enabled()) {
 - Platform differences are explicit:
   - Velocity has no worlds/blocks; some operations throw `UnsupportedOperationException`.
 - `YamlMessageFormatService` turns unknown MiniMessage tags into placeholders; avoid naming placeholders after built-in MiniMessage tags.
+
+
+## Commands helpers (optional)
+
+The `commands` module provides small Brigadier helpers intended for reuse across projects.
+
+- `ListArgumentType<T>` - CommandAPI-style delimiter-based list parsing + suggestions (validated via `getList(...)`)
+- `commands-paper` / `commands-fabric` - optional source adapters for Bukkit/Fabric command sources
+
+## Game events (optional)
+
+The `events` modules provide a small, semantic action-event layer (not a Bukkit event mirror).
+
+Install the platform bridge after bootstrapping the context:
+
+**Paper**
+
+```java
+import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.events.GameEvents;
+import de.t14d3.rapunzellib.platform.paper.PaperRapunzelBootstrap;
+import org.bukkit.plugin.java.JavaPlugin;
+
+public final class MyPlugin extends JavaPlugin {
+  @Override public void onEnable() {
+    PaperRapunzelBootstrap.bootstrap(this);
+    GameEvents.install(this);
+  }
+
+  @Override public void onDisable() {
+    Rapunzel.shutdown(this);
+  }
+}
+```
+
+Then subscribe to cancellable pre-events and/or async snapshots:
+
+```java
+import de.t14d3.rapunzellib.events.GameEvents;
+import de.t14d3.rapunzellib.events.block.BlockBreakPre;
+
+GameEvents.bus().onPre(BlockBreakPre.class, e -> {
+  if (!e.player().hasPermission("myplugin.break")) e.deny();
+});
+```
 
 ## Gradle plugin (optional)
 

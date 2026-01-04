@@ -6,13 +6,8 @@ import de.t14d3.rapunzellib.message.MessageFormatService;
 import de.t14d3.rapunzellib.message.Placeholders;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
-import net.kyori.adventure.text.minimessage.Context;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.minimessage.ParsingException;
-import net.kyori.adventure.text.minimessage.tag.Tag;
-import net.kyori.adventure.text.minimessage.tag.resolver.ArgumentQueue;
-import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
-import org.jetbrains.annotations.NotNull;
+import net.kyori.adventure.text.TextComponent;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
@@ -23,14 +18,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public final class YamlMessageFormatService implements MessageFormatService {
-    private static final char MARKER_PREFIX = '\uE000';
-    private static final char MARKER_SUFFIX = '\uE001';
+public final class YamlMessageFormatService implements MessageFormatService {   
     private static final String PREFIX_KEY = "prefix";
     private static final int STRING_RENDER_CACHE_MAX_ENTRIES = 64;
 
     private final MiniMessage miniMessage;
-    private final TagResolver builtInTags;
     private final ConfigService configService;
     private final Logger logger;
     private final Path file;
@@ -40,7 +32,6 @@ public final class YamlMessageFormatService implements MessageFormatService {
 
     public YamlMessageFormatService(ConfigService configService, Logger logger, Path file, String defaultResourcePath) {
         this.miniMessage = MiniMessage.miniMessage();
-        this.builtInTags = miniMessage.tags();
         this.configService = Objects.requireNonNull(configService, "configService");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.file = Objects.requireNonNull(file, "file");
@@ -155,16 +146,16 @@ public final class YamlMessageFormatService implements MessageFormatService {
         Component out = template.component;
 
         for (String name : template.placeholderOrder) {
-            Component replacement = placeholders.components().get(name);
+            Component replacement = placeholders.components().get(name);        
             if (replacement == null) {
                 String value = placeholders.strings().get(name);
                 if (value != null) replacement = Component.text(value);
                 else if (name.equals("prefix")) replacement = prefix;
-                else replacement = Component.text("<" + name + ">");
+                else continue;
             }
 
             out = out.replaceText(TextReplacementConfig.builder()
-                .matchLiteral(marker(name))
+                .matchLiteral("<" + name + ">")
                 .replacement(replacement)
                 .build());
         }
@@ -192,11 +183,11 @@ public final class YamlMessageFormatService implements MessageFormatService {
 
     private Template parseTemplate(String raw) {
         Set<String> placeholderNames = new LinkedHashSet<>();
-        TagResolver placeholderResolver = new PlaceholderTagResolver(builtInTags, placeholderNames);
 
         Component parsed;
         try {
-            parsed = miniMessage.deserialize(raw, placeholderResolver);
+            parsed = miniMessage.deserialize(raw);
+            extractPlaceholders(parsed, placeholderNames);
         } catch (Exception e) {
             logger.warn("Failed to parse MiniMessage template: {}", e.getMessage());
             parsed = Component.text(raw);
@@ -205,8 +196,51 @@ public final class YamlMessageFormatService implements MessageFormatService {
         return new Template(raw, parsed, Collections.unmodifiableSet(placeholderNames));
     }
 
-    private static String marker(String name) {
-        return "" + MARKER_PREFIX + name + MARKER_SUFFIX;
+    private static void extractPlaceholders(Component root, Set<String> out) {
+        if (root instanceof TextComponent text) {
+            extractPlaceholdersFromText(text.content(), out);
+        }
+        for (Component child : root.children()) {
+            extractPlaceholders(child, out);
+        }
+    }
+
+    private static void extractPlaceholdersFromText(String text, Set<String> out) {
+        if (text == null || text.isEmpty()) return;
+        int i = 0;
+        while (true) {
+            int start = text.indexOf('<', i);
+            if (start < 0) return;
+            int end = text.indexOf('>', start + 1);
+            if (end < 0) return;
+
+            if (end == start + 1) {
+                i = end + 1;
+                continue;
+            }
+
+            String name = text.substring(start + 1, end);
+            if (!name.isEmpty() && name.charAt(0) != '/' && isPlaceholderName(name)) {
+                out.add(name);
+            }
+
+            i = end + 1;
+        }
+    }
+
+    private static boolean isPlaceholderName(String name) {
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            boolean ok =
+                (c >= 'a' && c <= 'z') ||
+                    (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9') ||
+                    c == '_' ||
+                    c == '-' ||
+                    c == '.';
+            if (!ok) return false;
+        }
+        return true;
     }
 
     private static final class Template {
@@ -221,7 +255,7 @@ public final class YamlMessageFormatService implements MessageFormatService {
         private Template(String raw, Component component, Set<String> placeholders) {
             this.raw = raw;
             this.component = component;
-            this.placeholderOrder = placeholders.toArray(new String[0]);
+            this.placeholderOrder = placeholders.toArray(new String[0]);        
             this.stringRenderCache = placeholders.isEmpty()
                 ? null
                 : Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {
@@ -234,30 +268,5 @@ public final class YamlMessageFormatService implements MessageFormatService {
     }
 
     private record State(Map<String, Template> templates, Set<String> keys, Component prefix) {
-    }
-
-    private static final class PlaceholderTagResolver implements TagResolver {
-        private final TagResolver builtInTags;
-        private final Set<String> placeholderNames;
-
-        private PlaceholderTagResolver(TagResolver builtInTags, Set<String> placeholderNames) {
-            this.builtInTags = Objects.requireNonNull(builtInTags, "builtInTags");
-            this.placeholderNames = Objects.requireNonNull(placeholderNames, "placeholderNames");
-        }
-
-        @Override
-        public Tag resolve(@NotNull String name, ArgumentQueue arguments, @NotNull Context ctx) throws ParsingException {
-            placeholderNames.add(name);
-            while (arguments.hasNext()) {
-                arguments.pop();
-            }
-            return Tag.inserting(Component.text(marker(name)));
-        }
-
-        @Override
-        public boolean has(@NotNull String name) {
-            // Only handle tags the underlying MiniMessage instance does not know about.
-            return !builtInTags.has(name);
-        }
     }
 }
