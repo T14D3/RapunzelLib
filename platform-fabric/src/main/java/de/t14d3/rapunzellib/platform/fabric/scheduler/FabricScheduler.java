@@ -47,6 +47,15 @@ public final class FabricScheduler implements Scheduler, AutoCloseable {
     }
 
     @Override
+    public ScheduledTask runRepeatingAsync(Duration initialDelay, Duration period, Runnable task) {
+        long initialMs = Math.max(0L, initialDelay != null ? initialDelay.toMillis() : 0L);
+        long periodMs = Math.max(1L, period != null ? period.toMillis() : 50L);
+        return new FabricTaskHandle(
+                timer.scheduleAtFixedRate(task, initialMs, periodMs, TimeUnit.MILLISECONDS)
+        );
+    }
+
+    @Override
     public void close() {
         timer.shutdown();
     }

@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.common.context;
 
 import de.t14d3.rapunzellib.context.ServiceRegistry;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,5 +24,14 @@ public final class DefaultServiceRegistry implements ServiceRegistry {
         if (instance == null) return Optional.empty();
         return Optional.of(type.cast(instance));
     }
-}
 
+    @Override
+    public List<Class<?>> serviceTypes() {
+        return services.keySet().stream().toList();
+    }
+
+    @Override
+    public List<Object> services() {
+        return services.values().stream().toList();
+    }
+}

@@ -10,5 +10,7 @@ public interface Scheduler {
     ScheduledTask runLater(Duration delay, Runnable task);
 
     ScheduledTask runRepeating(Duration initialDelay, Duration period, Runnable task);
+
+    ScheduledTask runRepeatingAsync(Duration initialDelay, Duration period, Runnable task);
 }
 

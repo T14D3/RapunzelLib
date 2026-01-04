@@ -16,7 +16,7 @@ plugins {
     base
 }
 
-val buildVersion = System.getenv("VERSION")?.takeIf { it.isNotBlank() } ?: "0.1.2-SNAPSHOT"
+val buildVersion = System.getenv("VERSION")?.takeIf { it.isNotBlank() } ?: "0.1.7-SNAPSHOT"
 
 abstract class CheckReposiliteConfig : DefaultTask() {
     @get:Input @get:Optional abstract val reposiliteBaseUrl: Property<String>

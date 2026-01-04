@@ -37,6 +37,11 @@ public final class VelocityScheduler implements Scheduler {
         return schedule(task, initialDelay, period);
     }
 
+    @Override
+    public ScheduledTask runRepeatingAsync(Duration initialDelay, Duration period, Runnable task) {
+        return schedule(task, initialDelay, period);
+    }
+
     private ScheduledTask schedule(Runnable task, Duration delay, Duration period) {
         var builder = proxy.getScheduler().buildTask(plugin, task);
         if (delay != null && !delay.isZero() && !delay.isNegative()) {
