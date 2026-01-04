@@ -7,7 +7,9 @@ import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.message.MessageKey;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -153,4 +155,26 @@ public interface YamlConfig {
     void save();
 
     void reload();
+
+    /**
+     * Returns a nested section at {@code path}, or {@code null} if the value at that path is not a mapping.
+     */
+    default ConfigurationSection getConfigurationSection(String path) {
+        if (path == null || path.isBlank()) return new YamlConfigSection(this, "");
+        Object v = get(path);
+        if (v instanceof Map<?, ?>) return new YamlConfigSection(this, path);
+        return null;
+    }
+
+    /**
+     * Ensures a mapping exists at {@code path} and returns it as a section.
+     */
+    default ConfigurationSection createSection(String path) {
+        if (path == null || path.isBlank()) return new YamlConfigSection(this, "");
+        Object v = get(path);
+        if (!(v instanceof Map<?, ?>)) {
+            set(path, new LinkedHashMap<String, Object>());
+        }
+        return new YamlConfigSection(this, path);
+    }
 }

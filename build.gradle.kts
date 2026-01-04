@@ -16,7 +16,7 @@ plugins {
     base
 }
 
-val buildVersion = System.getenv("VERSION")?.takeIf { it.isNotBlank() } ?: "0.1.7-SNAPSHOT"
+val buildVersion = System.getenv("VERSION")?.takeIf { it.isNotBlank() } ?: "0.1.9-SNAPSHOT"
 
 abstract class CheckReposiliteConfig : DefaultTask() {
     @get:Input @get:Optional abstract val reposiliteBaseUrl: Property<String>
@@ -67,7 +67,6 @@ allprojects {
         maven("${reposiliteBaseUrl.trimEnd('/')}/snapshots")
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://maven.fabricmc.net/")
-        maven("https://maven.velocitypowered.com/snapshot/")
         maven("https://jitpack.io")
     }
 }

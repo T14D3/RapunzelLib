@@ -90,9 +90,9 @@ final class SnakeYamlConfigTest {
     }
 
     @Test
-    void mergesDefaultsKeysAndComments(@TempDir Path dir) throws Exception {
+    void mergesDefaultsKeysAndComments(@TempDir Path dir) throws Exception {    
         Path file = dir.resolve("config.yml");
-        Files.writeString(file, "present: 1\n", StandardCharsets.UTF_8);
+        Files.writeString(file, "present: 1\n", StandardCharsets.UTF_8);        
 
         String defaults = """
             # Present comment
@@ -112,6 +112,39 @@ final class SnakeYamlConfigTest {
         assertEquals(3, config.getInt("missing", 0));
         assertEquals("Present comment", config.getComment("present"));
         assertEquals("Missing comment", config.getComment("missing"));
+    }
+
+    @Test
+    void configurationSectionsSupportKeysAndNestedAccess(@TempDir Path dir) throws Exception {
+        Path file = dir.resolve("config.yml");
+        Files.writeString(file, """
+            root: 1
+            nested:
+              a: "x"
+              child:
+                b: 2
+            """, StandardCharsets.UTF_8);
+
+        ResourceProvider emptyResources = _path -> Optional.empty();
+        YamlConfig config = new SnakeYamlConfigService(emptyResources, LOGGER).load(file);
+
+        ConfigurationSection nested = config.getConfigurationSection("nested");
+        assertNotNull(nested);
+        assertTrue(nested.getKeys(false).contains("a"));
+        assertTrue(nested.getKeys(false).contains("child"));
+        assertEquals("x", nested.getString("a"));
+
+        assertTrue(nested.getKeys(true).contains("child.b"));
+        ConfigurationSection child = nested.getConfigurationSection("child");
+        assertNotNull(child);
+        assertEquals(2, child.getInt("b", 0));
+
+        ConfigurationSection created = config.createSection("created.section");
+        created.set("value", "ok");
+        config.save();
+
+        YamlConfig reloaded = new SnakeYamlConfigService(emptyResources, LOGGER).load(file);
+        assertEquals("ok", reloaded.getString("created.section.value"));
     }
 }
 

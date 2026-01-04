@@ -1,6 +1,7 @@
 plugins {
     `java-library`
     alias(libs.plugins.shadow)
+    alias(libs.plugins.userdev)
 }
 
 dependencies {
@@ -9,7 +10,7 @@ dependencies {
     implementation(project(":network"))
     implementation(project(":database-spool"))
 
-    compileOnly(libs.paper.api)
+    paperweight.paperDevBundle(libs.versions.paper.api)
     compileOnly(libs.annotations)
 
     testImplementation(libs.junit.jupiter)

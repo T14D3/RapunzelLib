@@ -38,10 +38,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.entity.CreatureSpawnEvent;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.*;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingPlaceEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
@@ -473,23 +470,14 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onArmorStandPlacePre(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (event.getClickedBlock() == null) return;
-        if (event.getHand() == EquipmentSlot.OFF_HAND) return;
-        if (event.getItem() == null) return;
-        if (event.getItem().getType() != org.bukkit.Material.ARMOR_STAND) return;
+    public void onEntityPlacePre(EntityPlaceEvent event) {
         if (!bus.hasPreListeners(BlockPlacePre.class)) return;
 
-        var clicked = event.getClickedBlock();
-        var face = event.getBlockFace();
-        var target = clicked.getRelative(face);
-
         RPlayer player = Rapunzel.players().require(event.getPlayer());
-        Location loc = target.getLocation();
+        Location loc = event.getEntity().getLocation();
         RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        String typeKey = event.getItem().getType().getKey().toString();
+        String typeKey = event.getEntityType().getKey().toString();
 
         BlockPlacePre pre = new BlockPlacePre(player, world, pos, typeKey, event.isCancelled());
         bus.dispatchPre(pre);
