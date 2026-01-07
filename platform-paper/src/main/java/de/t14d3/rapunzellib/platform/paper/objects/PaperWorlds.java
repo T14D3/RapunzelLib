@@ -26,7 +26,7 @@ public final class PaperWorlds implements Worlds {
 
     @Override
     public Optional<RWorld> wrap(Object nativeWorld) {
-        if (!(nativeWorld instanceof World world)) return Optional.empty();     
+        if (!(nativeWorld instanceof World world)) return Optional.empty();
         return Optional.of(wrapInternal(world));
     }
 

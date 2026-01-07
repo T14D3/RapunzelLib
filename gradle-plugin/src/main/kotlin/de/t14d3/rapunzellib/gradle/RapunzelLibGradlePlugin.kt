@@ -46,7 +46,7 @@ class RapunzelLibGradlePlugin : Plugin<Project> {
             }
         }
 
-        project.tasks.register<RunServersTask>("rapunzellibRunServers") {       
+        project.tasks.register<RunServersTask>("rapunzellibRunServers") {
             group = "run"
             description = "Runs Velocity + multiple Paper backends via Fill v3 (RapunzelLib runner)."
 

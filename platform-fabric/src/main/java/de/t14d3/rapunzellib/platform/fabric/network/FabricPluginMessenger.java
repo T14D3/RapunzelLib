@@ -73,7 +73,9 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
 
     @Override
     public boolean isConnected() {
-        return !server.getPlayerList().getPlayers().isEmpty();
+        var playerList = server.getPlayerList();
+        if (playerList == null) return false;
+        return !playerList.getPlayers().isEmpty();
     }
 
     @Override
@@ -118,7 +120,10 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
     }
 
     private void sendEnvelope(NetworkEnvelope env) {
-        ServerPlayer carrier = server.getPlayerList().getPlayers().stream().findFirst().orElse(null);
+        var playerList = server.getPlayerList();
+        if (playerList == null) return;
+
+        ServerPlayer carrier = playerList.getPlayers().stream().findFirst().orElse(null);
         if (carrier == null) return;
 
         ServerPlayNetworking.send(carrier, new BridgePayload(gson.toJson(env)));

@@ -170,7 +170,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         if (event.getClickedBlock() == null) return;
         boolean needsPost = bus.hasPostListeners(UseBlockPost.class);
-        boolean needsAsync = bus.hasAsyncListeners(UseBlockSnapshot.class);     
+        boolean needsAsync = bus.hasAsyncListeners(UseBlockSnapshot.class);
         if (!needsPost && !needsAsync) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
@@ -231,7 +231,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onAttackEntityPre(EntityDamageByEntityEvent event) {      
+    public void onAttackEntityPre(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof org.bukkit.entity.Player damager)) return;
         if (!bus.hasPreListeners(AttackEntityPre.class)) return;
 
@@ -417,7 +417,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onBucketEntityPre(PlayerBucketEntityEvent event) {        
+    public void onBucketEntityPre(PlayerBucketEntityEvent event) {
         if (!bus.hasPreListeners(BucketEntityPre.class)) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());

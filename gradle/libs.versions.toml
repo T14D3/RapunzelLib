@@ -41,7 +41,7 @@ minecraft = { module = "com.mojang:minecraft", version.ref = "minecraft" }
 fabric-loom = { module = "net.fabricmc:fabric-loom", version.ref = "fabric-loom" }
 fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
 
-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }        
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 

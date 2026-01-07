@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "rapunzellib_events_fabric",
+  "version": "${version}",
+  "name": "RapunzelLib (Fabric Events)",
+  "description": "Fabric event bridge implementation for RapunzelLib.",
+  "authors": [
+    "t14d3"
+  ],
+  "environment": "*",
+  "depends": {
+    "fabricloader": ">=0.16.0"
+  }
+}
