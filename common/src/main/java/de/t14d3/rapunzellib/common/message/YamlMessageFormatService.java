@@ -146,7 +146,7 @@ public final class YamlMessageFormatService implements MessageFormatService {
         Component out = template.component;
 
         for (String name : template.placeholderOrder) {
-            Component replacement = placeholders.components().get(name);        
+            Component replacement = placeholders.components().get(name);
             if (replacement == null) {
                 String value = placeholders.strings().get(name);
                 if (value != null) replacement = Component.text(value);
@@ -255,7 +255,7 @@ public final class YamlMessageFormatService implements MessageFormatService {
         private Template(String raw, Component component, Set<String> placeholders) {
             this.raw = raw;
             this.component = component;
-            this.placeholderOrder = placeholders.toArray(new String[0]);        
+            this.placeholderOrder = placeholders.toArray(new String[0]);
             this.stringRenderCache = placeholders.isEmpty()
                 ? null
                 : Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, true) {

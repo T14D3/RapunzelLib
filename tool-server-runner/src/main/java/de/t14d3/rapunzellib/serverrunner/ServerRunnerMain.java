@@ -70,7 +70,7 @@ public final class ServerRunnerMain {
         FillV3Client fill = new FillV3Client();
 
         List<ServerProcess> processes = new ArrayList<>();
-        final String[] mysqlContainerNameForShutdown = new String[]{null};      
+        final String[] mysqlContainerNameForShutdown = new String[]{null};
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             shutdownServersGracefully(processes, 20_000L);
             if (mysqlContainerNameForShutdown[0] != null) {

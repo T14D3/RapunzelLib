@@ -64,7 +64,7 @@ public final class PaperRapunzelBootstrap {
         ctx.register(Blocks.class, blocks);
         ctx.register(PaperBlocks.class, blocks);
 
-        PaperPluginMessenger messenger = new PaperPluginMessenger(plugin);      
+        PaperPluginMessenger messenger = new PaperPluginMessenger(plugin);
         ctx.register(Messenger.class, messenger);
         ctx.register(PaperPluginMessenger.class, messenger);
         ctx.registerCloseable(messenger);

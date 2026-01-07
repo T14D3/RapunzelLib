@@ -92,7 +92,7 @@ final class SnakeYamlConfigTest {
     @Test
     void mergesDefaultsKeysAndComments(@TempDir Path dir) throws Exception {    
         Path file = dir.resolve("config.yml");
-        Files.writeString(file, "present: 1\n", StandardCharsets.UTF_8);        
+        Files.writeString(file, "present: 1\n", StandardCharsets.UTF_8);
 
         String defaults = """
             # Present comment

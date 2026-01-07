@@ -37,6 +37,15 @@ dependencies {
 }
 
 tasks {
+    processResources {
+        val props = mapOf("version" to project.version)
+        inputs.properties(props)
+        filteringCharset = "UTF-8"
+        filesMatching("fabric.mod.json") {
+            expand(props)
+        }
+    }
+
     withType<ShadowJar>().configureEach {
         configurations.set(listOf(shade))
         archiveClassifier.set("dev-shaded")

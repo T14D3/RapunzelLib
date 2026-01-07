@@ -491,7 +491,7 @@ plugins {
 Provides tasks:
 
 - `rapunzellibValidateMessages` - scans compiled classes for used message keys and compares them to `messages.yml`
-- `rapunzellibInitTemplate` - generates a starter project template        
+- `rapunzellibInitTemplate` - generates a starter project template
 - `rapunzellibRunServers` - runs Velocity + multiple Paper backends via the included runner
 - `rapunzellibRunPerfServers` - runs Velocity + multiple Paper backends with JFR enabled (and MySQL enabled by default)
 

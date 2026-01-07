@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "rapunzellib_platform_fabric",
+  "version": "${version}",
+  "name": "RapunzelLib (Fabric Platform)",
+  "description": "Fabric platform implementation for RapunzelLib.",
+  "authors": [
+    "t14d3"
+  ],
+  "environment": "*",
+  "depends": {
+    "fabricloader": ">=0.16.0"
+  }
+}
