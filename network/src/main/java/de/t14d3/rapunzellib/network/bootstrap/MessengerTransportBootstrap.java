@@ -3,6 +3,7 @@ package de.t14d3.rapunzellib.network.bootstrap;
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.config.YamlConfig;
+import de.t14d3.rapunzellib.context.ServiceRegistry;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.redis.RedisPubSubConfig;
 import de.t14d3.rapunzellib.network.redis.RedisPubSubMessenger;
@@ -22,11 +23,27 @@ public final class MessengerTransportBootstrap {
     }
 
     public static Result bootstrap(YamlConfig config, PlatformId platformId, Logger logger) {
+        return bootstrap(config, platformId, logger, Rapunzel.context().services());
+    }
+
+    /**
+     * Bootstraps a transport and registers it into the given {@link ServiceRegistry}.
+     *
+     * <p>This overload exists so platform bootstraps can configure transports before the global
+     * {@code Rapunzel} context is installed.</p>
+     */
+    public static Result bootstrap(
+        YamlConfig config,
+        PlatformId platformId,
+        Logger logger,
+        ServiceRegistry services
+    ) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(platformId, "platformId");
         Objects.requireNonNull(logger, "logger");
+        Objects.requireNonNull(services, "services");
 
-        Messenger current = Rapunzel.context().services().get(Messenger.class);
+        Messenger current = services.get(Messenger.class);
 
         String transport = normalize(config.getString("network.transport", "plugin"));
         if (!"redis".equals(transport)) {
@@ -83,8 +100,8 @@ public final class MessengerTransportBootstrap {
         if (clientName != null) builder.clientName(clientName);
 
         RedisPubSubMessenger redis = new RedisPubSubMessenger(builder.build(), logger);
-        Rapunzel.context().services().register(Messenger.class, redis);
-        Rapunzel.context().services().register(RedisPubSubMessenger.class, redis);
+        services.register(Messenger.class, redis);
+        services.register(RedisPubSubMessenger.class, redis);
 
         logger.info(
             "[Network] Using RedisPubSubMessenger (serverName={}, proxyServerName={}, host={}, port={}, channel={})",
@@ -144,4 +161,3 @@ public final class MessengerTransportBootstrap {
         return value;
     }
 }
-

@@ -11,6 +11,7 @@ pluginManagement {
         mavenCentral()
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://maven.fabricmc.net/")
+        maven("https://maven.neoforged.net/releases/")
     }
 }
 
@@ -26,15 +27,17 @@ include(
     "commands",
     "commands-paper",
     "commands-fabric",
+    "commands-neoforge",
     "events",
     "events-paper",
     "events-fabric",
+    "events-neoforge",
     "network",
     "database-spool",
     "platform-paper",
     "platform-fabric",
     "platform-velocity",
+    "platform-neoforge",
     "tool-server-runner",
     "gradle-plugin",
 )
-

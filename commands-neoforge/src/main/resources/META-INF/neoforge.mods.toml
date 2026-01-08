@@ -1,0 +1,11 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="LGPL-2.1"
+
+[[mods]]
+modId="rapunzellib_commands_neoforge"
+version="${version}"
+displayName="RapunzelLib (NeoForge Commands)"
+description="NeoForge command adapters for RapunzelLib."
+authors="t14d3"
+

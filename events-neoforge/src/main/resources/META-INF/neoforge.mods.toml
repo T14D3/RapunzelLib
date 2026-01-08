@@ -1,0 +1,11 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="LGPL-2.1"
+
+[[mods]]
+modId="rapunzellib_events_neoforge"
+version="${version}"
+displayName="RapunzelLib (NeoForge Events)"
+description="NeoForge event bridge for RapunzelLib events module."
+authors="t14d3"
+
