@@ -3,6 +3,7 @@ package de.t14d3.rapunzellib.platform.velocity;
 import com.velocitypowered.api.proxy.ProxyServer;
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.RapunzelLibVersion;
 import de.t14d3.rapunzellib.common.context.DefaultRapunzelContext;
 import de.t14d3.rapunzellib.common.message.YamlMessageFormatService;
 import de.t14d3.rapunzellib.config.ConfigService;
@@ -28,50 +29,63 @@ import org.slf4j.Logger;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class VelocityRapunzelBootstrap {
     private VelocityRapunzelBootstrap() {
     }
 
     public static RapunzelContext bootstrap(Object plugin, ProxyServer proxy, Logger logger, Path dataDirectory) {
-        ResourceProvider resources = path -> Optional.ofNullable(openResource(plugin, path));
-        Scheduler scheduler = new VelocityScheduler(proxy, plugin);
+        AtomicReference<RapunzelContext> created = new AtomicReference<>();
+        Rapunzel.Lease lease = Rapunzel.bootstrapOrAcquire(plugin, () -> {
+            logger.info("Bootstrapping RapunzelLib {}", RapunzelLibVersion.current());
 
-        DefaultRapunzelContext ctx = new DefaultRapunzelContext(PlatformId.VELOCITY, logger, dataDirectory, resources, scheduler);
+            ResourceProvider resources = path -> Optional.ofNullable(openResource(plugin, path));
+            Scheduler scheduler = new VelocityScheduler(proxy, plugin);
 
-        ConfigService configService = new SnakeYamlConfigService(resources, logger);
-        ctx.register(ConfigService.class, configService);
+            DefaultRapunzelContext ctx =
+                new DefaultRapunzelContext(PlatformId.VELOCITY, logger, dataDirectory, resources, scheduler);
+            created.set(ctx);
 
-        MessageFormatService messageFormatService = new YamlMessageFormatService(configService, logger, dataDirectory.resolve("messages.yml"), "messages.yml");
-        ctx.register(MessageFormatService.class, messageFormatService);
+            ConfigService configService = new SnakeYamlConfigService(resources, logger);
+            ctx.register(ConfigService.class, configService);
 
-        VelocityPlayers players = new VelocityPlayers(proxy);
-        ctx.register(Players.class, players);
-        ctx.register(VelocityPlayers.class, players);
+            MessageFormatService messageFormatService =
+                new YamlMessageFormatService(configService, logger, dataDirectory.resolve("messages.yml"), "messages.yml");
+            ctx.register(MessageFormatService.class, messageFormatService);
 
-        VelocityWorlds worlds = new VelocityWorlds();
-        ctx.register(Worlds.class, worlds);
-        ctx.register(VelocityWorlds.class, worlds);
+            VelocityPlayers players = new VelocityPlayers(proxy);
+            ctx.register(Players.class, players);
+            ctx.register(VelocityPlayers.class, players);
 
-        VelocityBlocks blocks = new VelocityBlocks();
-        ctx.register(Blocks.class, blocks);
-        ctx.register(VelocityBlocks.class, blocks);
+            VelocityWorlds worlds = new VelocityWorlds();
+            ctx.register(Worlds.class, worlds);
+            ctx.register(VelocityWorlds.class, worlds);
 
-        VelocityPluginMessenger messenger = new VelocityPluginMessenger(plugin, proxy, logger);
-        ctx.register(Messenger.class, messenger);
-        ctx.register(VelocityPluginMessenger.class, messenger);
-        ctx.registerCloseable(messenger);
+            VelocityBlocks blocks = new VelocityBlocks();
+            ctx.register(Blocks.class, blocks);
+            ctx.register(VelocityBlocks.class, blocks);
 
-        VelocityNetworkInfoResponder networkInfoResponder = new VelocityNetworkInfoResponder(messenger, proxy, logger);
-        ctx.register(VelocityNetworkInfoResponder.class, networkInfoResponder);
-        ctx.registerCloseable(networkInfoResponder);
+            VelocityPluginMessenger messenger = new VelocityPluginMessenger(plugin, proxy, logger);
+            ctx.register(Messenger.class, messenger);
+            ctx.register(VelocityPluginMessenger.class, messenger);
+            ctx.registerCloseable(messenger);
 
-        VelocityNetworkInfoService networkInfo = new VelocityNetworkInfoService(messenger, proxy);
-        ctx.register(NetworkInfoService.class, networkInfo);
-        ctx.register(VelocityNetworkInfoService.class, networkInfo);
+            VelocityNetworkInfoResponder networkInfoResponder = new VelocityNetworkInfoResponder(messenger, proxy, logger);
+            ctx.register(VelocityNetworkInfoResponder.class, networkInfoResponder);
+            ctx.registerCloseable(networkInfoResponder);
 
-        Rapunzel.bootstrap(plugin, ctx);
-        return ctx;
+            VelocityNetworkInfoService networkInfo = new VelocityNetworkInfoService(messenger, proxy);
+            ctx.register(NetworkInfoService.class, networkInfo);
+            ctx.register(VelocityNetworkInfoService.class, networkInfo);
+
+            return ctx;
+        });
+
+        if (created.get() == null) {
+            logger.debug("RapunzelLib already bootstrapped; acquiring lease for {}", plugin.getClass().getName());
+        }
+        return lease.context();
     }
 
     private static InputStream openResource(Object plugin, String path) {

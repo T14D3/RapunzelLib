@@ -79,6 +79,10 @@ Fabric also publishes an unremapped dev jar as `:dev-shaded`.
 
 The platform bootstraps create a context (`DefaultRapunzelContext`), register default services, and call `Rapunzel.bootstrap(owner, ctx)`.
 
+In shared runtimes where multiple components may call a platform bootstrap, the bootstraps use `Rapunzel.bootstrapOrAcquire(owner, ...)` so only the first call creates the global context; later calls simply acquire a lease for the existing context.
+
+If multiple plugins/mods shade RapunzelLib, which exact version provides the shared classes depends on the platform's classloading behavior and load order; keep your consumers reasonably version-aligned.
+
 **Paper**
 
 ```java

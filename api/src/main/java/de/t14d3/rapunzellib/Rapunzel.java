@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 public final class Rapunzel {
     private static final Object DEFAULT_OWNER = Rapunzel.class;
@@ -69,6 +70,39 @@ public final class Rapunzel {
                     "RapunzelLib context already bootstrapped (existing=" + current.getClass().getName() +
                         ", attempted=" + newContext.getClass().getName() + ")"
                 );
+            }
+
+            Lease existing = leases.get(owner);
+            if (existing != null) return existing;
+
+            Lease lease = new Lease(owner, current);
+            leases.put(owner, lease);
+            return lease;
+        }
+    }
+
+    /**
+     * Bootstraps the global {@link RapunzelContext} if absent; otherwise acquires a lease for
+     * the already-bootstrapped context.
+     *
+     * <p>The {@code contextFactory} is only invoked when no context is currently bootstrapped.</p>
+     *
+     * <p>This is intended for shared runtimes where multiple components may attempt to bootstrap.
+     * Only the first call creates the context; all others simply acquire it.</p>
+     *
+     * @param owner a stable owner token (e.g. your plugin/mod instance)
+     * @return a lease that releases this owner on {@link Lease#close()}
+     */
+    public static Lease bootstrapOrAcquire(Object owner, Supplier<? extends RapunzelContext> contextFactory) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(contextFactory, "contextFactory");
+
+        synchronized (LOCK) {
+            RapunzelContext current = context;
+            if (current == null) {
+                RapunzelContext created = Objects.requireNonNull(contextFactory.get(), "contextFactory.get()");
+                context = created;
+                current = created;
             }
 
             Lease existing = leases.get(owner);
@@ -200,4 +234,3 @@ public final class Rapunzel {
         }
     }
 }
-
