@@ -41,7 +41,7 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
     private volatile String networkServerName;
 
-    public NeoForgePluginMessenger(MinecraftServer server, Logger logger) {     
+    public NeoForgePluginMessenger(MinecraftServer server, Logger logger) {
         this.server = Objects.requireNonNull(server, "server");
         this.logger = Objects.requireNonNull(logger, "logger");
         MESSENGERS.add(this);
