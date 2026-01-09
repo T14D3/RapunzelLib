@@ -2,6 +2,7 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
@@ -67,9 +68,13 @@ allprojects {
         maven("${reposiliteBaseUrl.trimEnd('/')}/snapshots")
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://maven.fabricmc.net/")
+        maven("https://maven.neoforged.net/releases/")
         maven("https://jitpack.io")
     }
 }
+
+val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
+val junitPlatformLauncher = libs.findLibrary("junit-platform-launcher").get()
 
 val checkReposiliteConfig = tasks.register<CheckReposiliteConfig>("checkReposiliteConfig") {
     group = "publishing"
@@ -96,6 +101,10 @@ subprojects {
     }
 
     plugins.withId("java") {
+        dependencies {
+            add("testRuntimeOnly", junitPlatformLauncher)
+        }
+
         extensions.configure<JavaPluginExtension> {
             toolchain.languageVersion.set(JavaLanguageVersion.of(21))
             withSourcesJar()

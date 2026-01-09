@@ -1,0 +1,10 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="LGPL-2.1"
+
+[[mods]]
+modId="rapunzellib_platform_neoforge"
+version="${version}"
+displayName="RapunzelLib (NeoForge Platform)"
+description="NeoForge platform implementation for RapunzelLib."
+authors="t14d3"
