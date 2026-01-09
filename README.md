@@ -15,6 +15,7 @@ RapunzelLib is a Java 21 library for Minecraft plugins/mods that share code acro
 - `platform-paper` - Paper bootstrap + wrappers + scheduler + plugin-messaging transport
 - `platform-velocity` - Velocity bootstrap + wrappers + scheduler + plugin-messaging transport + proxy-side responders
 - `platform-fabric` - Fabric bootstrap + wrappers + scheduler (network defaults to in-memory)
+- `platform-neoforge` - NeoForge bootstrap + wrappers + scheduler (network defaults to in-memory)
 - `network` - transport abstraction (`Messenger`), typed event bus, plugin-messaging payloads, Redis Pub/Sub transport, file sync, network info
 - `database-spool` - wrapper around `de.t14d3:spool` for simple DB usage + DB-backed network outbox (`DbQueuedMessenger`)
 - `gradle-plugin` - `de.t14d3.rapunzellib` Gradle plugin (templates, message validation, multi-server runner integration)
@@ -25,7 +26,7 @@ RapunzelLib is a Java 21 library for Minecraft plugins/mods that share code acro
 This project is published under:
 
 - **Group**: `de.t14d3.rapunzellib`
-- **ArtifactIds** (match module names): `api`, `common`, `network`, `database-spool`, `platform-paper`, `platform-velocity`, `platform-fabric`, `tool-server-runner`
+- **ArtifactIds** (match module names): `api`, `common`, `network`, `database-spool`, `platform-paper`, `platform-velocity`, `platform-fabric`, `platform-neoforge`, `tool-server-runner`
 
 Note: jar file names are prefixed `rapunzellib-...`, but Maven artifactIds are the plain module names above.
 
@@ -43,7 +44,7 @@ Pick the platform module you run on:
 ```kotlin
 dependencies {
   implementation("de.t14d3.rapunzellib:platform-paper:<version>")
-  // or: platform-velocity / platform-fabric
+  // or: platform-velocity / platform-fabric / platform-neoforge
 }
 ```
 
