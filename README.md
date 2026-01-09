@@ -1,17 +1,20 @@
 # RapunzelLib
 
-RapunzelLib is a Java 21 library for Minecraft plugins/mods that share code across **Paper**, **Velocity**, and **Fabric**. It provides a small, platform-neutral API plus platform-specific bootstraps and implementations.
+RapunzelLib is a Java 21 library for Minecraft plugins/mods that share code across **Paper**, **Velocity**, **Fabric**, and **NeoForge**. It provides a small, platform-neutral API plus platform-specific bootstraps and implementations.
 
 ## Modules
 
 - `api` - platform-neutral interfaces and value types
+- `bom` - Gradle/Maven BOM to keep module versions aligned
 - `common` - default context + common implementations (e.g. YAML MiniMessage messages)
 - `commands` - Brigadier helpers (e.g. list-argument parsing) + platform-neutral `RCommandSource`
 - `commands-paper` - optional Paper adapters (e.g. Bukkit sender → `RCommandSource`)
 - `commands-fabric` - optional Fabric adapters (e.g. `CommandSourceStack` → `RCommandSource`)
+- `commands-neoforge` - optional NeoForge adapters
 - `events` - platform-neutral game action events (sync cancellable + sync/async observers)
 - `events-paper` - Paper bridge (Bukkit/Paper listeners → Rapunzel events)
 - `events-fabric` - Fabric bridge (Fabric callbacks → Rapunzel events)
+- `events-neoforge` - NeoForge bridge
 - `platform-paper` - Paper bootstrap + wrappers + scheduler + plugin-messaging transport
 - `platform-velocity` - Velocity bootstrap + wrappers + scheduler + plugin-messaging transport + proxy-side responders
 - `platform-fabric` - Fabric bootstrap + wrappers + scheduler (network defaults to in-memory)
@@ -26,7 +29,8 @@ RapunzelLib is a Java 21 library for Minecraft plugins/mods that share code acro
 This project is published under:
 
 - **Group**: `de.t14d3.rapunzellib`
-- **ArtifactIds** (match module names): `api`, `common`, `network`, `database-spool`, `platform-paper`, `platform-velocity`, `platform-fabric`, `platform-neoforge`, `tool-server-runner`
+- **BOM**: `bom`
+- **ArtifactIds** (match module names): `api`, `common`, `commands`, `commands-paper`, `commands-fabric`, `commands-neoforge`, `events`, `events-paper`, `events-fabric`, `events-neoforge`, `network`, `database-spool`, `platform-paper`, `platform-velocity`, `platform-fabric`, `platform-neoforge`, `tool-server-runner`
 
 Note: jar file names are prefixed `rapunzellib-...`, but Maven artifactIds are the plain module names above.
 
@@ -43,7 +47,8 @@ Pick the platform module you run on:
 
 ```kotlin
 dependencies {
-  implementation("de.t14d3.rapunzellib:platform-paper:<version>")
+  implementation(platform("de.t14d3.rapunzellib:bom:<version>"))
+  implementation("de.t14d3.rapunzellib:platform-paper")
   // or: platform-velocity / platform-fabric / platform-neoforge
 }
 ```
@@ -52,8 +57,8 @@ Optional add-ons:
 
 ```kotlin
 dependencies {
-  implementation("de.t14d3.rapunzellib:network:<version>")
-  implementation("de.t14d3.rapunzellib:database-spool:<version>")
+  implementation("de.t14d3.rapunzellib:network")
+  implementation("de.t14d3.rapunzellib:database-spool")
 }
 ```
 

@@ -23,6 +23,7 @@ rootProject.name = "RapunzelLib"
 
 include(
     "api",
+    "bom",
     "common",
     "commands",
     "commands-paper",
