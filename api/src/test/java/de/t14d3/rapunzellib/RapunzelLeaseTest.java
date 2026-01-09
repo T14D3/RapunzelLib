@@ -77,6 +77,25 @@ final class RapunzelLeaseTest {
         assertEquals(1, Rapunzel.ownerCount());
     }
 
+    @Test
+    void bootstrapOrAcquireSkipsFactoryWhenAlreadyBootstrapped(@TempDir Path dir) {
+        Rapunzel.shutdownAll();
+
+        Object ownerA = new Object();
+        Object ownerB = new Object();
+        TestContext ctx = new TestContext(dir);
+
+        Rapunzel.bootstrap(ownerA, ctx);
+
+        Rapunzel.Lease leaseB = Rapunzel.bootstrapOrAcquire(ownerB, () -> {
+            fail("contextFactory should not be invoked when already bootstrapped");
+            return new TestContext(dir.resolve("unused"));
+        });
+
+        assertSame(ctx, leaseB.context());
+        assertEquals(2, Rapunzel.ownerCount());
+    }
+
     private static final class TestContext implements RapunzelContext {
         private static final Logger LOGGER = LoggerFactory.getLogger(TestContext.class);
 

@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.platform.paper;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.RapunzelLibVersion;
 import de.t14d3.rapunzellib.common.context.DefaultRapunzelContext;
 import de.t14d3.rapunzellib.common.message.YamlMessageFormatService;
 import de.t14d3.rapunzellib.config.ConfigService;
@@ -37,65 +38,78 @@ public final class PaperRapunzelBootstrap {
 
     public static RapunzelContext bootstrap(JavaPlugin plugin) {
         Logger logger = plugin.getSLF4JLogger();
-        Path dataDir = plugin.getDataFolder().toPath();
-        ResourceProvider resources = path -> Optional.ofNullable(openResource(plugin, path));
-        Scheduler scheduler = new PaperScheduler(plugin);
 
-        DefaultRapunzelContext ctx = new DefaultRapunzelContext(PlatformId.PAPER, logger, dataDir, resources, scheduler);
-        if (scheduler instanceof AutoCloseable closeable) {
-            ctx.registerCloseable(closeable);
-        }
+        AtomicReference<RapunzelContext> created = new AtomicReference<>();
+        Rapunzel.Lease lease = Rapunzel.bootstrapOrAcquire(plugin, () -> {
+            logger.info("Bootstrapping RapunzelLib {}", RapunzelLibVersion.current());
 
-        ConfigService configService = new SnakeYamlConfigService(resources, logger);
-        ctx.register(ConfigService.class, configService);
+            Path dataDir = plugin.getDataFolder().toPath();
+            ResourceProvider resources = path -> Optional.ofNullable(openResource(plugin, path));
+            Scheduler scheduler = new PaperScheduler(plugin);
 
-        MessageFormatService messageFormatService = new YamlMessageFormatService(configService, logger, dataDir.resolve("messages.yml"), "messages.yml");
-        ctx.register(MessageFormatService.class, messageFormatService);
+            DefaultRapunzelContext ctx = new DefaultRapunzelContext(PlatformId.PAPER, logger, dataDir, resources, scheduler);
+            created.set(ctx);
 
-        PaperPlayers players = new PaperPlayers();
-        ctx.register(Players.class, players);
-        ctx.register(PaperPlayers.class, players);
-
-        PaperWorlds worlds = new PaperWorlds();
-        ctx.register(Worlds.class, worlds);
-        ctx.register(PaperWorlds.class, worlds);
-
-        PaperBlocks blocks = new PaperBlocks();
-        ctx.register(Blocks.class, blocks);
-        ctx.register(PaperBlocks.class, blocks);
-
-        PaperPluginMessenger messenger = new PaperPluginMessenger(plugin);
-        ctx.register(Messenger.class, messenger);
-        ctx.register(PaperPluginMessenger.class, messenger);
-        ctx.registerCloseable(messenger);
-
-        NetworkInfoClient networkInfo = new NetworkInfoClient(messenger, scheduler, logger);
-        ctx.register(NetworkInfoService.class, networkInfo);
-        ctx.register(NetworkInfoClient.class, networkInfo);
-
-        networkInfo.networkServerName()
-            .thenAccept(messenger::setNetworkServerName)
-            .exceptionally(ignored -> null);
-
-        AtomicReference<ScheduledTask> resolveNameTask = new AtomicReference<>();
-        resolveNameTask.set(scheduler.runRepeating(Duration.ofSeconds(1), Duration.ofSeconds(5), () -> {
-            if (messenger.hasNetworkServerName()) {
-                ScheduledTask task = resolveNameTask.get();
-                if (task != null) task.cancel();
-                return;
+            if (scheduler instanceof AutoCloseable closeable) {
+                ctx.registerCloseable(closeable);
             }
-            if (!messenger.isConnected()) return;
+
+            ConfigService configService = new SnakeYamlConfigService(resources, logger);
+            ctx.register(ConfigService.class, configService);
+
+            MessageFormatService messageFormatService =
+                new YamlMessageFormatService(configService, logger, dataDir.resolve("messages.yml"), "messages.yml");
+            ctx.register(MessageFormatService.class, messageFormatService);
+
+            PaperPlayers players = new PaperPlayers();
+            ctx.register(Players.class, players);
+            ctx.register(PaperPlayers.class, players);
+
+            PaperWorlds worlds = new PaperWorlds();
+            ctx.register(Worlds.class, worlds);
+            ctx.register(PaperWorlds.class, worlds);
+
+            PaperBlocks blocks = new PaperBlocks();
+            ctx.register(Blocks.class, blocks);
+            ctx.register(PaperBlocks.class, blocks);
+
+            PaperPluginMessenger messenger = new PaperPluginMessenger(plugin);
+            ctx.register(Messenger.class, messenger);
+            ctx.register(PaperPluginMessenger.class, messenger);
+            ctx.registerCloseable(messenger);
+
+            NetworkInfoClient networkInfo = new NetworkInfoClient(messenger, scheduler, logger);
+            ctx.register(NetworkInfoService.class, networkInfo);
+            ctx.register(NetworkInfoClient.class, networkInfo);
+
             networkInfo.networkServerName()
                 .thenAccept(messenger::setNetworkServerName)
                 .exceptionally(ignored -> null);
-        }));
-        ctx.registerCloseable(() -> {
-            ScheduledTask task = resolveNameTask.get();
-            if (task != null) task.cancel();
+
+            AtomicReference<ScheduledTask> resolveNameTask = new AtomicReference<>();
+            resolveNameTask.set(scheduler.runRepeating(Duration.ofSeconds(1), Duration.ofSeconds(5), () -> {
+                if (messenger.hasNetworkServerName()) {
+                    ScheduledTask task = resolveNameTask.get();
+                    if (task != null) task.cancel();
+                    return;
+                }
+                if (!messenger.isConnected()) return;
+                networkInfo.networkServerName()
+                    .thenAccept(messenger::setNetworkServerName)
+                    .exceptionally(ignored -> null);
+            }));
+            ctx.registerCloseable(() -> {
+                ScheduledTask task = resolveNameTask.get();
+                if (task != null) task.cancel();
+            });
+
+            return ctx;
         });
 
-        Rapunzel.bootstrap(plugin, ctx);
-        return ctx;
+        if (created.get() == null) {
+            logger.debug("RapunzelLib already bootstrapped; acquiring lease for {}", plugin.getName());
+        }
+        return lease.context();
     }
 
     private static InputStream openResource(JavaPlugin plugin, String path) {

@@ -112,6 +112,15 @@ subprojects {
             withJavadocJar()
         }
 
+        tasks.withType<org.gradle.jvm.tasks.Jar>().configureEach {
+            manifest.attributes(
+                mapOf(
+                    "Implementation-Title" to rootProject.name,
+                    "Implementation-Version" to project.version.toString()
+                )
+            )
+        }
+
         tasks.withType<JavaCompile>().configureEach {
             options.encoding = "UTF-8"
             options.release.set(21)

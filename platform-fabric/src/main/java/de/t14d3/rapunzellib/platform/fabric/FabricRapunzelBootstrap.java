@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.platform.fabric;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.RapunzelLibVersion;
 import de.t14d3.rapunzellib.common.context.DefaultRapunzelContext;
 import de.t14d3.rapunzellib.common.message.YamlMessageFormatService;
 import de.t14d3.rapunzellib.config.ConfigService;
@@ -32,6 +33,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class FabricRapunzelBootstrap {
     private FabricRapunzelBootstrap() {
@@ -40,84 +42,95 @@ public final class FabricRapunzelBootstrap {
     public static RapunzelContext bootstrap(String modId, MinecraftServer server, Class<?> resourceAnchor) {
         Logger logger = LoggerFactory.getLogger(modId);
 
-        Path dataDir = FabricLoader.getInstance().getConfigDir().resolve(modId);
-        try {
-            Files.createDirectories(dataDir);
-        } catch (Exception ignored) {
-        }
+        AtomicReference<RapunzelContext> created = new AtomicReference<>();
+        Rapunzel.Lease lease = Rapunzel.bootstrapOrAcquire(modId, () -> {
+            logger.info("Bootstrapping RapunzelLib {}", RapunzelLibVersion.current());
 
-        ResourceProvider resources = path -> Optional.ofNullable(openResource(resourceAnchor, path));
-        Scheduler scheduler = new FabricScheduler(server);
-        DefaultRapunzelContext ctx = new DefaultRapunzelContext(PlatformId.FABRIC, logger, dataDir, resources, scheduler);
-
-        AutoCloseable closeable = (AutoCloseable) scheduler;
-        ctx.registerCloseable(closeable);
-
-        ConfigService configService = new SnakeYamlConfigService(resources, logger);
-        ctx.register(ConfigService.class, configService);
-
-        MessageFormatService messageFormatService = new YamlMessageFormatService(configService, logger, dataDir.resolve("messages.yml"), "messages.yml");
-        ctx.register(MessageFormatService.class, messageFormatService);
-
-        FabricPlayers players = new FabricPlayers(server);
-        ctx.register(Players.class, players);
-        ctx.register(FabricPlayers.class, players);
-
-        FabricWorlds worlds = new FabricWorlds(server);
-        ctx.register(Worlds.class, worlds);
-        ctx.register(FabricWorlds.class, worlds);
-
-        FabricBlocks blocks = new FabricBlocks();
-        ctx.register(Blocks.class, blocks);
-        ctx.register(FabricBlocks.class, blocks);
-
-        InMemoryMessenger inMemoryMessenger = new InMemoryMessenger(modId, "velocity");
-        Messenger messenger = inMemoryMessenger;
-        ctx.register(Messenger.class, messenger);
-        ctx.register(InMemoryMessenger.class, inMemoryMessenger);
-
-        // Optional transport: plugin messaging (proxy) or Redis.
-        try {
-            var transportConfig = configService.load(dataDir.resolve("config.yml"), "config.yml");
-            String transport = transportConfig.getString("network.transport", "plugin");
-            switch (transport.trim().toLowerCase()) {
-                case "redis" -> {
-                    var result = MessengerTransportBootstrap.bootstrap(transportConfig, PlatformId.FABRIC, logger, ctx.services());
-                    messenger = result.messenger();
-                    ctx.services().register(Messenger.class, messenger);
-                    ctx.registerCloseable(result.closeable());
-                }
-                case "plugin" -> {
-                    FabricPluginMessenger pluginMessenger = new FabricPluginMessenger(server, logger);
-                    messenger = pluginMessenger;
-                    ctx.services().register(Messenger.class, messenger);
-                    ctx.register(FabricPluginMessenger.class, pluginMessenger);
-                    ctx.registerCloseable(pluginMessenger);
-                }
-                default -> {
-                    // keep in-memory
-                }
+            Path dataDir = FabricLoader.getInstance().getConfigDir().resolve(modId);
+            try {
+                Files.createDirectories(dataDir);
+            } catch (Exception ignored) {
             }
 
-            // When we have a real transport, expose network info client.
-            if (!(messenger instanceof InMemoryMessenger)) {
-                NetworkInfoClient networkInfo = new NetworkInfoClient(messenger, scheduler, logger);
-                ctx.register(NetworkInfoService.class, networkInfo);
-                ctx.register(NetworkInfoClient.class, networkInfo);
+            ResourceProvider resources = path -> Optional.ofNullable(openResource(resourceAnchor, path));
+            Scheduler scheduler = new FabricScheduler(server);
+            DefaultRapunzelContext ctx = new DefaultRapunzelContext(PlatformId.FABRIC, logger, dataDir, resources, scheduler);
+            created.set(ctx);
 
-                if (messenger instanceof FabricPluginMessenger pluginMessenger) {
-                    networkInfo.networkServerName()
-                        .thenAccept(pluginMessenger::setNetworkServerName)
-                        .exceptionally(ignored -> null);
+            AutoCloseable closeable = (AutoCloseable) scheduler;
+            ctx.registerCloseable(closeable);
+
+            ConfigService configService = new SnakeYamlConfigService(resources, logger);
+            ctx.register(ConfigService.class, configService);
+
+            MessageFormatService messageFormatService =
+                new YamlMessageFormatService(configService, logger, dataDir.resolve("messages.yml"), "messages.yml");
+            ctx.register(MessageFormatService.class, messageFormatService);
+
+            FabricPlayers players = new FabricPlayers(server);
+            ctx.register(Players.class, players);
+            ctx.register(FabricPlayers.class, players);
+
+            FabricWorlds worlds = new FabricWorlds(server);
+            ctx.register(Worlds.class, worlds);
+            ctx.register(FabricWorlds.class, worlds);
+
+            FabricBlocks blocks = new FabricBlocks();
+            ctx.register(Blocks.class, blocks);
+            ctx.register(FabricBlocks.class, blocks);
+
+            InMemoryMessenger inMemoryMessenger = new InMemoryMessenger(modId, "velocity");
+            Messenger messenger = inMemoryMessenger;
+            ctx.register(Messenger.class, messenger);
+            ctx.register(InMemoryMessenger.class, inMemoryMessenger);
+
+            // Optional transport: plugin messaging (proxy) or Redis.
+            try {
+                var transportConfig = configService.load(dataDir.resolve("config.yml"), "config.yml");
+                String transport = transportConfig.getString("network.transport", "plugin");
+                switch (transport.trim().toLowerCase()) {
+                    case "redis" -> {
+                        var result = MessengerTransportBootstrap.bootstrap(transportConfig, PlatformId.FABRIC, logger, ctx.services());
+                        messenger = result.messenger();
+                        ctx.services().register(Messenger.class, messenger);
+                        ctx.registerCloseable(result.closeable());
+                    }
+                    case "plugin" -> {
+                        FabricPluginMessenger pluginMessenger = new FabricPluginMessenger(server, logger);
+                        messenger = pluginMessenger;
+                        ctx.services().register(Messenger.class, messenger);
+                        ctx.register(FabricPluginMessenger.class, pluginMessenger);
+                        ctx.registerCloseable(pluginMessenger);
+                    }
+                    default -> {
+                        // keep in-memory
+                    }
                 }
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to initialize network transport; using in-memory. Reason: {}", e.getMessage());
-            ctx.services().register(Messenger.class, inMemoryMessenger);
-        }
 
-        Rapunzel.bootstrap(modId, ctx);
-        return ctx;
+                // When we have a real transport, expose network info client.
+                if (!(messenger instanceof InMemoryMessenger)) {
+                    NetworkInfoClient networkInfo = new NetworkInfoClient(messenger, scheduler, logger);
+                    ctx.register(NetworkInfoService.class, networkInfo);
+                    ctx.register(NetworkInfoClient.class, networkInfo);
+
+                    if (messenger instanceof FabricPluginMessenger pluginMessenger) {
+                        networkInfo.networkServerName()
+                            .thenAccept(pluginMessenger::setNetworkServerName)
+                            .exceptionally(ignored -> null);
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to initialize network transport; using in-memory. Reason: {}", e.getMessage());
+                ctx.services().register(Messenger.class, inMemoryMessenger);
+            }
+
+            return ctx;
+        });
+
+        if (created.get() == null) {
+            logger.debug("RapunzelLib already bootstrapped; acquiring lease for {}", modId);
+        }
+        return lease.context();
     }
 
     private static InputStream openResource(Class<?> anchor, String path) {
