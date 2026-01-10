@@ -82,7 +82,6 @@ final class FabricGameEventsBridge implements GameEventBridge {
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             if (!bus.hasPostListeners(PlayerQuitPost.class)) return;
             ServerPlayer player = handler.getPlayer();
-            if (player == null) return;
             bus.dispatchPost(new PlayerQuitPost(player.getUUID(), player.getName().getString()));
         });
     }
@@ -213,7 +212,7 @@ final class FabricGameEventsBridge implements GameEventBridge {
         if (needsUsePre) {
             UseBlockPre pre = new UseBlockPre(rPlayer, clickedBlock);
             bus.dispatchPre(pre);
-            cancelled = cancelled || pre.isDenied();
+            cancelled = pre.isDenied();
         }
 
         if (cancelled) {

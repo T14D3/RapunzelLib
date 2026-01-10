@@ -1,6 +1,8 @@
 package de.t14d3.rapunzellib.message;
 
 import net.kyori.adventure.text.Component;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -13,7 +15,7 @@ import java.util.Objects;
 public final class Placeholders {
     private static final Placeholders EMPTY = new Placeholders(Map.of(), Map.of());
 
-    public static Placeholders empty() {
+    public static @NotNull Placeholders empty() {
         return EMPTY;
     }
 
@@ -21,7 +23,7 @@ public final class Placeholders {
      * Creates a new Placeholders Builder.
      * @return The builder.
      */
-    public static Builder builder() {
+    public static @NotNull Builder builder() {
         return new Builder();
     }
 
@@ -33,11 +35,11 @@ public final class Placeholders {
         this.components = components;
     }
 
-    public Map<String, String> strings() {
+    public @NotNull Map<String, String> strings() {
         return strings;
     }
 
-    public Map<String, Component> components() {
+    public @NotNull Map<String, Component> components() {
         return components;
     }
 
@@ -48,17 +50,17 @@ public final class Placeholders {
         private Builder() {
         }
 
-        public Builder string(String name, String value) {
+        public @NotNull Builder string(@NotNull String name, @Nullable String value) {
             strings.put(requireName(name), Objects.toString(value, ""));
             return this;
         }
 
-        public Builder component(String name, Component value) {
+        public @NotNull Builder component(@NotNull String name, @NotNull Component value) {
             components.put(requireName(name), Objects.requireNonNull(value, "value"));
             return this;
         }
 
-        public Placeholders build() {
+        public @NotNull Placeholders build() {
             if (strings.isEmpty() && components.isEmpty()) return EMPTY;
             return new Placeholders(
                 Collections.unmodifiableMap(new LinkedHashMap<>(strings)),
@@ -66,8 +68,8 @@ public final class Placeholders {
             );
         }
 
-        private static String requireName(String name) {
-            if (name == null || name.isBlank()) throw new IllegalArgumentException("name cannot be null/blank");
+        private static @NotNull String requireName(@NotNull String name) {
+            if (name.isBlank()) throw new IllegalArgumentException("name cannot be null/blank");
             return name;
         }
     }

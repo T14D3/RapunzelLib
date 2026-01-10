@@ -1,19 +1,21 @@
 package de.t14d3.rapunzellib.context;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.List;
 import java.util.Optional;
 
 public interface ServiceRegistry {
-    <T> void register(Class<T> type, T instance);
+    <T> void register(@NotNull Class<T> type, @NotNull T instance);
 
-    <T> Optional<T> find(Class<T> type);
+    <T> @NotNull Optional<T> find(@NotNull Class<T> type);
 
-    default <T> T get(Class<T> type) {
+    default <T> @NotNull T get(@NotNull Class<T> type) {
         return find(type).orElseThrow(() -> new IllegalStateException("Service not registered: " + type.getName()));
     }
 
-    List<Class<?>> serviceTypes();
+    @NotNull List<Class<?>> serviceTypes();
 
-    List<Object> services();
+    @NotNull List<Object> services();
 }
 

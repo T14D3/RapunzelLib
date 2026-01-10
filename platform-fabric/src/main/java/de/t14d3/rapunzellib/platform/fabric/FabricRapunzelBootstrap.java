@@ -3,21 +3,20 @@ package de.t14d3.rapunzellib.platform.fabric;
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.RapunzelLibVersion;
+import de.t14d3.rapunzellib.common.bootstrap.BootstrapServices;
 import de.t14d3.rapunzellib.common.context.DefaultRapunzelContext;
-import de.t14d3.rapunzellib.common.message.YamlMessageFormatService;
 import de.t14d3.rapunzellib.config.ConfigService;
-import de.t14d3.rapunzellib.config.SnakeYamlConfigService;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.objects.Players;
 import de.t14d3.rapunzellib.objects.Worlds;
 import de.t14d3.rapunzellib.objects.block.Blocks;
-import de.t14d3.rapunzellib.message.MessageFormatService;
 import de.t14d3.rapunzellib.network.InMemoryMessenger;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.bootstrap.MessengerTransportBootstrap;
 import de.t14d3.rapunzellib.network.info.NetworkInfoClient;
 import de.t14d3.rapunzellib.network.info.NetworkInfoService;
+import de.t14d3.rapunzellib.network.queue.NetworkQueueBootstrap;
 import de.t14d3.rapunzellib.platform.fabric.entity.FabricBlocks;
 import de.t14d3.rapunzellib.platform.fabric.entity.FabricPlayers;
 import de.t14d3.rapunzellib.platform.fabric.entity.FabricWorlds;
@@ -49,23 +48,18 @@ public final class FabricRapunzelBootstrap {
             Path dataDir = FabricLoader.getInstance().getConfigDir().resolve(modId);
             try {
                 Files.createDirectories(dataDir);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.debug("Failed to create Fabric config directory {}", dataDir, e);
             }
 
             ResourceProvider resources = path -> Optional.ofNullable(openResource(resourceAnchor, path));
             Scheduler scheduler = new FabricScheduler(server);
-            DefaultRapunzelContext ctx = new DefaultRapunzelContext(PlatformId.FABRIC, logger, dataDir, resources, scheduler);
+            DefaultRapunzelContext ctx =
+                BootstrapServices.createContext(PlatformId.FABRIC, logger, dataDir, resources, scheduler);
             created.set(ctx);
 
-            AutoCloseable closeable = (AutoCloseable) scheduler;
-            ctx.registerCloseable(closeable);
-
-            ConfigService configService = new SnakeYamlConfigService(resources, logger);
-            ctx.register(ConfigService.class, configService);
-
-            MessageFormatService messageFormatService =
-                new YamlMessageFormatService(configService, logger, dataDir.resolve("messages.yml"), "messages.yml");
-            ctx.register(MessageFormatService.class, messageFormatService);
+            ConfigService configService = BootstrapServices.registerYamlConfig(ctx, resources, logger);
+            BootstrapServices.registerYamlMessages(ctx, configService, logger, dataDir);
 
             FabricPlayers players = new FabricPlayers(server);
             ctx.register(Players.class, players);
@@ -97,10 +91,21 @@ public final class FabricRapunzelBootstrap {
                     }
                     case "plugin" -> {
                         FabricPluginMessenger pluginMessenger = new FabricPluginMessenger(server, logger);
-                        messenger = pluginMessenger;
+
+                        String ownerId = PlatformId.FABRIC.name() + ":" + dataDir.toAbsolutePath().normalize();
+                        NetworkQueueBootstrap.Result queued = NetworkQueueBootstrap.wrapIfEnabled(
+                            pluginMessenger,
+                            transportConfig,
+                            scheduler,
+                            logger,
+                            ownerId
+                        );
+                        messenger = queued.messenger();
                         ctx.services().register(Messenger.class, messenger);
                         ctx.register(FabricPluginMessenger.class, pluginMessenger);
-                        ctx.registerCloseable(pluginMessenger);
+                        if (messenger instanceof AutoCloseable toClose && messenger != pluginMessenger) {
+                            ctx.registerCloseable(toClose);
+                        }
                     }
                     default -> {
                         // keep in-memory
@@ -120,7 +125,7 @@ public final class FabricRapunzelBootstrap {
                     }
                 }
             } catch (Exception e) {
-                logger.warn("Failed to initialize network transport; using in-memory. Reason: {}", e.getMessage());
+                logger.warn("Failed to initialize network transport; using in-memory.", e);
                 ctx.services().register(Messenger.class, inMemoryMessenger);
             }
 

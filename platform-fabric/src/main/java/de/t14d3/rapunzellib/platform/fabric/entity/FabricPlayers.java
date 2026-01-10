@@ -4,6 +4,7 @@ import de.t14d3.rapunzellib.objects.Players;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -19,19 +20,19 @@ public final class FabricPlayers implements Players {
     }
 
     @Override
-    public Collection<RPlayer> online() {
+    public @NotNull Collection<RPlayer> online() {
         return server.getPlayerList().getPlayers().stream().map(this::wrapInternal).map(RPlayer.class::cast).toList();
     }
 
     @Override
-    public Optional<RPlayer> get(UUID uuid) {
+    public @NotNull Optional<RPlayer> get(@NotNull UUID uuid) {
         ServerPlayer player = server.getPlayerList().getPlayer(uuid);
         if (player == null) return Optional.empty();
         return Optional.of(wrapInternal(player));
     }
 
     @Override
-    public Optional<RPlayer> wrap(Object nativePlayer) {
+    public @NotNull Optional<RPlayer> wrap(@NotNull Object nativePlayer) {
         if (!(nativePlayer instanceof ServerPlayer player)) return Optional.empty();
         return Optional.of(wrapInternal(player));
     }

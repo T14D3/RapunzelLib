@@ -7,5 +7,5 @@ dependencies {
     compileOnlyApi(libs.brigadier)
     compileOnly(libs.annotations)
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.brigadier)
 }
-

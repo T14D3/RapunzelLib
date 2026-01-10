@@ -1,19 +1,20 @@
 package de.t14d3.rapunzellib.objects;
 
 import de.t14d3.rapunzellib.PlatformId;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 
 public interface RNative {
-    PlatformId platformId();
+    @NotNull PlatformId platformId();
 
-    Object handle();
+    @NotNull Object handle();
 
-    default <T> T handle(Class<T> type) {
+    default <T> @NotNull T handle(@NotNull Class<T> type) {
         return type.cast(handle());
     }
 
-    default <T> Optional<T> tryHandle(Class<T> type) {
+    default <T> @NotNull Optional<T> tryHandle(@NotNull Class<T> type) {
         Object handle = handle();
         if (type.isInstance(handle)) return Optional.of(type.cast(handle));
         return Optional.empty();
@@ -25,7 +26,7 @@ public interface RNative {
      * Platform implementations should return a mutable implementation so plugins can attach
      * additional data to wrapper instances.
      */
-    default RExtras extras() {
+    default @NotNull RExtras extras() {
         return RExtras.empty();
     }
 }

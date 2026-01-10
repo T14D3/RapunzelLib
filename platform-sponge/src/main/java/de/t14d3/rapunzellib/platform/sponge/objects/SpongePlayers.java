@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.platform.sponge.objects;
 
 import de.t14d3.rapunzellib.objects.Players;
 import de.t14d3.rapunzellib.objects.RPlayer;
+import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.entity.living.player.server.ServerPlayer;
 
@@ -14,7 +15,7 @@ public final class SpongePlayers implements Players {
     private final ConcurrentHashMap<UUID, SpongePlayer> cache = new ConcurrentHashMap<>();
 
     @Override
-    public Collection<RPlayer> online() {
+    public @NotNull Collection<RPlayer> online() {
         if (!Sponge.isServerAvailable()) return java.util.List.of();
         return Sponge.server().onlinePlayers().stream()
             .map(this::wrapInternal)
@@ -23,14 +24,14 @@ public final class SpongePlayers implements Players {
     }
 
     @Override
-    public Optional<RPlayer> get(UUID uuid) {
+    public @NotNull Optional<RPlayer> get(@NotNull UUID uuid) {
         if (uuid == null) return Optional.empty();
         if (!Sponge.isServerAvailable()) return Optional.empty();
         return Sponge.server().player(uuid).map(this::wrapInternal).map(RPlayer.class::cast);
     }
 
     @Override
-    public Optional<RPlayer> wrap(Object nativePlayer) {
+    public @NotNull Optional<RPlayer> wrap(@NotNull Object nativePlayer) {
         if (!(nativePlayer instanceof ServerPlayer player)) return Optional.empty();
         return Optional.of(wrapInternal(player));
     }

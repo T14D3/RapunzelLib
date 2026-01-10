@@ -7,6 +7,7 @@ import de.t14d3.rapunzellib.objects.RNativeBase;
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.block.RBlock;
 import de.t14d3.rapunzellib.objects.block.RBlockData;
+import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.registry.RegistryTypes;
 import org.spongepowered.api.world.server.ServerWorld;
@@ -25,30 +26,30 @@ final class SpongeBlock extends RNativeBase implements RBlock {
     }
 
     @Override
-    public BlockState handle() {
+    public @NotNull BlockState handle() {
         return world.block(pos);
     }
 
     @Override
-    public RWorld world() {
+    public @NotNull RWorld world() {
         return Rapunzel.context().worlds()
             .wrap(world)
             .orElseGet(() -> new SpongeWorld(world));
     }
 
     @Override
-    public RBlockPos pos() {
+    public @NotNull RBlockPos pos() {
         return new RBlockPos(pos.x(), pos.y(), pos.z());
     }
 
     @Override
-    public String typeKey() {
+    public @NotNull String typeKey() {
         BlockState state = world.block(pos);
         return state.type().key(RegistryTypes.BLOCK_TYPE).asString();
     }
 
     @Override
-    public RBlockData data() {
+    public @NotNull RBlockData data() {
         return new SpongeBlockData(world.block(pos));
     }
 }

@@ -2,23 +2,24 @@ package de.t14d3.rapunzellib.objects.block;
 
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RWorld;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 
 public interface Blocks {
-    Optional<RBlock> wrap(Object nativeBlock);
+    @NotNull Optional<RBlock> wrap(@NotNull Object nativeBlock);
 
-    Optional<RBlockData> wrapData(Object nativeBlockData);
+    @NotNull Optional<RBlockData> wrapData(@NotNull Object nativeBlockData);
 
-    RBlock at(RWorld world, RBlockPos pos);
+    @NotNull RBlock at(@NotNull RWorld world, @NotNull RBlockPos pos);
 
-    Optional<RBlockData> parseData(String value);
+    @NotNull Optional<RBlockData> parseData(@NotNull String value);
 
-    default RBlock require(Object nativeBlock) {
+    default @NotNull RBlock require(@NotNull Object nativeBlock) {
         return wrap(nativeBlock).orElseThrow(() -> new IllegalArgumentException("Cannot wrap block: " + nativeBlock));
     }
 
-    default RBlockData requireData(Object nativeBlockData) {
+    default @NotNull RBlockData requireData(@NotNull Object nativeBlockData) {
         return wrapData(nativeBlockData)
             .orElseThrow(() -> new IllegalArgumentException("Cannot wrap block data: " + nativeBlockData));
     }

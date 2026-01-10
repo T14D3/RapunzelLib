@@ -5,10 +5,12 @@ import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.context.ServiceRegistry;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
 
@@ -21,6 +23,7 @@ public final class DefaultRapunzelContext implements RapunzelContext {
     private final DefaultServiceRegistry services = new DefaultServiceRegistry();
 
     private final List<AutoCloseable> closeables = new ArrayList<>();
+    private final IdentityHashMap<AutoCloseable, Boolean> closeableSet = new IdentityHashMap<>();
 
     public DefaultRapunzelContext(
         PlatformId platformId,
@@ -37,45 +40,50 @@ public final class DefaultRapunzelContext implements RapunzelContext {
     }
 
     @Override
-    public PlatformId platformId() {
+    public @NotNull PlatformId platformId() {
         return platformId;
     }
 
     @Override
-    public Logger logger() {
+    public @NotNull Logger logger() {
         return logger;
     }
 
     @Override
-    public Path dataDirectory() {
+    public @NotNull Path dataDirectory() {
         return dataDirectory;
     }
 
     @Override
-    public ResourceProvider resources() {
+    public @NotNull ResourceProvider resources() {
         return resources;
     }
 
     @Override
-    public Scheduler scheduler() {
+    public @NotNull Scheduler scheduler() {
         return scheduler;
     }
 
     @Override
-    public ServiceRegistry services() {
+    public @NotNull ServiceRegistry services() {
         return services;
     }
 
-    public <T> T register(Class<T> type, T instance) {
+    @Override
+    public <T> @NotNull T register(@NotNull Class<T> type, @NotNull T instance) {
         services.register(type, instance);
         if (instance instanceof AutoCloseable closeable) {
-            closeables.add(closeable);
+            registerCloseable(closeable);
         }
         return instance;
     }
 
-    public void registerCloseable(AutoCloseable closeable) {
-        closeables.add(Objects.requireNonNull(closeable, "closeable"));
+    @Override
+    public void registerCloseable(@NotNull AutoCloseable closeable) {
+        AutoCloseable c = Objects.requireNonNull(closeable, "closeable");
+        if (closeableSet.putIfAbsent(c, Boolean.TRUE) == null) {
+            closeables.add(c);
+        }
     }
 
     @Override
@@ -90,6 +98,7 @@ public final class DefaultRapunzelContext implements RapunzelContext {
             }
         }
         closeables.clear();
+        closeableSet.clear();
         if (first != null) throw first;
     }
 }

@@ -12,6 +12,8 @@ import de.t14d3.rapunzellib.network.MessageListener;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkConstants;
 import de.t14d3.rapunzellib.network.NetworkEnvelope;
+import de.t14d3.rapunzellib.network.json.JsonCodecs;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.nio.charset.StandardCharsets;
@@ -20,14 +22,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
+    private static final long UNDELIVERABLE_LOG_COOLDOWN_MS = 10_000L;
+
     public static final ChannelIdentifier CHANNEL_ID = MinecraftChannelIdentifier.from(NetworkConstants.TRANSPORT_CHANNEL);
 
     private final Object plugin;
     private final ProxyServer proxy;
     private final Logger logger;
-    private final Gson gson = new Gson();
+    private final Gson gson = JsonCodecs.gson();
+    private final AtomicLong lastUndeliverableLog = new AtomicLong(0L);
 
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
 
@@ -69,7 +75,7 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
         try {
             env = gson.fromJson(json, NetworkEnvelope.class);
         } catch (Exception e) {
-            logger.warn("Failed to parse network envelope from backend {}: {}", originServer, e.getMessage());
+            logger.warn("Failed to parse network envelope from backend {}", originServer, e);
             return;
         }
 
@@ -100,27 +106,27 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public void sendToAll(String channel, String data) {
+    public void sendToAll(@NotNull String channel, @NotNull String data) {
         forwardToAllBackends(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.ALL, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToServer(String channel, String serverName, String data) {
+    public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
         forwardToBackend(serverName, new NetworkEnvelope(channel, data, NetworkEnvelope.Target.SERVER, serverName, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToProxy(String channel, String data) {
+    public void sendToProxy(@NotNull String channel, @NotNull String data) {
         deliverToLocalListeners(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.PROXY, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void registerListener(String channel, MessageListener listener) {
+    public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         listeners.computeIfAbsent(channel, k -> new CopyOnWriteArrayList<>()).add(listener);
     }
 
     @Override
-    public void unregisterListener(String channel, MessageListener listener) {
+    public void unregisterListener(@NotNull String channel, @NotNull MessageListener listener) {
         List<MessageListener> list = listeners.get(channel);
         if (list == null) return;
         list.remove(listener);
@@ -132,12 +138,12 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public String getServerName() {
+    public @NotNull String getServerName() {
         return getProxyServerName();
     }
 
     @Override
-    public String getProxyServerName() {
+    public @NotNull String getProxyServerName() {
         return "velocity";
     }
 
@@ -170,13 +176,36 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
 
     private void queueForwardToBackend(String serverName, NetworkEnvelope env) {
         Messenger forwarder = undeliverableForwarder;
-        if (forwarder == null) return;
+        if (forwarder == null) {
+            logUndeliverable(serverName, env);
+            return;
+        }
         if (env == null || env.getChannel() == null) return;
         try {
             forwarder.sendToServer(env.getChannel(), serverName, env.getData());
         } catch (Exception e) {
-            logger.debug("Failed to queue backend forward for {} on channel {}: {}", serverName, env.getChannel(), e.getMessage());
+            logger.debug("Failed to queue backend forward for {} on channel {}", serverName, env.getChannel(), e);
         }
+    }
+
+    private void logUndeliverable(String serverName, NetworkEnvelope env) {
+        long now = System.currentTimeMillis();
+        long last = lastUndeliverableLog.get();
+        if ((now - last) < UNDELIVERABLE_LOG_COOLDOWN_MS || !lastUndeliverableLog.compareAndSet(last, now)) {
+            return;
+        }
+
+        String channel = (env != null) ? env.getChannel() : null;
+        String source = (env != null) ? env.getSourceServer() : null;
+        NetworkEnvelope.Target target = (env != null) ? env.getTarget() : null;
+
+        logger.debug(
+            "Dropping backend forward (no carrier and no undeliverableForwarder configured): targetServer={}, target={}, channel={}, sourceServer={}",
+            serverName,
+            target,
+            channel,
+            source
+        );
     }
 
     private void deliverToLocalListeners(NetworkEnvelope env) {
@@ -186,7 +215,7 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
             try {
                 listener.onMessage(env.getChannel(), env.getData(), env.getSourceServer());
             } catch (Exception e) {
-                logger.warn("Network listener error on channel {}: {}", env.getChannel(), e.getMessage());
+                logger.warn("Network listener error on channel {}", env.getChannel(), e);
             }
         }
     }

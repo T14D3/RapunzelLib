@@ -8,6 +8,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.TextComponent;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
@@ -67,29 +68,29 @@ public final class YamlMessageFormatService implements MessageFormatService {
     }
 
     @Override
-    public boolean contains(String key) {
+    public boolean contains(@NotNull String key) {
         return state.templates.containsKey(key);
     }
 
     @Override
-    public Set<String> keys() {
+    public @NotNull Set<String> keys() {
         return state.keys;
     }
 
     @Override
-    public String raw(String key) {
+    public @NotNull String raw(@NotNull String key) {
         Template t = state.templates.get(key);
         if (t == null) return key;
         return t.raw;
     }
 
     @Override
-    public Component component(String key) {
+    public @NotNull Component component(@NotNull String key) {
         return component(key, Placeholders.empty());
     }
 
     @Override
-    public Component component(String key, Placeholders placeholders) {
+    public @NotNull Component component(@NotNull String key, @NotNull Placeholders placeholders) {
         State state = this.state;
         Template t = state.templates.get(key);
         if (t == null) {
@@ -189,7 +190,7 @@ public final class YamlMessageFormatService implements MessageFormatService {
             parsed = miniMessage.deserialize(raw);
             extractPlaceholders(parsed, placeholderNames);
         } catch (Exception e) {
-            logger.warn("Failed to parse MiniMessage template: {}", e.getMessage());
+            logger.warn("Failed to parse MiniMessage template", e);
             parsed = Component.text(raw);
         }
 

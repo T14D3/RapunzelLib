@@ -3,6 +3,7 @@ package de.t14d3.rapunzellib.network.filesync;
 import com.google.gson.Gson;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkEventBus;
+import de.t14d3.rapunzellib.network.json.JsonCodecs;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.slf4j.Logger;
@@ -127,7 +128,7 @@ public final class FileSyncEndpoint implements AutoCloseable {
         this.listener = (listener != null) ? listener : new Listener() {
         };
 
-        Gson effectiveGson = (gson != null) ? gson : new Gson();
+        Gson effectiveGson = (gson != null) ? gson : JsonCodecs.gson();
         this.bus = new NetworkEventBus(messenger, effectiveGson);
 
         this.reqSub = bus.register(
@@ -253,7 +254,7 @@ public final class FileSyncEndpoint implements AutoCloseable {
                 }
 
                 List<String> deletePaths = new ArrayList<>();
-                if (spec.deleteExtraneous() && remote != null && !remote.isEmpty()) {
+                if (spec.deleteExtraneous() && !remote.isEmpty()) {
                     for (String remotePath : remote.keySet()) {
                         if (!local.containsKey(remotePath)) {
                             deletePaths.add(remotePath);
@@ -307,7 +308,8 @@ public final class FileSyncEndpoint implements AutoCloseable {
                 targetServer,
                 new FileSyncResponseMeta(requestId, groupId, false, message, List.of(), 0, 0, null)
             );
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            logger.debug("Failed to send file sync error response ({}, requestId={})", groupId, requestId, e);
         }
     }
 
@@ -333,7 +335,11 @@ public final class FileSyncEndpoint implements AutoCloseable {
             }
         }
 
-        req.requestTimeout.cancel();
+        try {
+            req.requestTimeout.cancel();
+        } catch (Exception e) {
+            logger.debug("Failed to cancel file sync request timeout ({}, requestId={})", groupId, meta.requestId(), e);
+        }
 
         if (!meta.ok()) {
             pending.remove(meta.requestId());
@@ -388,7 +394,11 @@ public final class FileSyncEndpoint implements AutoCloseable {
         transfer.chunks[chunk.index()] = chunk.dataBase64();
 
         if (!transfer.isComplete()) return;
-        transfer.timeoutTask.cancel();
+        try {
+            transfer.timeoutTask.cancel();
+        } catch (Exception e) {
+            logger.debug("Failed to cancel file sync transfer timeout ({}, requestId={})", groupId, chunk.requestId(), e);
+        }
 
         scheduler.runAsync(() -> {
             try {
@@ -424,15 +434,17 @@ public final class FileSyncEndpoint implements AutoCloseable {
         if (removed == null) return;
         try {
             removed.requestTimeout.cancel();
-        } catch (Exception ignored) {
+        } catch (Exception cancelError) {
+            logger.debug("Failed to cancel file sync request timeout ({}, requestId={})", groupId, requestId, cancelError);
         }
         if (removed.transfer != null) {
             try {
                 removed.transfer.timeoutTask.cancel();
-            } catch (Exception ignored) {
+            } catch (Exception cancelError) {
+                logger.debug("Failed to cancel file sync transfer timeout ({}, requestId={})", groupId, requestId, cancelError);
             }
         }
-        logger.warn("File sync failed ({}): {}", groupId, e.getMessage());
+        logger.warn("File sync failed ({})", groupId, e);
         removed.future.completeExceptionally(e);
     }
 
@@ -446,12 +458,14 @@ public final class FileSyncEndpoint implements AutoCloseable {
         for (PendingSync req : pending.values()) {
             try {
                 req.requestTimeout.cancel();
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.debug("Failed to cancel file sync request timeout during close ({})", groupId, e);
             }
             if (req.transfer != null) {
                 try {
                     req.transfer.timeoutTask.cancel();
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    logger.debug("Failed to cancel file sync transfer timeout during close ({})", groupId, e);
                 }
             }
             req.future.completeExceptionally(new IllegalStateException("FileSyncEndpoint closed"));

@@ -3,13 +3,11 @@ package de.t14d3.rapunzellib.platform.sponge;
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.RapunzelLibVersion;
+import de.t14d3.rapunzellib.common.bootstrap.BootstrapServices;
 import de.t14d3.rapunzellib.common.context.DefaultRapunzelContext;
-import de.t14d3.rapunzellib.common.message.YamlMessageFormatService;
 import de.t14d3.rapunzellib.config.ConfigService;
-import de.t14d3.rapunzellib.config.SnakeYamlConfigService;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
-import de.t14d3.rapunzellib.message.MessageFormatService;
 import de.t14d3.rapunzellib.network.InMemoryMessenger;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.bootstrap.MessengerTransportBootstrap;
@@ -54,35 +52,22 @@ public final class SpongeRapunzelBootstrap {
 
             try {
                 Files.createDirectories(dataDirectory);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.debug("Failed to create Sponge data directory {}", dataDirectory, e);
             }
 
             ResourceProvider resources = path -> Optional.ofNullable(openResource(resourceAnchor, path));
 
-            Scheduler scheduler = new SpongeScheduler(server);
+            Scheduler scheduler = new SpongeScheduler(server, container);       
 
-            DefaultRapunzelContext ctx = new DefaultRapunzelContext(
-                PlatformId.SPONGE,
-                logger,
-                dataDirectory,
-                resources,
-                scheduler
-            );
+            DefaultRapunzelContext ctx =
+                BootstrapServices.createContext(PlatformId.SPONGE, logger, dataDirectory, resources, scheduler);
             created.set(ctx);
-            ctx.registerCloseable((AutoCloseable) scheduler);
 
             ctx.register(Server.class, server);
 
-            ConfigService configService = new SnakeYamlConfigService(resources, logger);
-            ctx.register(ConfigService.class, configService);
-
-            MessageFormatService messageFormatService = new YamlMessageFormatService(
-                configService,
-                logger,
-                dataDirectory.resolve("messages.yml"),
-                "messages.yml"
-            );
-            ctx.register(MessageFormatService.class, messageFormatService);
+            ConfigService configService = BootstrapServices.registerYamlConfig(ctx, resources, logger);
+            BootstrapServices.registerYamlMessages(ctx, configService, logger, dataDirectory);
 
             SpongePlayers players = new SpongePlayers();
             ctx.register(Players.class, players);
@@ -106,7 +91,7 @@ public final class SpongeRapunzelBootstrap {
                     MessengerTransportBootstrap.bootstrap(transportConfig, PlatformId.SPONGE, logger, ctx.services());
                 ctx.registerCloseable(result.closeable());
             } catch (Exception e) {
-                logger.warn("Failed to initialize network transport; using in-memory. Reason: {}", e.getMessage());
+                logger.warn("Failed to initialize network transport; using in-memory.", e);
                 ctx.services().register(Messenger.class, inMemoryMessenger);
             }
 

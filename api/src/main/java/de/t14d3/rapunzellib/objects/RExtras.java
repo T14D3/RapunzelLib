@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib.objects;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -7,19 +9,19 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 public interface RExtras {
-    <T> Optional<T> get(RExtraKey<T> key);
+    <T> @NotNull Optional<T> get(@NotNull RExtraKey<T> key);
 
-    <T> void put(RExtraKey<T> key, T value);
+    <T> void put(@NotNull RExtraKey<T> key, @NotNull T value);
 
-    <T> Optional<T> remove(RExtraKey<T> key);
+    <T> @NotNull Optional<T> remove(@NotNull RExtraKey<T> key);
 
-    Map<RExtraKey<?>, Object> asMap();
+    @NotNull Map<RExtraKey<?>, Object> asMap();
 
-    static RExtras empty() {
+    static @NotNull RExtras empty() {
         return EmptyRExtras.INSTANCE;
     }
 
-    static RExtras mutable() {
+    static @NotNull RExtras mutable() {
         return new MapRExtras();
     }
 
@@ -27,7 +29,7 @@ public interface RExtras {
      * Returns a mutable extras instance that avoids allocating its internal map until
      * an element is actually put.
      */
-    static RExtras lazyMutable() {
+    static @NotNull RExtras lazyMutable() {
         return new LazyRExtras();
     }
 }
@@ -39,23 +41,23 @@ final class EmptyRExtras implements RExtras {
     }
 
     @Override
-    public <T> Optional<T> get(RExtraKey<T> key) {
+    public <T> @NotNull Optional<T> get(@NotNull RExtraKey<T> key) {
         Objects.requireNonNull(key, "key");
         return Optional.empty();
     }
 
     @Override
-    public <T> void put(RExtraKey<T> key, T value) {
+    public <T> void put(@NotNull RExtraKey<T> key, @NotNull T value) {
         throw new UnsupportedOperationException("extras are not supported by this wrapper instance");
     }
 
     @Override
-    public <T> Optional<T> remove(RExtraKey<T> key) {
+    public <T> @NotNull Optional<T> remove(@NotNull RExtraKey<T> key) {
         throw new UnsupportedOperationException("extras are not supported by this wrapper instance");
     }
 
     @Override
-    public Map<RExtraKey<?>, Object> asMap() {
+    public @NotNull Map<RExtraKey<?>, Object> asMap() {
         return Collections.emptyMap();
     }
 }
@@ -64,7 +66,7 @@ final class MapRExtras implements RExtras {
     private final ConcurrentHashMap<RExtraKey<?>, Object> values = new ConcurrentHashMap<>();
 
     @Override
-    public <T> Optional<T> get(RExtraKey<T> key) {
+    public <T> @NotNull Optional<T> get(@NotNull RExtraKey<T> key) {
         Objects.requireNonNull(key, "key");
         Object value = values.get(key);
         if (value == null) return Optional.empty();
@@ -72,7 +74,7 @@ final class MapRExtras implements RExtras {
     }
 
     @Override
-    public <T> void put(RExtraKey<T> key, T value) {
+    public <T> void put(@NotNull RExtraKey<T> key, @NotNull T value) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(value, "value");
         if (!key.type().isInstance(value)) {
@@ -84,7 +86,7 @@ final class MapRExtras implements RExtras {
     }
 
     @Override
-    public <T> Optional<T> remove(RExtraKey<T> key) {
+    public <T> @NotNull Optional<T> remove(@NotNull RExtraKey<T> key) {
         Objects.requireNonNull(key, "key");
         Object value = values.remove(key);
         if (value == null) return Optional.empty();
@@ -92,7 +94,7 @@ final class MapRExtras implements RExtras {
     }
 
     @Override
-    public Map<RExtraKey<?>, Object> asMap() {
+    public @NotNull Map<RExtraKey<?>, Object> asMap() {
         return Collections.unmodifiableMap(values);
     }
 }
@@ -113,26 +115,26 @@ final class LazyRExtras implements RExtras {
     }
 
     @Override
-    public <T> Optional<T> get(RExtraKey<T> key) {
+    public <T> @NotNull Optional<T> get(@NotNull RExtraKey<T> key) {
         Objects.requireNonNull(key, "key");
         MapRExtras current = delegate;
         return (current != null) ? current.get(key) : Optional.empty();
     }
 
     @Override
-    public <T> void put(RExtraKey<T> key, T value) {
+    public <T> void put(@NotNull RExtraKey<T> key, @NotNull T value) {
         ensureDelegate().put(key, value);
     }
 
     @Override
-    public <T> Optional<T> remove(RExtraKey<T> key) {
+    public <T> @NotNull Optional<T> remove(@NotNull RExtraKey<T> key) {
         MapRExtras current = delegate;
         if (current == null) return Optional.empty();
         return current.remove(key);
     }
 
     @Override
-    public Map<RExtraKey<?>, Object> asMap() {
+    public @NotNull Map<RExtraKey<?>, Object> asMap() {
         MapRExtras current = delegate;
         return (current != null) ? current.asMap() : Collections.emptyMap();
     }

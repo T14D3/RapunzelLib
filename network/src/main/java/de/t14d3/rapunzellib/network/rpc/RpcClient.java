@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkEventBus;
+import de.t14d3.rapunzellib.network.json.JsonCodecs;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.slf4j.Logger;
@@ -41,7 +42,7 @@ public final class RpcClient implements AutoCloseable {
      * @param logger the logger to use for RPC
      */
     public RpcClient(Messenger messenger, Scheduler scheduler, Logger logger) {
-        this(messenger, scheduler, logger, Duration.ofSeconds(3), new Gson());
+        this(messenger, scheduler, logger, Duration.ofSeconds(3), JsonCodecs.gson());
     }
     /**
      * Creates a new RPC client with the given messenger, scheduler, and logger.
@@ -52,7 +53,7 @@ public final class RpcClient implements AutoCloseable {
      * @param defaultTimeout the default timeout for RPC requests
      */
     public RpcClient(Messenger messenger, Scheduler scheduler, Logger logger, Duration defaultTimeout) {
-        this(messenger, scheduler, logger, defaultTimeout, new Gson());
+        this(messenger, scheduler, logger, defaultTimeout, JsonCodecs.gson());
     }
     /**
      * Creates a new RPC client with the given messenger, scheduler, and logger.
@@ -151,7 +152,8 @@ public final class RpcClient implements AutoCloseable {
             if (removed == null) return;
             try {
                 removed.timeoutTask.cancel();
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.debug("Failed to cancel RPC timeout task for {}#{} (requestId={})", removed.service, removed.method, requestId, e);
             }
         });
 
@@ -174,7 +176,8 @@ public final class RpcClient implements AutoCloseable {
             if (removed != null) {
                 try {
                     removed.timeoutTask.cancel();
-                } catch (Exception ignored) {
+                } catch (Exception cancelError) {
+                    logger.debug("Failed to cancel RPC timeout task after send failure for {}#{} (requestId={})", removed.service, removed.method, requestId, cancelError);
                 }
             }
             future.completeExceptionally(e);
@@ -195,7 +198,11 @@ public final class RpcClient implements AutoCloseable {
 
         PendingRequest<?> req = pending.remove(response.requestId());
         if (req == null) return;
-        req.timeoutTask.cancel();
+        try {
+            req.timeoutTask.cancel();
+        } catch (Exception e) {
+            logger.debug("Failed to cancel RPC timeout task for {}#{} (requestId={})", req.service, req.method, response.requestId(), e);
+        }
 
         if (!response.ok()) {
             String message = (response.error() == null || response.error().isBlank())
@@ -214,7 +221,7 @@ public final class RpcClient implements AutoCloseable {
         try {
             req.completeWithResult(gson, response.result());
         } catch (Exception e) {
-            logger.warn("Failed to parse RPC response {}#{}: {}", req.service, req.method, e.getMessage());
+            logger.warn("Failed to parse RPC response {}#{}", req.service, req.method, e);
             req.future.completeExceptionally(e);
         }
     }
@@ -222,12 +229,17 @@ public final class RpcClient implements AutoCloseable {
     @Override
     public void close() {
         closed = true;
-        responseSubscription.close();
+        try {
+            responseSubscription.close();
+        } catch (Exception e) {
+            logger.debug("Failed to close RPC response subscription", e);
+        }
 
         for (PendingRequest<?> req : pending.values()) {
             try {
                 req.timeoutTask.cancel();
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.debug("Failed to cancel RPC timeout task for {}#{} during close", req.service, req.method, e);
             }
             req.future.completeExceptionally(new IllegalStateException("RpcClient closed"));
         }
@@ -239,35 +251,30 @@ public final class RpcClient implements AutoCloseable {
         SERVER
     }
 
-    private static final class PendingRequest<T> {
-        private final CompletableFuture<T> future;
-        private final Type resultType;
-        private final ScheduledTask timeoutTask;
-        private final String service;
-        private final String method;
+    private record PendingRequest<T>(CompletableFuture<T> future, Type resultType, ScheduledTask timeoutTask,
+                                     String service, String method) {
+            private PendingRequest(
+                    CompletableFuture<T> future,
+                    Type resultType,
+                    ScheduledTask timeoutTask,
+                    String service,
+                    String method
+            ) {
+                this.future = Objects.requireNonNull(future, "future");
+                this.resultType = Objects.requireNonNull(resultType, "resultType");
+                this.timeoutTask = Objects.requireNonNull(timeoutTask, "timeoutTask");
+                this.service = Objects.requireNonNull(service, "service");
+                this.method = Objects.requireNonNull(method, "method");
+            }
 
-        private PendingRequest(
-            CompletableFuture<T> future,
-            Type resultType,
-            ScheduledTask timeoutTask,
-            String service,
-            String method
-        ) {
-            this.future = Objects.requireNonNull(future, "future");
-            this.resultType = Objects.requireNonNull(resultType, "resultType");
-            this.timeoutTask = Objects.requireNonNull(timeoutTask, "timeoutTask");
-            this.service = Objects.requireNonNull(service, "service");
-            this.method = Objects.requireNonNull(method, "method");
-        }
-
-        private void completeWithResult(Gson gson, JsonElement resultJsonElement) {
-            @SuppressWarnings("unchecked")
-            T parsed = gson.fromJson(resultJsonElement, resultType);
-            if (parsed == null && resultType != Void.class) {
-                future.completeExceptionally(new IllegalStateException("Remote returned no result"));
-            } else {
-                future.complete(parsed);
+            private void completeWithResult(Gson gson, JsonElement resultJsonElement) {
+                @SuppressWarnings("unchecked")
+                T parsed = gson.fromJson(resultJsonElement, resultType);
+                if (parsed == null && resultType != Void.class) {
+                    future.completeExceptionally(new IllegalStateException("Remote returned no result"));
+                } else {
+                    future.complete(parsed);
+                }
             }
         }
-    }
 }

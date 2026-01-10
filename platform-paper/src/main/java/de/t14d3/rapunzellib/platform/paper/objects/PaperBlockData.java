@@ -4,6 +4,7 @@ import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.objects.RNativeHandle;
 import de.t14d3.rapunzellib.objects.block.RBlockData;
 import org.bukkit.block.data.BlockData;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
@@ -13,12 +14,12 @@ final class PaperBlockData extends RNativeHandle<BlockData> implements RBlockDat
     }
 
     @Override
-    public String typeKey() {
+    public @NotNull String typeKey() {
         return handle().getMaterial().getKey().toString();
     }
 
     @Override
-    public String asString() {
+    public @NotNull String asString() {
         return handle().getAsString(true);
     }
 }

@@ -8,6 +8,7 @@ import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import net.kyori.adventure.audience.Audience;
+import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.ResourceKey;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.entity.living.player.server.ServerPlayer;
@@ -30,28 +31,28 @@ final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RPlayer 
     }
 
     @Override
-    public Audience audience() {
+    public @NotNull Audience audience() {
         return handle();
     }
 
     @Override
-    public UUID uuid() {
+    public @NotNull UUID uuid() {
         return handle().profile().uuid();
     }
 
     @Override
-    public String name() {
+    public @NotNull String name() {
         return handle().profile().name().orElseGet(() -> handle().profile().uuid().toString());
     }
 
     @Override
-    public boolean hasPermission(String permission) {
+    public boolean hasPermission(@NotNull String permission) {
         if (permission == null || permission.isBlank()) return true;
         return handle().hasPermission(permission);
     }
 
     @Override
-    public Optional<RWorld> world() {
+    public @NotNull Optional<RWorld> world() {
         ServerWorld world = handle().world();
         return Rapunzel.context().worlds()
             .wrap(world)
@@ -59,7 +60,7 @@ final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RPlayer 
     }
 
     @Override
-    public Optional<RLocation> location() {
+    public @NotNull Optional<RLocation> location() {
         ServerPlayer player = handle();
         Location<?, ?> location = player.location();
         if (!(location instanceof ServerLocation loc)) {
@@ -83,7 +84,7 @@ final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RPlayer 
     }
 
     @Override
-    public void teleport(RLocation location) {
+    public void teleport(@NotNull RLocation location) {
         Objects.requireNonNull(location, "location");
         if (!Sponge.isServerAvailable()) return;
 

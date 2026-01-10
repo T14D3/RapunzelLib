@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.objects.RNativeHandle;
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import net.minecraft.server.level.ServerLevel;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 import java.nio.charset.StandardCharsets;
@@ -24,12 +25,12 @@ final class FabricWorld extends RNativeHandle<ServerLevel> implements RWorld {
     }
 
     @Override
-    public RWorldRef ref() {
+    public @NotNull RWorldRef ref() {
         return new RWorldRef(key, key);
     }
 
     @Override
-    public Optional<UUID> uuid() {
+    public @NotNull Optional<UUID> uuid() {
         return Optional.of(UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)));
     }
 }

@@ -71,6 +71,29 @@ Most non-`api` modules also publish a **`shaded` classifier** (e.g. `...:<versio
 
 Fabric also publishes an unremapped dev jar as `:dev-shaded`.
 
+## Gradle plugin (`de.t14d3.rapunzellib`)
+
+The `gradle-plugin` module publishes a Gradle plugin with developer tools:
+
+- `rapunzellibValidateMessages`: validates message key usage in compiled bytecode against your `messages.yml`.
+- `rapunzellibRunServers` / `rapunzellibRunPerfServers`: runs a local Velocity + multiple Paper backends using `tool-server-runner`.
+- `rapunzellibInitTemplate`: generates a small starter template (messages/config/Example.java).
+
+Example:
+
+```kotlin
+plugins {
+  id("de.t14d3.rapunzellib") version "<version>"
+}
+
+rapunzellib {
+  messagesFile.set(layout.projectDirectory.file("src/main/resources/messages.yml"))
+  failOnUnusedKeys.set(true)
+}
+```
+
+More details: `gradle-plugin/README.md`.
+
 ## Core API
 
 ### Bootstrapping (`RapunzelContext`)
@@ -147,13 +170,14 @@ public final class MyModBootstrap {
 ```java
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.platform.sponge.SpongeRapunzelBootstrap;
-import org.slf4j.Logger;
+import org.spongepowered.api.Server;
+import org.spongepowered.plugin.PluginContainer;
 
 import java.nio.file.Path;
 
 public final class MySpongePlugin {
-  public void startup(Logger logger, Path dataDir) {
-    SpongeRapunzelBootstrap.bootstrap(this, "my_sponge_plugin", logger, dataDir, MySpongePlugin.class);
+  public void startup(PluginContainer container, Server server, Path dataDir) {
+    SpongeRapunzelBootstrap.bootstrap(container, dataDir, server);
   }
 
   public void shutdown() {
@@ -382,6 +406,8 @@ Plugin messaging has delivery constraints (e.g. requires a player connection). T
 - `DbQueuedMessenger` - wraps a `Messenger`, persists allowlisted channels to a shared DB and retries periodically
 - `NetworkQueueConfig` - reads outbox settings from `YamlConfig` (`network.queue.*`)
 
+Platform bootstraps that use plugin-messaging transports (Paper/Fabric/NeoForge/Velocity) call `NetworkQueueBootstrap.wrapIfEnabled(...)` automatically when `network.queue.enabled=true`. To persist queued messages, configure `network.queue.jdbc` (or `database.jdbc`) to point at a JDBC URL (e.g. SQLite).
+
 Config keys (with defaults):
 
 - `network.queue.enabled` (`true`)
@@ -448,7 +474,7 @@ if (q.enabled()) {
 - `Rapunzel.context()` throws until you bootstrap; only one global context is supported.
 - Plugin messaging transport needs a player connection:
   - Paper: `Messenger.isConnected()` is false with zero online players; sends are dropped.
-  - Velocity: forwarding to a backend server requires at least one player currently on that backend (or configure `VelocityPluginMessenger#setUndeliverableForwarder`, e.g. with `DbQueuedMessenger`).
+  - Velocity: forwarding to a backend server requires at least one player currently on that backend (queueing can be enabled via `network.queue.*`).
 - Platform differences are explicit:
   - Velocity has no worlds/blocks; some operations throw `UnsupportedOperationException`.
 - `YamlMessageFormatService` turns unknown MiniMessage tags into placeholders; avoid naming placeholders after built-in MiniMessage tags.

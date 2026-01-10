@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.platform.sponge.objects;
 
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.Worlds;
+import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.world.server.ServerWorld;
 
@@ -10,7 +11,7 @@ import java.util.Optional;
 
 public final class SpongeWorlds implements Worlds {
     @Override
-    public Collection<RWorld> all() {
+    public @NotNull Collection<RWorld> all() {
         if (!Sponge.isServerAvailable()) return java.util.List.of();
         return Sponge.server().worldManager().worlds().stream()
             .map(SpongeWorld::new)
@@ -19,7 +20,7 @@ public final class SpongeWorlds implements Worlds {
     }
 
     @Override
-    public Optional<RWorld> getByName(String name) {
+    public @NotNull Optional<RWorld> getByName(@NotNull String name) {
         if (name == null || name.isBlank()) return Optional.empty();
         if (!Sponge.isServerAvailable()) return Optional.empty();
         String target = name.trim();
@@ -31,7 +32,7 @@ public final class SpongeWorlds implements Worlds {
     }
 
     @Override
-    public Optional<RWorld> wrap(Object nativeWorld) {
+    public @NotNull Optional<RWorld> wrap(@NotNull Object nativeWorld) {
         if (!(nativeWorld instanceof ServerWorld world)) return Optional.empty();
         return Optional.of(new SpongeWorld(world));
     }

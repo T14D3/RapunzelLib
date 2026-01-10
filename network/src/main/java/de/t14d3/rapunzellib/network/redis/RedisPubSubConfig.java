@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.network.redis;
 
+@SuppressWarnings("SameParameterValue")
 public final class RedisPubSubConfig {
     private final String host;
     private final int port;
@@ -112,6 +113,7 @@ public final class RedisPubSubConfig {
             '}';
     }
 
+    @SuppressWarnings("UnusedReturnValue")
     public static final class Builder {
         private String host = "127.0.0.1";
         private int port = 6379;
