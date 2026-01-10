@@ -65,7 +65,6 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         if (!bus.hasPostListeners(ChunkUnloadPost.class)) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         var chunk = event.getChunk();
-        if (chunk == null) return;
         String id = level.dimension().location().toString();
         bus.dispatchPost(new ChunkUnloadPost(new RWorldRef(id, id), chunk.getPos().x, chunk.getPos().z));
     }
@@ -214,7 +213,6 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
 
         var target = event.getTarget();
-        if (target == null) return;
 
         RPlayer rPlayer = Rapunzel.players().require(player);
         String worldId = level.dimension().location().toString();
@@ -234,13 +232,11 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
     public void onAttackEntity(AttackEntityEvent event) {
         if (!bus.hasPreListeners(AttackEntityPre.class)) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!(player.level() instanceof ServerLevel level)) return;
 
         var target = event.getTarget();
-        if (target == null) return;
 
         RPlayer rPlayer = Rapunzel.players().require(player);
-        String worldId = level.dimension().location().toString();
+        String worldId = player.level().dimension().location().toString();
         RWorldRef worldRef = new RWorldRef(worldId, worldId);
         BlockPos pos = target.blockPosition();
         RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());

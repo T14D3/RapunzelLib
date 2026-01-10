@@ -1,9 +1,11 @@
 package de.t14d3.rapunzellib.network.filesync;
 
+import org.jetbrains.annotations.NotNull;
+
 public record FileSyncInvalidate(
-    String groupId,
-    String invalidateId,
-    long createdAt
+        @NotNull String groupId,
+        @NotNull String invalidateId,
+        long createdAt
 ) {
 }
 

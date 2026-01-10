@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":common"))
     implementation(project(":network"))
     implementation(project(":database-spool"))
+    implementation(libs.fastutil)
 
     compileOnly(libs.sponge.api)
     compileOnly(libs.annotations)

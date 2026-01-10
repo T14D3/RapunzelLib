@@ -29,6 +29,9 @@ class RapunzelLibGradlePlugin : Plugin<Project> {
         ext.templateProjectName.convention(project.name)
 
         val validate = project.tasks.register<ValidateMessagesTask>("rapunzellibValidateMessages") {
+            group = "verification"
+            description = "Validates messages.yml keys against compiled bytecode usage."
+
             messagesFile.set(ext.messagesFile)
             additionalMessagesFiles.set(ext.additionalMessagesFiles)
             failOnUnusedKeys.set(ext.failOnUnusedKeys)
@@ -136,7 +139,10 @@ class RapunzelLibGradlePlugin : Plugin<Project> {
             }
         }
 
-        project.tasks.register<InitTemplateTask>("rapunzellibInitTemplate") {
+        project.tasks.register<InitTemplateTask>("rapunzellibInitTemplate") {   
+            group = "rapunzellib"
+            description = "Generates a small RapunzelLib starter template into template/."
+
             outputDir.set(ext.templateOutputDir)
             basePackage.set(ext.templateBasePackage)
             projectName.set(ext.templateProjectName)

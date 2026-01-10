@@ -1,21 +1,23 @@
 package de.t14d3.rapunzellib.objects;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface Players {
-    Collection<RPlayer> online();
+    @NotNull Collection<RPlayer> online();
 
-    Optional<RPlayer> get(UUID uuid);
+    @NotNull Optional<RPlayer> get(@NotNull UUID uuid);
 
-    Optional<RPlayer> wrap(Object nativePlayer);
+    @NotNull Optional<RPlayer> wrap(@NotNull Object nativePlayer);
 
-    default RPlayer require(UUID uuid) {
+    default @NotNull RPlayer require(@NotNull UUID uuid) {
         return get(uuid).orElseThrow(() -> new IllegalArgumentException("Unknown player: " + uuid));
     }
 
-    default RPlayer require(Object nativePlayer) {
+    default @NotNull RPlayer require(@NotNull Object nativePlayer) {
         return wrap(nativePlayer).orElseThrow(() -> new IllegalArgumentException("Cannot wrap player: " + nativePlayer));
     }
 }

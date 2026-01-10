@@ -2,19 +2,20 @@ package de.t14d3.rapunzellib.objects.block;
 
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.objects.RNative;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 
 public interface RBlockData extends RNative {
-    String typeKey();
+    @NotNull String typeKey();
 
-    String asString();
+    @NotNull String asString();
 
-    static Optional<RBlockData> wrap(Object nativeBlockData) {
+    static @NotNull Optional<RBlockData> wrap(@NotNull Object nativeBlockData) {
         return Rapunzel.blocks().wrapData(nativeBlockData);
     }
 
-    static Optional<RBlockData> parse(String value) {
+    static @NotNull Optional<RBlockData> parse(@NotNull String value) {
         return Rapunzel.blocks().parseData(value);
     }
 }

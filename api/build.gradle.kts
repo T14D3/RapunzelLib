@@ -5,8 +5,8 @@ plugins {
 dependencies {
     api(libs.adventure.api)
     api(libs.slf4j.api)
-    implementation(libs.snakeyaml)
-    compileOnly(libs.annotations)
+    api(libs.annotations)
 
     testImplementation(libs.junit.jupiter)
+    testImplementation(project(":common"))
 }

@@ -8,6 +8,7 @@ import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.block.RBlock;
 import de.t14d3.rapunzellib.objects.block.RBlockData;
 import org.bukkit.block.Block;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
@@ -17,7 +18,7 @@ final class PaperBlock extends RNativeHandle<Block> implements RBlock {
     }
 
     @Override
-    public RWorld world() {
+    public @NotNull RWorld world() {
         Block block = handle();
         return Rapunzel.context().worlds()
             .wrap(block.getWorld())
@@ -25,18 +26,18 @@ final class PaperBlock extends RNativeHandle<Block> implements RBlock {
     }
 
     @Override
-    public RBlockPos pos() {
+    public @NotNull RBlockPos pos() {
         Block block = handle();
         return new RBlockPos(block.getX(), block.getY(), block.getZ());
     }
 
     @Override
-    public String typeKey() {
+    public @NotNull String typeKey() {
         return handle().getType().getKey().toString();
     }
 
     @Override
-    public RBlockData data() {
+    public @NotNull RBlockData data() {
         return new PaperBlockData(handle().getBlockData());
     }
 }

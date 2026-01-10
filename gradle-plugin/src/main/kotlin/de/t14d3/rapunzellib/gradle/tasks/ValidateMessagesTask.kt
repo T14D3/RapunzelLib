@@ -89,8 +89,8 @@ abstract class ValidateMessagesTask : DefaultTask() {
         for (file in files) {
             val root = try {
                 yaml.load<Any?>(file.readText(Charsets.UTF_8))
-            } catch (_: Exception) {
-                null
+            } catch (e: Exception) {
+                throw GradleException("Failed to parse YAML file: ${file.absolutePath}", e)
             }
 
             val flattened = LinkedHashMap<String, Any?>()
@@ -137,7 +137,8 @@ abstract class ValidateMessagesTask : DefaultTask() {
                 val node = ClassNode(Opcodes.ASM9)
                 ClassReader(classFile.readBytes()).accept(node, ClassReader.SKIP_FRAMES)
                 scanClass(node, analyzer, keys, ownerAllowList, methodAllowList, prefix)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logger.debug("Failed to scan class file for message key usage: {}", classFile.absolutePath, e)
             }
         }
 
@@ -228,9 +229,9 @@ abstract class ValidateMessagesTask : DefaultTask() {
         return value == "prefix" || value.contains('.')
     }
 
-    private class StringConstInterpreter : BasicInterpreter(Opcodes.ASM9) {
+    private class StringConstInterpreter : BasicInterpreter(ASM9) {
         override fun newOperation(insn: AbstractInsnNode): BasicValue {
-            if (insn.opcode == Opcodes.LDC) {
+            if (insn.opcode == LDC) {
                 val cst = (insn as LdcInsnNode).cst
                 if (cst is String) return StringConstValue(Type.getType(String::class.java), cst)
             }

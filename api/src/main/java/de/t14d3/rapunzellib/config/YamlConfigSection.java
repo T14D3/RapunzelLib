@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib.config;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -17,14 +19,14 @@ final class YamlConfigSection implements ConfigurationSection {
     }
 
     @Override
-    public boolean contains(String path) {
+    public boolean contains(@NotNull String path) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return false;
         return config.contains(abs);
     }
 
     @Override
-    public Set<String> getKeys(boolean deep) {
+    public @NotNull Set<String> getKeys(boolean deep) {
         if (prefix.isEmpty()) {
             return config.keys(deep);
         }
@@ -48,49 +50,49 @@ final class YamlConfigSection implements ConfigurationSection {
     }
 
     @Override
-    public Object get(String path) {
+    public Object get(@NotNull String path) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return null;
         return config.get(abs);
     }
 
     @Override
-    public String getString(String path, String def) {
+    public String getString(@NotNull String path, String def) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return def;
         return config.getString(abs, def);
     }
 
     @Override
-    public int getInt(String path, int def) {
+    public int getInt(@NotNull String path, int def) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return def;
         return config.getInt(abs, def);
     }
 
     @Override
-    public boolean getBoolean(String path, boolean def) {
+    public boolean getBoolean(@NotNull String path, boolean def) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return def;
         return config.getBoolean(abs, def);
     }
 
     @Override
-    public double getDouble(String path, double def) {
+    public double getDouble(@NotNull String path, double def) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return def;
         return config.getDouble(abs, def);
     }
 
     @Override
-    public List<String> getStringList(String path, List<String> def) {
+    public @NotNull List<String> getStringList(@NotNull String path, @NotNull List<String> def) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return def;
         return config.getStringList(abs, def);
     }
 
     @Override
-    public ConfigurationSection getConfigurationSection(String path) {
+    public ConfigurationSection getConfigurationSection(@NotNull String path) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return this;
         Object v = config.get(abs);
@@ -99,7 +101,7 @@ final class YamlConfigSection implements ConfigurationSection {
     }
 
     @Override
-    public ConfigurationSection createSection(String path) {
+    public @NotNull ConfigurationSection createSection(@NotNull String path) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return this;
 
@@ -111,21 +113,21 @@ final class YamlConfigSection implements ConfigurationSection {
     }
 
     @Override
-    public void set(String path, Object value) {
+    public void set(@NotNull String path, Object value) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return;
         config.set(abs, value);
     }
 
     @Override
-    public String getComment(String path) {
+    public String getComment(@NotNull String path) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return null;
         return config.getComment(abs);
     }
 
     @Override
-    public void setComment(String path, String comment) {
+    public void setComment(@NotNull String path, @NotNull String comment) {
         String abs = abs(path);
         if (abs == null || abs.isBlank()) return;
         config.setComment(abs, comment);

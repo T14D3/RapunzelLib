@@ -164,7 +164,7 @@ final class RedisConnection implements AutoCloseable {
     public void close() {
         try {
             socket.close();
-        } catch (Exception ignored) {
+        } catch (IOException ignored) {
         }
     }
 }

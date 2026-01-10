@@ -3,6 +3,7 @@ package de.t14d3.rapunzellib.platform.velocity.scheduler;
 import com.velocitypowered.api.proxy.ProxyServer;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -18,27 +19,27 @@ public final class VelocityScheduler implements Scheduler {
     }
 
     @Override
-    public ScheduledTask run(Runnable task) {
+    public @NotNull ScheduledTask run(@NotNull Runnable task) {
         return schedule(task, Duration.ZERO, null);
     }
 
     @Override
-    public ScheduledTask runAsync(Runnable task) {
+    public @NotNull ScheduledTask runAsync(@NotNull Runnable task) {
         return schedule(task, Duration.ZERO, null);
     }
 
     @Override
-    public ScheduledTask runLater(Duration delay, Runnable task) {
+    public @NotNull ScheduledTask runLater(@NotNull Duration delay, @NotNull Runnable task) {
         return schedule(task, delay, null);
     }
 
     @Override
-    public ScheduledTask runRepeating(Duration initialDelay, Duration period, Runnable task) {
+    public @NotNull ScheduledTask runRepeating(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
         return schedule(task, initialDelay, period);
     }
 
     @Override
-    public ScheduledTask runRepeatingAsync(Duration initialDelay, Duration period, Runnable task) {
+    public @NotNull ScheduledTask runRepeatingAsync(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
         return schedule(task, initialDelay, period);
     }
 

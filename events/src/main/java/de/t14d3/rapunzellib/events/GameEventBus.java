@@ -1,15 +1,16 @@
 package de.t14d3.rapunzellib.events;
 
 import de.t14d3.rapunzellib.scheduler.Scheduler;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+@SuppressWarnings("UnusedReturnValue")
 public final class GameEventBus implements AutoCloseable {
     public interface Subscription extends AutoCloseable {
         @Override
@@ -23,70 +24,76 @@ public final class GameEventBus implements AutoCloseable {
     private final Map<Class<?>, ListenerList> postListeners = new ConcurrentHashMap<>();
     private final Map<Class<?>, ListenerList> asyncListeners = new ConcurrentHashMap<>();
 
-    public GameEventBus(Scheduler scheduler, Logger logger) {
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+    public GameEventBus(@NotNull Scheduler scheduler, @NotNull Logger logger) {
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");        
         this.logger = Objects.requireNonNull(logger, "logger");
     }
 
-    public <E extends CancellablePreEvent> Subscription onPre(Class<E> eventType, Consumer<E> listener) {
+    public <E extends CancellablePreEvent> @NotNull Subscription onPre(
+        @NotNull Class<E> eventType,
+        @NotNull Consumer<E> listener
+    ) {
         return register(preListeners, eventType, listener);
     }
 
-    public <E extends GamePostEvent> Subscription onPost(Class<E> eventType, Consumer<E> listener) {
+    public <E extends GamePostEvent> @NotNull Subscription onPost(
+        @NotNull Class<E> eventType,
+        @NotNull Consumer<E> listener
+    ) {
         return register(postListeners, eventType, listener);
     }
 
-    public <E extends GameEventSnapshot> Subscription onAsync(Class<E> eventType, Consumer<E> listener) {
+    public <E extends GameEventSnapshot> @NotNull Subscription onAsync(
+        @NotNull Class<E> eventType,
+        @NotNull Consumer<E> listener
+    ) {
         return register(asyncListeners, eventType, listener);
     }
 
-    public <E extends CancellablePreEvent> void dispatchPre(E event) {
+    public <E extends CancellablePreEvent> void dispatchPre(@NotNull E event) {
         ListenerList list = preListeners.get(event.getClass());
         if (list == null) return;
         Consumer<?>[] listeners = list.snapshot();
-        if (listeners.length == 0) return;
 
-        for (int i = 0; i < listeners.length; i++) {
+        for (Consumer<?> listener : listeners) {
             if (event.isDenied()) return;
-            dispatchUnchecked(listeners[i], event);
+            dispatchUnchecked(listener, event);
         }
     }
 
-    public <E extends GamePostEvent> void dispatchPost(E event) {
+    public <E extends GamePostEvent> void dispatchPost(@NotNull E event) {
         ListenerList list = postListeners.get(event.getClass());
         if (list == null) return;
         Consumer<?>[] listeners = list.snapshot();
-        if (listeners.length == 0) return;
 
-        for (int i = 0; i < listeners.length; i++) {
-            dispatchUnchecked(listeners[i], event);
+        for (Consumer<?> listener : listeners) {
+            dispatchUnchecked(listener, event);
         }
     }
 
-    public <E extends GameEventSnapshot> void dispatchAsync(E snapshot) {
+    public <E extends GameEventSnapshot> void dispatchAsync(@NotNull E snapshot) {
         ListenerList list = asyncListeners.get(snapshot.getClass());
         if (list == null) return;
         Consumer<?>[] listeners = list.snapshot();
-        if (listeners.length == 0) return;
 
         scheduler.runAsync(() -> {
-            for (int i = 0; i < listeners.length; i++) {
-                dispatchUnchecked(listeners[i], snapshot);
+            for (Consumer<?> listener : listeners) {
+                dispatchUnchecked(listener, snapshot);
             }
         });
     }
 
-    public boolean hasPreListeners(Class<? extends GamePreEvent> type) {
+    public boolean hasPreListeners(@NotNull Class<? extends GamePreEvent> type) {
         ListenerList list = preListeners.get(type);
         return list != null && list.hasListeners();
     }
 
-    public boolean hasPostListeners(Class<? extends GamePostEvent> type) {
+    public boolean hasPostListeners(@NotNull Class<? extends GamePostEvent> type) {
         ListenerList list = postListeners.get(type);
         return list != null && list.hasListeners();
     }
 
-    public boolean hasAsyncListeners(Class<? extends GameEventSnapshot> type) {
+    public boolean hasAsyncListeners(@NotNull Class<? extends GameEventSnapshot> type) {
         ListenerList list = asyncListeners.get(type);
         return list != null && list.hasListeners();
     }
@@ -113,7 +120,7 @@ public final class GameEventBus implements AutoCloseable {
         try {
             ((Consumer<E>) listener).accept(event);
         } catch (Exception e) {
-            logger.warn("Unhandled exception in event listener for {}: {}", event.getClass().getName(), e.getMessage());
+            logger.warn("Unhandled exception in event listener for {}", event.getClass().getName(), e);
         }
     }
 

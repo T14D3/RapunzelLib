@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib;
 
+import org.jetbrains.annotations.NotNull;
+
 /**
  * Best-effort runtime version information for RapunzelLib.
  *
@@ -10,11 +12,10 @@ public final class RapunzelLibVersion {
     private RapunzelLibVersion() {
     }
 
-    public static String current() {
+    public static @NotNull String current() {
         Package pkg = RapunzelLibVersion.class.getPackage();
         String version = (pkg != null) ? pkg.getImplementationVersion() : null;
         if (version == null || version.isBlank()) return "unknown";
         return version;
     }
 }
-

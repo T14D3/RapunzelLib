@@ -3,9 +3,9 @@ package de.t14d3.rapunzellib.platform.paper.scheduler;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.dedicated.DedicatedServer;
 import org.bukkit.craftbukkit.CraftServer;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -35,7 +35,7 @@ public final class PaperScheduler implements Scheduler, AutoCloseable {
     }
 
     @Override
-    public ScheduledTask run(Runnable task) {
+    public @NotNull ScheduledTask run(@NotNull Runnable task) {
         Objects.requireNonNull(task, "task");
         ensureOpen();
         if (Thread.currentThread() == mainThread) {
@@ -48,14 +48,14 @@ public final class PaperScheduler implements Scheduler, AutoCloseable {
     }
 
     @Override
-    public ScheduledTask runAsync(Runnable task) {
+    public @NotNull ScheduledTask runAsync(@NotNull Runnable task) {
         Objects.requireNonNull(task, "task");
         ensureOpen();
         return new PaperFutureTaskHandle(asyncExecutor.submit(wrapAsync(task, "runAsync")));
     }
 
     @Override
-    public ScheduledTask runLater(Duration delay, Runnable task) {
+    public @NotNull ScheduledTask runLater(@NotNull Duration delay, @NotNull Runnable task) {
         Objects.requireNonNull(task, "task");
         ensureOpen();
         long delayMs = safeDelayMs(delay);
@@ -65,7 +65,7 @@ public final class PaperScheduler implements Scheduler, AutoCloseable {
     }
 
     @Override
-    public ScheduledTask runRepeating(Duration initialDelay, Duration period, Runnable task) {
+    public @NotNull ScheduledTask runRepeating(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
         Objects.requireNonNull(task, "task");
         ensureOpen();
         long initialMs = safeDelayMs(initialDelay);
@@ -79,7 +79,7 @@ public final class PaperScheduler implements Scheduler, AutoCloseable {
     }
 
     @Override
-    public ScheduledTask runRepeatingAsync(Duration initialDelay, Duration period, Runnable task) {
+    public @NotNull ScheduledTask runRepeatingAsync(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
         Objects.requireNonNull(task, "task");
         ensureOpen();
         long initialMs = safeDelayMs(initialDelay);

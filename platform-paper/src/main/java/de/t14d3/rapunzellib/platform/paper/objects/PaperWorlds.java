@@ -4,6 +4,7 @@ import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.Worlds;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -14,18 +15,18 @@ public final class PaperWorlds implements Worlds {
     private final ConcurrentHashMap<UUID, PaperWorld> cache = new ConcurrentHashMap<>();
 
     @Override
-    public Collection<RWorld> all() {
+    public @NotNull Collection<RWorld> all() {
         return Bukkit.getWorlds().stream().map(this::wrapInternal).map(RWorld.class::cast).toList();
     }
 
     @Override
-    public Optional<RWorld> getByName(String name) {
+    public @NotNull Optional<RWorld> getByName(@NotNull String name) {
         World world = Bukkit.getWorld(name);
         return (world != null) ? Optional.of(wrapInternal(world)) : Optional.empty();
     }
 
     @Override
-    public Optional<RWorld> wrap(Object nativeWorld) {
+    public @NotNull Optional<RWorld> wrap(@NotNull Object nativeWorld) {
         if (!(nativeWorld instanceof World world)) return Optional.empty();
         return Optional.of(wrapInternal(world));
     }

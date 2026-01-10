@@ -1,5 +1,8 @@
 package de.t14d3.rapunzellib.config;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 import java.util.Set;
 
@@ -9,54 +12,53 @@ import java.util.Set;
  * <p>Paths passed to this interface are relative to the section's root.</p>
  */
 public interface ConfigurationSection {
-    boolean contains(String path);
+    boolean contains(@NotNull String path);
 
-    Set<String> getKeys(boolean deep);
+    @NotNull Set<String> getKeys(boolean deep);
 
-    Object get(String path);
+    @Nullable Object get(@NotNull String path);
 
-    String getString(String path, String def);
+    @Nullable String getString(@NotNull String path, @Nullable String def);
 
-    default String getString(String path) {
+    default @Nullable String getString(@NotNull String path) {
         return getString(path, null);
     }
 
-    int getInt(String path, int def);
+    int getInt(@NotNull String path, int def);
 
-    default int getInt(String path) {
+    default int getInt(@NotNull String path) {
         return getInt(path, 0);
     }
 
-    boolean getBoolean(String path, boolean def);
+    boolean getBoolean(@NotNull String path, boolean def);
 
-    default boolean getBoolean(String path) {
+    default boolean getBoolean(@NotNull String path) {
         return getBoolean(path, false);
     }
 
-    double getDouble(String path, double def);
+    double getDouble(@NotNull String path, double def);
 
-    default double getDouble(String path) {
+    default double getDouble(@NotNull String path) {
         return getDouble(path, 0D);
     }
 
-    List<String> getStringList(String path, List<String> def);
+    @NotNull List<String> getStringList(@NotNull String path, @NotNull List<String> def);
 
-    default List<String> getStringList(String path) {
+    default @NotNull List<String> getStringList(@NotNull String path) {
         return getStringList(path, List.of());
     }
 
-    ConfigurationSection getConfigurationSection(String path);
+    @Nullable ConfigurationSection getConfigurationSection(@NotNull String path);
 
-    ConfigurationSection createSection(String path);
+    @NotNull ConfigurationSection createSection(@NotNull String path);
 
-    void set(String path, Object value);
+    void set(@NotNull String path, @Nullable Object value);
 
-    default void remove(String path) {
+    default void remove(@NotNull String path) {
         set(path, null);
     }
 
-    String getComment(String path);
+    @Nullable String getComment(@NotNull String path);
 
-    void setComment(String path, String comment);
+    void setComment(@NotNull String path, @NotNull String comment);
 }
-

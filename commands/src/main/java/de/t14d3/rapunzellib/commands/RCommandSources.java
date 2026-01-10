@@ -4,6 +4,7 @@ import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RNativeHandle;
 import net.kyori.adventure.audience.Audience;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -36,7 +37,7 @@ public final class RCommandSources {
         }
 
         @Override
-        public Audience audience() {
+        public @NotNull Audience audience() {
             return handle();
         }
 

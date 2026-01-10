@@ -3,6 +3,7 @@ package de.t14d3.rapunzellib.platform.sponge.objects;
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.objects.RNativeHandle;
 import de.t14d3.rapunzellib.objects.block.RBlockData;
+import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.registry.RegistryTypes;
 
@@ -14,12 +15,12 @@ final class SpongeBlockData extends RNativeHandle<BlockState> implements RBlockD
     }
 
     @Override
-    public String typeKey() {
+    public @NotNull String typeKey() {
         return handle().type().key(RegistryTypes.BLOCK_TYPE).asString();
     }
 
     @Override
-    public String asString() {
+    public @NotNull String asString() {
         return handle().asString();
     }
 }
