@@ -4,11 +4,13 @@ import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.objects.Players;
 import de.t14d3.rapunzellib.objects.Worlds;
 import de.t14d3.rapunzellib.objects.block.Blocks;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 public final class Rapunzel {
     private static final Object DEFAULT_OWNER = Rapunzel.class;
@@ -23,7 +25,7 @@ public final class Rapunzel {
         return context != null;
     }
 
-    public static RapunzelContext context() {
+    public static @NotNull RapunzelContext context() {
         RapunzelContext current = context;
         if (current == null) {
             throw new IllegalStateException("RapunzelLib context not bootstrapped yet");
@@ -31,15 +33,15 @@ public final class Rapunzel {
         return current;
     }
 
-    public static Players players() {
+    public static @NotNull Players players() {
         return context().players();
     }
 
-    public static Worlds worlds() {
+    public static @NotNull Worlds worlds() {
         return context().worlds();
     }
 
-    public static Blocks blocks() {
+    public static @NotNull Blocks blocks() {
         return context().blocks();
     }
 
@@ -55,7 +57,7 @@ public final class Rapunzel {
      * @param owner a stable owner token (e.g. your plugin/mod instance)
      * @return a lease that releases this owner on {@link Lease#close()}
      */
-    public static Lease bootstrap(Object owner, RapunzelContext newContext) {
+    public static @NotNull Lease bootstrap(@NotNull Object owner, @NotNull RapunzelContext newContext) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(newContext, "newContext");
 
@@ -81,13 +83,49 @@ public final class Rapunzel {
     }
 
     /**
+     * Bootstraps the global {@link RapunzelContext} if absent; otherwise acquires a lease for
+     * the already-bootstrapped context.
+     *
+     * <p>The {@code contextFactory} is only invoked when no context is currently bootstrapped.</p>
+     *
+     * <p>This is intended for shared runtimes where multiple components may attempt to bootstrap.
+     * Only the first call creates the context; all others simply acquire it.</p>
+     *
+     * @param owner a stable owner token (e.g. your plugin/mod instance)
+     * @return a lease that releases this owner on {@link Lease#close()}
+     */
+    public static @NotNull Lease bootstrapOrAcquire(
+        @NotNull Object owner,
+        @NotNull Supplier<? extends RapunzelContext> contextFactory
+    ) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(contextFactory, "contextFactory");
+
+        synchronized (LOCK) {
+            RapunzelContext current = context;
+            if (current == null) {
+                RapunzelContext created = Objects.requireNonNull(contextFactory.get(), "contextFactory.get()");
+                context = created;
+                current = created;
+            }
+
+            Lease existing = leases.get(owner);
+            if (existing != null) return existing;
+
+            Lease lease = new Lease(owner, current);
+            leases.put(owner, lease);
+            return lease;
+        }
+    }
+
+    /**
      * Registers {@code owner} as a consumer of the already-bootstrapped context.
      *
      * <p>This does not create or replace the global context; it only prevents shutdown until the owner releases.</p>
      *
      * @throws IllegalStateException if no context is bootstrapped
      */
-    public static Lease acquire(Object owner) {
+    public static @NotNull Lease acquire(@NotNull Object owner) {
         Objects.requireNonNull(owner, "owner");
 
         synchronized (LOCK) {
@@ -110,14 +148,14 @@ public final class Rapunzel {
      *
      * <p>Prefer {@link #bootstrap(Object, RapunzelContext)} in shared runtimes.</p>
      */
-    public static void bootstrap(RapunzelContext newContext) {
+    public static void bootstrap(@NotNull RapunzelContext newContext) {
         bootstrap(DEFAULT_OWNER, newContext);
     }
 
     /**
      * Releases {@code owner}. The global context is closed once no owners remain.
      */
-    public static void shutdown(Object owner) {
+    public static void shutdown(@NotNull Object owner) {
         Objects.requireNonNull(owner, "owner");
 
         RapunzelContext toClose;
@@ -133,7 +171,15 @@ public final class Rapunzel {
         if (toClose == null) return;
         try {
             toClose.close();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            try {
+                toClose.logger().warn("Failed to close RapunzelLib context", e);
+            } catch (Exception logError) {
+                System.err.println("Failed to close RapunzelLib context: " + e);
+                e.printStackTrace(System.err);
+                System.err.println("Additionally failed to log close failure: " + logError);
+                logError.printStackTrace(System.err);
+            }
         }
     }
 
@@ -161,7 +207,15 @@ public final class Rapunzel {
         if (toClose == null) return;
         try {
             toClose.close();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            try {
+                toClose.logger().warn("Failed to close RapunzelLib context", e);
+            } catch (Exception logError) {
+                System.err.println("Failed to close RapunzelLib context: " + e);
+                e.printStackTrace(System.err);
+                System.err.println("Additionally failed to log close failure: " + logError);
+                logError.printStackTrace(System.err);
+            }
         }
     }
 
@@ -181,11 +235,11 @@ public final class Rapunzel {
             this.context = context;
         }
 
-        public Object owner() {
+        public @NotNull Object owner() {
             return owner;
         }
 
-        public RapunzelContext context() {
+        public @NotNull RapunzelContext context() {
             return context;
         }
 
@@ -200,4 +254,3 @@ public final class Rapunzel {
         }
     }
 }
-

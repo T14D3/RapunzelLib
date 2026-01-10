@@ -6,6 +6,7 @@ import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkEnvelope;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.time.Duration;
@@ -16,7 +17,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -26,11 +29,222 @@ import java.util.function.Supplier;
  * <p>When immediate delivery isn't possible, selected channels are persisted to a shared DB and retried
  * periodically.</p>
  */
-public final class DbQueuedMessenger implements Messenger, AutoCloseable {
-    private final SpoolDatabase database;
-    private final NetworkOutboxRepository repository;
+public final class DbQueuedMessenger implements Messenger, AutoCloseable {   
+    public interface Listener {
+        default void onEnqueued(long id, NetworkEnvelope.Target target, String targetServer, String channel) {
+        }
+
+        default void onDelivered(long id, NetworkEnvelope.Target target, String targetServer, String channel) {
+        }
+
+        default void onDropped(long id, DropReason reason, NetworkEnvelope.Target target, String targetServer, String channel) {
+        }
+
+        default void onExpired(long id, NetworkEnvelope.Target target, String targetServer, String channel, long ageMillis) {
+        }
+
+        default void onDeliveryFailed(long id, NetworkEnvelope.Target target, String targetServer, String channel, Exception error) {
+        }
+    }
+
+    public enum DropReason {
+        NOT_ALLOWLISTED,
+        INVALID_TARGET,
+        MISSING_TARGET_SERVER
+    }
+
+    interface OutboxStore {
+        long enqueue(
+            String ownerId,
+            NetworkEnvelope.Target target,
+            String targetServer,
+            String channel,
+            String data,
+            long createdAt
+        );
+
+        List<StoredMessage> fetchBatch(String ownerId, int limit);
+
+        void deleteByIds(List<Long> ids);
+
+        void recordAttempt(long id, long now);
+    }
+
+    record StoredMessage(
+        long id,
+        String ownerId,
+        String target,
+        String targetServer,
+        String channel,
+        String data,
+        long createdAt,
+        int attempts,
+        long lastAttemptAt
+    ) {
+    }
+
+    static final class DatabaseOutboxStore implements OutboxStore, AutoCloseable {
+        private final SpoolDatabase database;
+        private final NetworkOutboxRepository repository;
+
+        DatabaseOutboxStore(SpoolDatabase database) {
+            this.database = Objects.requireNonNull(database, "database");
+            this.repository = new NetworkOutboxRepository(database.entityManager());
+        }
+
+        @Override
+        public long enqueue(
+            String ownerId,
+            NetworkEnvelope.Target target,
+            String targetServer,
+            String channel,
+            String data,
+            long createdAt
+        ) {
+            final long[] id = new long[1];
+            database.runLocked(() -> {
+                NetworkOutboxMessage msg = new NetworkOutboxMessage();
+                msg.setOwnerId(ownerId);
+                msg.setChannel(channel);
+                msg.setData(data);
+                msg.setTarget(target.name());
+                msg.setTargetServer(targetServer);
+                msg.setCreatedAt(createdAt);
+                msg.setAttempts(0);
+                msg.setLastAttemptAt(0L);
+
+                repository.save(msg);
+                database.entityManager().flush();
+                id[0] = msg.getId();
+            });
+            return id[0];
+        }
+
+        @Override
+        public List<StoredMessage> fetchBatch(String ownerId, int limit) {
+            if (limit <= 0) return List.of();
+            return database.locked(() -> repository
+                .findBy("ownerId", ownerId)
+                .stream()
+                .sorted(Comparator.comparingLong(NetworkOutboxMessage::getId))
+                .limit(limit)
+                .map(msg -> new StoredMessage(
+                    msg.getId(),
+                    msg.getOwnerId(),
+                    msg.getTarget(),
+                    msg.getTargetServer(),
+                    msg.getChannel(),
+                    msg.getData(),
+                    msg.getCreatedAt(),
+                    msg.getAttempts(),
+                    msg.getLastAttemptAt()
+                ))
+                .toList());
+        }
+
+        @Override
+        public void deleteByIds(List<Long> ids) {
+            if (ids == null || ids.isEmpty()) return;
+            database.runLocked(() -> {
+                for (Long id : ids) {
+                    if (id == null) continue;
+                    repository.deleteById(id);
+                }
+            });
+            database.flushAsync();
+        }
+
+        @Override
+        public void recordAttempt(long id, long now) {
+            if (id <= 0L) return;
+            database.runLocked(() -> {
+                NetworkOutboxMessage existing = repository.findById(id);
+                if (existing == null) return;
+                existing.setAttempts(existing.getAttempts() + 1);
+                existing.setLastAttemptAt(now);
+                repository.save(existing);
+            });
+            database.flushAsync();
+        }
+
+        @Override
+        public void close() throws Exception {
+            database.close();
+        }
+    }
+
+    static final class InMemoryOutboxStore implements OutboxStore {
+        private final AtomicLong ids = new AtomicLong(0L);
+        private final ConcurrentHashMap<Long, StoredMessage> messages = new ConcurrentHashMap<>();
+
+        @Override
+        public long enqueue(
+            String ownerId,
+            NetworkEnvelope.Target target,
+            String targetServer,
+            String channel,
+            String data,
+            long createdAt
+        ) {
+            long id = ids.incrementAndGet();
+            messages.put(id, new StoredMessage(
+                id,
+                ownerId,
+                target.name(),
+                targetServer,
+                channel,
+                data,
+                createdAt,
+                0,
+                0L
+            ));
+            return id;
+        }
+
+        @Override
+        public List<StoredMessage> fetchBatch(String ownerId, int limit) {
+            if (limit <= 0) return List.of();
+            if (ownerId == null || ownerId.isBlank()) return List.of();
+            return messages.values().stream()
+                .filter(m -> ownerId.equals(m.ownerId()))
+                .sorted(Comparator.comparingLong(StoredMessage::id))
+                .limit(limit)
+                .toList();
+        }
+
+        @Override
+        public void deleteByIds(List<Long> ids) {
+            if (ids == null || ids.isEmpty()) return;
+            for (Long id : ids) {
+                if (id == null) continue;
+                messages.remove(id);
+            }
+        }
+
+        @Override
+        public void recordAttempt(long id, long now) {
+            messages.computeIfPresent(id, (_id, existing) -> new StoredMessage(
+                existing.id(),
+                existing.ownerId(),
+                existing.target(),
+                existing.targetServer(),
+                existing.channel(),
+                existing.data(),
+                existing.createdAt(),
+                existing.attempts() + 1,
+                now
+            ));
+        }
+
+        int size() {
+            return messages.size();
+        }
+    }
+
+    private final OutboxStore store;
     private final Messenger delegate;
     private final Logger logger;
+    private final Listener listener;
     private final String ownerId;
     private final Set<String> channelAllowlist;
     private final int maxBatchSize;
@@ -80,12 +294,72 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         Supplier<List<String>> allServersSupplier,
         Predicate<String> canSendToServerOverride
     ) {
-        this.database = Objects.requireNonNull(database, "database");
-        this.repository = new NetworkOutboxRepository(database.entityManager());
+        this(
+            database,
+            delegate,
+            scheduler,
+            logger,
+            ownerId,
+            channelAllowlist,
+            flushPeriod,
+            maxBatchSize,
+            maxAge,
+            allServersSupplier,
+            canSendToServerOverride,
+            null
+        );
+    }
 
+    public DbQueuedMessenger(
+        SpoolDatabase database,
+        Messenger delegate,
+        Scheduler scheduler,
+        Logger logger,
+        String ownerId,
+        Set<String> channelAllowlist,
+        Duration flushPeriod,
+        int maxBatchSize,
+        Duration maxAge,
+        Supplier<List<String>> allServersSupplier,
+        Predicate<String> canSendToServerOverride,
+        Listener listener
+    ) {
+        this(
+            new DatabaseOutboxStore(Objects.requireNonNull(database, "database")),
+            delegate,
+            scheduler,
+            logger,
+            ownerId,
+            channelAllowlist,
+            flushPeriod,
+            maxBatchSize,
+            maxAge,
+            allServersSupplier,
+            canSendToServerOverride,
+            listener
+        );
+    }
+
+    DbQueuedMessenger(
+        OutboxStore store,
+        Messenger delegate,
+        Scheduler scheduler,
+        Logger logger,
+        String ownerId,
+        Set<String> channelAllowlist,
+        Duration flushPeriod,
+        int maxBatchSize,
+        Duration maxAge,
+        Supplier<List<String>> allServersSupplier,
+        Predicate<String> canSendToServerOverride,
+        Listener listener
+    ) {
+        this.store = Objects.requireNonNull(store, "store");
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         Objects.requireNonNull(scheduler, "scheduler");
         this.logger = Objects.requireNonNull(logger, "logger");
+        this.listener = (listener != null) ? listener : new Listener() {
+        };
 
         String normalizedOwner = (ownerId == null) ? "" : ownerId.trim();
         if (normalizedOwner.isBlank()) {
@@ -108,7 +382,7 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public void sendToAll(String channel, String data) {
+    public void sendToAll(@NotNull String channel, @NotNull String data) {
         if (shouldQueue(channel)) {
             List<String> servers = allServers();
             if (!servers.isEmpty()) {
@@ -132,7 +406,7 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public void sendToServer(String channel, String serverName, String data) {
+    public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
         if (canSendToServer(serverName)) {
             delegate.sendToServer(channel, serverName, data);
             return;
@@ -145,7 +419,7 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public void sendToProxy(String channel, String data) {
+    public void sendToProxy(@NotNull String channel, @NotNull String data) {
         if (canSendToProxy()) {
             delegate.sendToProxy(channel, data);
             return;
@@ -158,12 +432,12 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public void registerListener(String channel, MessageListener listener) {
+    public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         delegate.registerListener(channel, listener);
     }
 
     @Override
-    public void unregisterListener(String channel, MessageListener listener) {
+    public void unregisterListener(@NotNull String channel, @NotNull MessageListener listener) {
         delegate.unregisterListener(channel, listener);
     }
 
@@ -173,12 +447,12 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public String getServerName() {
+    public @NotNull String getServerName() {
         return delegate.getServerName();
     }
 
     @Override
-    public String getProxyServerName() {
+    public @NotNull String getProxyServerName() {
         return delegate.getProxyServerName();
     }
 
@@ -186,7 +460,15 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     public void close() {
         try {
             flushTask.cancel();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            logger.debug("Failed to cancel outbox flush task", e);
+        }
+        if (store instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                logger.debug("Failed to close outbox store", e);
+            }
         }
     }
 
@@ -202,7 +484,8 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         if (override != null) {
             try {
                 return override.test(normalized);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.debug("canSendToServer override failed for {}", normalized, e);
                 return false;
             }
         }
@@ -225,9 +508,10 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         if (supplier == null) return List.of();
         try {
             List<String> servers = supplier.get();
-            if (servers == null || servers.isEmpty()) return List.of();
+            if (servers == null || servers.isEmpty()) return List.of();     
             return List.copyOf(servers);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            logger.debug("allServersSupplier failed", e);
             return List.of();
         }
     }
@@ -240,21 +524,11 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
 
         final long now = System.currentTimeMillis();
         final String normalizedTargetServer = (targetServer == null) ? null : targetServer.trim();
+        final String targetServerValue =
+            (normalizedTargetServer == null || normalizedTargetServer.isBlank()) ? null : normalizedTargetServer;
 
-        database.runLocked(() -> {
-            NetworkOutboxMessage msg = new NetworkOutboxMessage();
-            msg.setOwnerId(ownerId);
-            msg.setChannel(normalizedChannel);
-            msg.setData(payload);
-            msg.setTarget(target.name());
-            msg.setTargetServer((normalizedTargetServer == null || normalizedTargetServer.isBlank()) ? null : normalizedTargetServer);
-            msg.setCreatedAt(now);
-            msg.setAttempts(0);
-            msg.setLastAttemptAt(0L);
-
-            repository.save(msg);
-            database.entityManager().flush();
-        });
+        long id = store.enqueue(ownerId, target, targetServerValue, normalizedChannel, payload, now);
+        listener.onEnqueued(id, target, targetServerValue, normalizedChannel);
     }
 
     private void flush() {
@@ -265,72 +539,68 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         try {
             flushOnce();
         } catch (Exception e) {
-            logger.debug("Outbox flush failed: {}", e.getMessage());
+            logger.debug("Outbox flush failed", e);
         } finally {
             flushing.set(false);
         }
     }
 
     private void flushOnce() {
-        List<NetworkOutboxMessage> batch = database.locked(() -> repository
-            .findBy("ownerId", ownerId)
-            .stream()
-            .sorted(Comparator.comparingLong(NetworkOutboxMessage::getId))
-            .limit(maxBatchSize)
-            .toList()
-        );
+        List<StoredMessage> batch = store.fetchBatch(ownerId, maxBatchSize);
 
         if (batch.isEmpty()) return;
 
         long now = System.currentTimeMillis();
         List<Long> deleteIds = new ArrayList<>();
 
-        for (NetworkOutboxMessage msg : batch) {
+        for (StoredMessage msg : batch) {
             if (msg == null) continue;
 
-            if (maxAgeMillis > 0L && msg.getCreatedAt() > 0L && (now - msg.getCreatedAt()) > maxAgeMillis) {
-                deleteIds.add(msg.getId());
+            if (maxAgeMillis > 0L && msg.createdAt() > 0L && (now - msg.createdAt()) > maxAgeMillis) {
+                deleteIds.add(msg.id());
+                listener.onExpired(msg.id(), parseTargetOrNull(msg.target()), msg.targetServer(), msg.channel(), now - msg.createdAt());
                 continue;
             }
 
-            String channel = msg.getChannel();
+            String channel = msg.channel();
             if (!shouldQueue(channel)) {
-                deleteIds.add(msg.getId());
+                deleteIds.add(msg.id());
+                listener.onDropped(msg.id(), DropReason.NOT_ALLOWLISTED, parseTargetOrNull(msg.target()), msg.targetServer(), channel);
                 continue;
             }
 
-            NetworkEnvelope.Target target = parseTarget(msg.getTarget());
-            if (target == null) {
-                deleteIds.add(msg.getId());
+            NetworkEnvelope.Target target;
+            try {
+                target = parseTarget(msg.target());
+            } catch (Exception e) {
+                deleteIds.add(msg.id());
+                listener.onDropped(msg.id(), DropReason.INVALID_TARGET, null, msg.targetServer(), channel);
                 continue;
             }
 
             if (target == NetworkEnvelope.Target.SERVER
-                && (msg.getTargetServer() == null || msg.getTargetServer().isBlank())) {
-                deleteIds.add(msg.getId());
+                && (msg.targetServer() == null || msg.targetServer().isBlank())) {
+                deleteIds.add(msg.id());
+                listener.onDropped(msg.id(), DropReason.MISSING_TARGET_SERVER, target, null, channel);
                 continue;
             }
 
-            if (!canSend(target, msg.getTargetServer())) {
+            if (!canSend(target, msg.targetServer())) {
                 continue;
             }
 
             try {
-                deliver(target, msg.getTargetServer(), channel, msg.getData());
-                deleteIds.add(msg.getId());
+                deliver(target, msg.targetServer(), channel, msg.data());
+                deleteIds.add(msg.id());
+                listener.onDelivered(msg.id(), target, msg.targetServer(), channel);
             } catch (Exception e) {
-                recordAttempt(msg.getId(), now);
+                listener.onDeliveryFailed(msg.id(), target, msg.targetServer(), channel, e);
+                store.recordAttempt(msg.id(), now);
             }
         }
 
         if (!deleteIds.isEmpty()) {
-            database.runLocked(() -> {
-                for (Long id : deleteIds) {
-                    if (id == null) continue;
-                    repository.deleteById(id);
-                }
-            });
-            database.flushAsync();
+            store.deleteByIds(deleteIds);
         }
     }
 
@@ -352,22 +622,19 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
 
     private void recordAttempt(long id, long now) {
         if (id <= 0L) return;
-        database.runLocked(() -> {
-            NetworkOutboxMessage existing = repository.findById(id);
-            if (existing == null) return;
-            existing.setAttempts(existing.getAttempts() + 1);
-            existing.setLastAttemptAt(now);
-            repository.save(existing);
-        });
-        database.flushAsync();
+        store.recordAttempt(id, now);
     }
 
     private static NetworkEnvelope.Target parseTarget(String raw) {
-        if (raw == null) return null;
+        if (raw == null) throw new IllegalArgumentException("target is null");
         String normalized = raw.trim().toUpperCase(Locale.ROOT);
-        if (normalized.isBlank()) return null;
+        if (normalized.isBlank()) throw new IllegalArgumentException("target is blank");
+        return NetworkEnvelope.Target.valueOf(normalized);
+    }
+
+    private static NetworkEnvelope.Target parseTargetOrNull(String raw) {
         try {
-            return NetworkEnvelope.Target.valueOf(normalized);
+            return parseTarget(raw);
         } catch (Exception ignored) {
             return null;
         }
@@ -384,4 +651,3 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         return Set.copyOf(out);
     }
 }
-

@@ -6,6 +6,7 @@ import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.message.MessageKey;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -38,8 +39,6 @@ public final class SnakeYamlConfig implements YamlConfig {
     private final Logger logger;
     private final String defaultResourcePath;
 
-    private final LoaderOptions loaderOptions;
-    private final DumperOptions dumperOptions;
     private final Yaml yaml;
 
     private Map<String, Object> root = new LinkedHashMap<>();
@@ -53,12 +52,12 @@ public final class SnakeYamlConfig implements YamlConfig {
             ? null
             : normalizeResourcePath(defaultResourcePath);
 
-        this.loaderOptions = new LoaderOptions();
-        this.dumperOptions = new DumperOptions();
-        this.dumperOptions.setIndent(INDENT);
-        this.dumperOptions.setPrettyFlow(true);
-        this.dumperOptions.setSplitLines(false);
-        this.dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        LoaderOptions loaderOptions = new LoaderOptions();
+        DumperOptions dumperOptions = new DumperOptions();
+        dumperOptions.setIndent(INDENT);
+        dumperOptions.setPrettyFlow(true);
+        dumperOptions.setSplitLines(false);
+        dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
 
         SafeConstructor constructor = new SafeConstructor(loaderOptions);
         Representer representer = new Representer(dumperOptions);
@@ -66,12 +65,12 @@ public final class SnakeYamlConfig implements YamlConfig {
     }
 
     @Override
-    public boolean contains(String path) {
+    public boolean contains(@NotNull String path) {
         return resolve(path, false) != null;
     }
 
     @Override
-    public Set<String> keys(boolean deep) {
+    public @NotNull Set<String> keys(boolean deep) {
         if (!deep) {
             return new LinkedHashSet<>(root.keySet());
         }
@@ -82,59 +81,59 @@ public final class SnakeYamlConfig implements YamlConfig {
     }
 
     @Override
-    public Object get(String path) {
+    public Object get(@NotNull String path) {
         Resolved resolved = resolve(path, false);
         if (resolved == null) return null;
         return resolved.parent.get(resolved.key);
     }
 
     @Override
-    public <T> T get(String path, Class<T> type, T def) {
+    public <T> T get(@NotNull String path, @NotNull Class<T> type, T def) {
         Object value = get(path);
         T coerced = coerce(value, type);
         return coerced != null ? coerced : def;
     }
 
     @Override
-    public String getString(String path, String def) {
+    public String getString(@NotNull String path, String def) {
         String v = get(path, String.class, null);
         return v != null ? v : def;
     }
 
     @Override
-    public int getInt(String path, int def) {
+    public int getInt(@NotNull String path, int def) {
         Integer v = get(path, Integer.class, null);
         return v != null ? v : def;
     }
 
     @Override
-    public boolean getBoolean(String path, boolean def) {
+    public boolean getBoolean(@NotNull String path, boolean def) {
         Boolean v = get(path, Boolean.class, null);
         return v != null ? v : def;
     }
 
     @Override
-    public double getDouble(String path, double def) {
+    public double getDouble(@NotNull String path, double def) {
         Double v = get(path, Double.class, null);
         return v != null ? v : def;
     }
 
     @Override
-    public List<?> getList(String path, List<?> def) {
+    public @NotNull List<?> getList(@NotNull String path, @NotNull List<?> def) {
         Object v = get(path);
         if (v instanceof List<?> list) return list;
         return def;
     }
 
     @Override
-    public List<String> getStringList(String path, List<String> def) {
+    public @NotNull List<String> getStringList(@NotNull String path, @NotNull List<String> def) {
         Object v = get(path);
         if (!(v instanceof List<?> list)) return def;
         return list.stream().map(String::valueOf).toList();
     }
 
     @Override
-    public void set(String path, Object value) {
+    public void set(@NotNull String path, Object value) {
         Objects.requireNonNull(path, "path");
         if (path.isBlank()) return;
 
@@ -151,14 +150,14 @@ public final class SnakeYamlConfig implements YamlConfig {
     }
 
     @Override
-    public String getComment(String path) {
+    public String getComment(@NotNull String path) {
         return comments.get(path);
     }
 
     @Override
-    public void setComment(String path, String comment) {
+    public void setComment(@NotNull String path, @NotNull String comment) {
         Objects.requireNonNull(path, "path");
-        if (comment == null || comment.isBlank()) {
+        if (comment.isBlank()) {
             comments.remove(path);
         } else {
             comments.put(path, comment.strip());
@@ -171,7 +170,7 @@ public final class SnakeYamlConfig implements YamlConfig {
             Path parent = file.getParent();
             if (parent != null) Files.createDirectories(parent);
         } catch (IOException e) {
-            logger.error("Failed to create config directory: {}", e.getMessage());
+            logger.error("Failed to create config directory", e);
         }
 
         String dumped = yaml.dump(root);
@@ -179,7 +178,7 @@ public final class SnakeYamlConfig implements YamlConfig {
         try {
             Files.writeString(file, withComments, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            logger.error("Failed to save YAML config {}: {}", file, e.getMessage());
+            logger.error("Failed to save YAML config {}", file, e);
         }
     }
 
@@ -194,14 +193,14 @@ public final class SnakeYamlConfig implements YamlConfig {
                 }
             }
         } catch (IOException e) {
-            logger.warn("Failed to ensure YAML config exists {}: {}", file, e.getMessage());
+            logger.warn("Failed to ensure YAML config exists {}", file, e);
         }
 
         String content;
         try {
             content = Files.readString(file, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            logger.error("Failed to read YAML config {}: {}", file, e.getMessage());
+            logger.error("Failed to read YAML config {}", file, e);
             content = "";
         }
 
@@ -235,7 +234,7 @@ public final class SnakeYamlConfig implements YamlConfig {
                 }
             }
         } catch (Exception e) {
-            logger.warn("Failed to merge default YAML resource {}: {}", resourcePath, e.getMessage());
+            logger.warn("Failed to merge default YAML resource {}", resourcePath, e);
         }
     }
 
@@ -247,7 +246,7 @@ public final class SnakeYamlConfig implements YamlConfig {
             }
             Files.copy(in, file);
         } catch (IOException e) {
-            logger.warn("Failed to copy default YAML resource {} to {}: {}", defaultResourcePath, file, e.getMessage());
+            logger.warn("Failed to copy default YAML resource {} to {}", defaultResourcePath, file, e);
             try {
                 if (!Files.exists(file)) Files.createFile(file);
             } catch (IOException ignored) {
@@ -260,7 +259,7 @@ public final class SnakeYamlConfig implements YamlConfig {
         try {
             loaded = yaml.load(content);
         } catch (Exception e) {
-            logger.warn("Failed to parse YAML {}: {}", file, e.getMessage());
+            logger.warn("Failed to parse YAML {}", file, e);
             loaded = null;
         }
 
@@ -349,58 +348,70 @@ public final class SnakeYamlConfig implements YamlConfig {
     private Object toYamlValue(Object value) {
         if (value == null) return null;
 
-        if (value instanceof String
-            || value instanceof Number
-            || value instanceof Boolean) {
-            return value;
-        }
 
-        if (value instanceof UUID uuid) return uuid.toString();
-        if (value instanceof Duration duration) return formatDuration(duration);
-        if (value instanceof PlatformId platformId) return platformId.name();
-        if (value instanceof MessageKey key) return key.value();
-
-        if (value instanceof RBlockPos pos) {
-            LinkedHashMap<String, Object> out = new LinkedHashMap<>();
-            out.put("x", pos.x());
-            out.put("y", pos.y());
-            out.put("z", pos.z());
-            return out;
-        }
-
-        if (value instanceof RWorldRef worldRef) {
-            LinkedHashMap<String, Object> out = new LinkedHashMap<>();
-            if (worldRef.name() != null && !worldRef.name().isBlank()) out.put("name", worldRef.name());
-            if (worldRef.key() != null && !worldRef.key().isBlank()) out.put("key", worldRef.key());
-            return out;
-        }
-
-        if (value instanceof RLocation loc) {
-            LinkedHashMap<String, Object> out = new LinkedHashMap<>();
-            out.put("world", toYamlValue(loc.world()));
-            out.put("x", loc.x());
-            out.put("y", loc.y());
-            out.put("z", loc.z());
-            if (loc.yaw() != 0F) out.put("yaw", loc.yaw());
-            if (loc.pitch() != 0F) out.put("pitch", loc.pitch());
-            return out;
-        }
-
-        if (value instanceof Enum<?> e) return e.name();
-
-        if (value instanceof Map<?, ?> map) {
-            LinkedHashMap<String, Object> out = new LinkedHashMap<>();
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                if (entry.getKey() == null) continue;
-                out.put(String.valueOf(entry.getKey()), toYamlValue(entry.getValue()));
+        switch (value) {
+            case String s -> {
+                return s;
             }
-            return out;
-        }
-
-        if (value instanceof List<?> list) {
-            List<Object> out = new ArrayList<>(list.size());
-            for (Object o : list) out.add(toYamlValue(o));
-            return out;
+            case Number n -> {
+                return n;
+            }
+            case Boolean b -> {
+                return b;
+            }
+            case UUID uuid -> {
+                return uuid.toString();
+            }
+            case Duration duration -> {
+                return formatDuration(duration);
+            }
+            case PlatformId platformId -> {
+                return platformId.name();
+            }
+            case MessageKey(String key) -> {
+                return key;
+            }
+            case RBlockPos(int x, int y, int z) -> {
+                LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+                out.put("x", x);
+                out.put("y", y);
+                out.put("z", z);
+                return out;
+            }
+            case RWorldRef(String name, String key) -> {
+                LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+                if (name != null && !name.isBlank()) out.put("name", name);
+                if (key != null && !key.isBlank()) out.put("key", key);
+                return out;
+            }
+            case RLocation(RWorldRef world, double x, double y, double z, float yaw, float pitch) -> {
+                LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+                out.put("world", toYamlValue(world));
+                out.put("x", x);
+                out.put("y", y);
+                out.put("z", z);
+                if (yaw != 0F) out.put("yaw", yaw);
+                if (pitch != 0F) out.put("pitch", pitch);
+                return out;
+            }
+            case Enum<?> e -> {
+                return e.name();
+            }
+            case Map<?, ?> map -> {
+                LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (entry.getKey() == null) continue;
+                    out.put(String.valueOf(entry.getKey()), toYamlValue(entry.getValue()));
+                }
+                return out;
+            }
+            case List<?> list -> {
+                List<Object> out = new ArrayList<>(list.size());
+                for (Object o : list) out.add(toYamlValue(o));
+                return out;
+            }
+            default -> {
+            }
         }
 
         if (value.getClass().isRecord()) {
@@ -488,11 +499,19 @@ public final class SnakeYamlConfig implements YamlConfig {
         }
 
         if (type == Duration.class) {
-            if (value instanceof Duration d) return (T) d;
-            if (value instanceof Number n) return (T) Duration.ofSeconds(n.longValue());
-            if (value instanceof String s) {
-                Duration parsed = parseDuration(s);
-                if (parsed != null) return (T) parsed;
+            switch (value) {
+                case Duration d -> {
+                    return (T) d;
+                }
+                case Number n -> {
+                    return (T) Duration.ofSeconds(n.longValue());
+                }
+                case String s -> {
+                    Duration parsed = parseDuration(s);
+                    if (parsed != null) return (T) parsed;
+                }
+                default -> {
+                }
             }
             return null;
         }
@@ -522,39 +541,51 @@ public final class SnakeYamlConfig implements YamlConfig {
         }
 
         if (type == RBlockPos.class) {
-            if (value instanceof RBlockPos pos) return (T) pos;
-            if (value instanceof Map<?, ?> map) {
-                Integer x = coerce(mapGet(map, "x"), Integer.class);
-                Integer y = coerce(mapGet(map, "y"), Integer.class);
-                Integer z = coerce(mapGet(map, "z"), Integer.class);
-                if (x == null || y == null || z == null) return null;
-                return (T) new RBlockPos(x, y, z);
-            }
-            if (value instanceof String s) {
-                RBlockPos parsed = parseBlockPos(s);
-                if (parsed != null) return (T) parsed;
+            switch (value) {
+                case RBlockPos pos -> {
+                    return (T) pos;
+                }
+                case Map<?, ?> map -> {
+                    Integer x = coerce(mapGet(map, "x"), Integer.class);
+                    Integer y = coerce(mapGet(map, "y"), Integer.class);
+                    Integer z = coerce(mapGet(map, "z"), Integer.class);
+                    if (x == null || y == null || z == null) return null;
+                    return (T) new RBlockPos(x, y, z);
+                }
+                case String s -> {
+                    RBlockPos parsed = parseBlockPos(s);
+                    if (parsed != null) return (T) parsed;
+                }
+                default -> {
+                }
             }
             return null;
         }
 
         if (type == RWorldRef.class) {
-            if (value instanceof RWorldRef ref) return (T) ref;
-            if (value instanceof Map<?, ?> map) {
-                String name = coerce(mapGet(map, "name"), String.class);
-                String key = coerce(mapGet(map, "key"), String.class);
-                try {
-                    return (T) new RWorldRef(name, key);
-                } catch (Exception ignored) {
-                    return null;
+            switch (value) {
+                case RWorldRef ref -> {
+                    return (T) ref;
                 }
-            }
-            if (value instanceof String s) {
-                String id = s.trim();
-                if (id.isBlank()) return null;
-                try {
-                    return (T) new RWorldRef(null, id);
-                } catch (Exception ignored) {
-                    return null;
+                case Map<?, ?> map -> {
+                    String name = coerce(mapGet(map, "name"), String.class);
+                    String key = coerce(mapGet(map, "key"), String.class);
+                    try {
+                        return (T) new RWorldRef(name, key);
+                    } catch (Exception ignored) {
+                        return null;
+                    }
+                }
+                case String s -> {
+                    String id = s.trim();
+                    if (id.isBlank()) return null;
+                    try {
+                        return (T) new RWorldRef(null, id);
+                    } catch (Exception ignored) {
+                        return null;
+                    }
+                }
+                default -> {
                 }
             }
             return null;
@@ -762,8 +793,8 @@ public final class SnakeYamlConfig implements YamlConfig {
                 continue;
             }
 
-            while (!stack.isEmpty() && stack.get(stack.size() - 1).indent >= indent) {
-                stack.remove(stack.size() - 1);
+            while (!stack.isEmpty() && stack.getLast().indent >= indent) {
+                stack.removeLast();
             }
 
             String path = buildPath(stack, key);
@@ -799,8 +830,8 @@ public final class SnakeYamlConfig implements YamlConfig {
 
             String key = parseKeyLine(trimmed);
             if (key != null) {
-                while (!stack.isEmpty() && stack.get(stack.size() - 1).indent >= indent) {
-                    stack.remove(stack.size() - 1);
+                while (!stack.isEmpty() && stack.getLast().indent >= indent) {
+                    stack.removeLast();
                 }
 
                 String path = buildPath(stack, key);

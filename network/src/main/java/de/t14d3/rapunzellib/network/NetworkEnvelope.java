@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib.network;
 
+import org.jetbrains.annotations.Nullable;
+
 public class NetworkEnvelope {
     public enum Target {
         PROXY,
@@ -26,28 +28,27 @@ public class NetworkEnvelope {
         this.createdAt = createdAt;
     }
 
-
-    public String getChannel() {
+    public @Nullable String getChannel() {
         return channel;
     }
 
-    public String getData() {
+    public @Nullable String getData() {
         return data;
     }
 
-    public Target getTarget() {
+    public @Nullable Target getTarget() {
         return target;
     }
 
-    public String getTargetServer() {
+    public @Nullable String getTargetServer() {
         return targetServer;
     }
 
-    public String getSourceServer() {
+    public @Nullable String getSourceServer() {
         return sourceServer;
     }
 
-    public void setSourceServer(String sourceServer) {
+    public void setSourceServer(@Nullable String sourceServer) {
         this.sourceServer = sourceServer;
     }
 

@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.objects.RNativeHandle;
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import org.bukkit.World;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -20,7 +21,7 @@ final class PaperWorld extends RNativeHandle<World> implements RWorld {
     }
 
     @Override
-    public RWorldRef ref() {
+    public @NotNull RWorldRef ref() {
         World world = handle();
         world.getKey();
         String key = world.getKey().toString();
@@ -28,7 +29,7 @@ final class PaperWorld extends RNativeHandle<World> implements RWorld {
     }
 
     @Override
-    public Optional<UUID> uuid() {
+    public @NotNull Optional<UUID> uuid() {
         return Optional.of(handle().getUID());
     }
 }

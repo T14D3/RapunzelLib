@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import java.util.Locale;
 import java.util.Objects;
 
+@SuppressWarnings("SameParameterValue")
 public final class MessengerTransportBootstrap {
     public static final String ENV_SERVER_NAME = "RAPUNZEL_SERVER_NAME";
     public static final String ENV_PROXY_SERVER_NAME = "RAPUNZEL_PROXY_SERVER_NAME";

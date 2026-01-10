@@ -7,40 +7,65 @@ import de.t14d3.rapunzellib.objects.Worlds;
 import de.t14d3.rapunzellib.objects.block.Blocks;
 import de.t14d3.rapunzellib.message.MessageFormatService;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
 
 public interface RapunzelContext extends AutoCloseable {
-    PlatformId platformId();
+    @NotNull PlatformId platformId();
 
-    Logger logger();
+    @NotNull Logger logger();
 
-    Path dataDirectory();
+    @NotNull Path dataDirectory();
 
-    ResourceProvider resources();
+    @NotNull ResourceProvider resources();
 
-    Scheduler scheduler();
+    @NotNull Scheduler scheduler();
 
-    ServiceRegistry services();
+    @NotNull ServiceRegistry services();
 
-    default ConfigService configs() {
+    /**
+     * Registers a service into this context.
+     *
+     * <p>Default implementation registers into {@link #services()} only. Context
+     * implementations may override to provide additional lifecycle tracking (e.g. auto-closing).</p>
+     */
+    default <T> @NotNull T register(@NotNull Class<T> type, @NotNull T instance) {
+        services().register(type, instance);
+        if (instance instanceof AutoCloseable closeable) {
+            registerCloseable(closeable);
+        }
+        return instance;
+    }
+
+    /**
+     * Registers a closeable to be closed when the context shuts down.
+     *
+     * <p>Default implementation is a no-op. Implementations with lifecycle tracking
+     * should override.</p>
+     */
+    default void registerCloseable(@NotNull AutoCloseable closeable) {
+        // no-op by default
+    }
+
+    default @NotNull ConfigService configs() {
         return services().get(ConfigService.class);
     }
 
-    default MessageFormatService messages() {
+    default @NotNull MessageFormatService messages() {
         return services().get(MessageFormatService.class);
     }
 
-    default Players players() {
+    default @NotNull Players players() {
         return services().get(Players.class);
     }
 
-    default Worlds worlds() {
+    default @NotNull Worlds worlds() {
         return services().get(Worlds.class);
     }
 
-    default Blocks blocks() {
+    default @NotNull Blocks blocks() {
         return services().get(Blocks.class);
     }
 

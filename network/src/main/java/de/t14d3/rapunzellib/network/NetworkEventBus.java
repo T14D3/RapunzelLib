@@ -1,6 +1,9 @@
 package de.t14d3.rapunzellib.network;
 
 import com.google.gson.Gson;
+import de.t14d3.rapunzellib.network.json.GsonJsonCodec;
+import de.t14d3.rapunzellib.network.json.JsonCodec;
+import de.t14d3.rapunzellib.network.json.JsonCodecs;
 
 import java.util.List;
 import java.util.Map;
@@ -18,18 +21,22 @@ public final class NetworkEventBus {
     }
 
     private final Messenger messenger;
-    private final Gson gson;
+    private final JsonCodec json;
 
     private final Map<String, CopyOnWriteArrayList<TypedRegistration<?>>> typedListeners = new ConcurrentHashMap<>();
     private final Map<String, MessageListener> rawBridgeListeners = new ConcurrentHashMap<>();
 
     public NetworkEventBus(Messenger messenger) {
-        this(messenger, new Gson());
+        this(messenger, JsonCodecs.codec());
     }
 
     public NetworkEventBus(Messenger messenger, Gson gson) {
+        this(messenger, new GsonJsonCodec(gson));
+    }
+
+    public NetworkEventBus(Messenger messenger, JsonCodec json) {
         this.messenger = messenger;
-        this.gson = gson;
+        this.json = json;
     }
 
     public <T> Subscription register(String channel, Class<T> payloadType, TypedListener<T> listener) {
@@ -63,15 +70,15 @@ public final class NetworkEventBus {
     }
 
     public void sendToAll(String channel, Object payload) {
-        messenger.sendToAll(channel, gson.toJson(payload));
+        messenger.sendToAll(channel, json.toJson(payload));
     }
 
     public void sendToServer(String channel, String serverName, Object payload) {
-        messenger.sendToServer(channel, serverName, gson.toJson(payload));
+        messenger.sendToServer(channel, serverName, json.toJson(payload));
     }
 
     public void sendToProxy(String channel, Object payload) {
-        messenger.sendToProxy(channel, gson.toJson(payload));
+        messenger.sendToProxy(channel, json.toJson(payload));
     }
 
     private void dispatchTyped(String channel, String data, String serverName) {
@@ -79,23 +86,16 @@ public final class NetworkEventBus {
         if (regs == null || regs.isEmpty()) return;
 
         for (TypedRegistration<?> reg : regs) {
-            reg.dispatch(gson, data, serverName);
+            reg.dispatch(json, data, serverName);
         }
     }
 
-    private static final class TypedRegistration<T> {
-        private final Class<T> type;
-        private final TypedListener<T> listener;
+    private record TypedRegistration<T>(Class<T> type, TypedListener<T> listener) {
 
-        private TypedRegistration(Class<T> type, TypedListener<T> listener) {
-            this.type = type;
-            this.listener = listener;
+        private void dispatch(JsonCodec json, String data, String serverName) {
+                T payload = json.fromJson(data, type);
+                listener.onEvent(payload, serverName);
+            }
         }
-
-        private void dispatch(Gson gson, String data, String serverName) {
-            T payload = gson.fromJson(data, type);
-            listener.onEvent(payload, serverName);
-        }
-    }
 }
 

@@ -4,6 +4,7 @@ import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.Worlds;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -19,7 +20,7 @@ public final class FabricWorlds implements Worlds {
     }
 
     @Override
-    public Collection<RWorld> all() {
+    public @NotNull Collection<RWorld> all() {
         Collection<RWorld> worlds = new ArrayList<>();
         for (ServerLevel level : server.getAllLevels()) {
             worlds.add(wrapInternal(level));
@@ -28,7 +29,7 @@ public final class FabricWorlds implements Worlds {
     }
 
     @Override
-    public Optional<RWorld> getByName(String name) {
+    public @NotNull Optional<RWorld> getByName(@NotNull String name) {
         if (name == null || name.isBlank()) return Optional.empty();
         for (ServerLevel level : server.getAllLevels()) {
             String key = level.dimension().location().toString();
@@ -40,7 +41,7 @@ public final class FabricWorlds implements Worlds {
     }
 
     @Override
-    public Optional<RWorld> wrap(Object nativeWorld) {
+    public @NotNull Optional<RWorld> wrap(@NotNull Object nativeWorld) {
         if (!(nativeWorld instanceof ServerLevel level)) return Optional.empty();
         return Optional.of(wrapInternal(level));
     }

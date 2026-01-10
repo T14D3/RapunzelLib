@@ -13,6 +13,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -28,27 +29,27 @@ final class PaperPlayer extends RNativeHandle<Player> implements RPlayer {
     }
 
     @Override
-    public Audience audience() {
+    public @NotNull Audience audience() {
         return handle();
     }
 
     @Override
-    public UUID uuid() {
+    public @NotNull UUID uuid() {
         return handle().getUniqueId();
     }
 
     @Override
-    public String name() {
+    public @NotNull String name() {
         return handle().getName();
     }
 
     @Override
-    public boolean hasPermission(String permission) {
+    public boolean hasPermission(@NotNull String permission) {
         return handle().hasPermission(permission);
     }
 
     @Override
-    public Optional<RWorld> world() {
+    public @NotNull Optional<RWorld> world() {
         Player player = handle();
         return Rapunzel.context().worlds()
             .wrap(player.getWorld())
@@ -56,7 +57,7 @@ final class PaperPlayer extends RNativeHandle<Player> implements RPlayer {
     }
 
     @Override
-    public Optional<RLocation> location() {
+    public @NotNull Optional<RLocation> location() {
         Location loc = handle().getLocation();
         String key = loc.getWorld() != null ? loc.getWorld().getKey().toString() : null;
         String name = (loc.getWorld() != null) ? loc.getWorld().getName() : null;
@@ -69,7 +70,7 @@ final class PaperPlayer extends RNativeHandle<Player> implements RPlayer {
     }
 
     @Override
-    public void teleport(RLocation location) {
+    public void teleport(@NotNull RLocation location) {
         Objects.requireNonNull(location, "location");
         RWorldRef worldRef = location.world();
         org.bukkit.World world = null;
@@ -94,7 +95,7 @@ final class PaperPlayer extends RNativeHandle<Player> implements RPlayer {
     }
 
     @Override
-    public Optional<String> currentServerName() {
+    public @NotNull Optional<String> currentServerName() {
         return Optional.of(Rapunzel.context().services().get(NetworkInfoService.class).networkServerName().join());
     }
 }

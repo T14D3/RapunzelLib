@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
@@ -25,30 +26,30 @@ final class FabricBlock extends RNativeBase implements RBlock {
     }
 
     @Override
-    public BlockState handle() {
+    public @NotNull BlockState handle() {
         return world.getBlockState(pos);
     }
 
     @Override
-    public RWorld world() {
+    public @NotNull RWorld world() {
         return Rapunzel.context().worlds()
             .wrap(world)
             .orElseGet(() -> new FabricWorld(world));
     }
 
     @Override
-    public RBlockPos pos() {
+    public @NotNull RBlockPos pos() {
         return new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
     }
 
     @Override
-    public String typeKey() {
+    public @NotNull String typeKey() {
         BlockState state = world.getBlockState(pos);
         return BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
     }
 
     @Override
-    public RBlockData data() {
+    public @NotNull RBlockData data() {
         return new FabricBlockData(world.getBlockState(pos));
     }
 }

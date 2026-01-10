@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.objects.RNativeHandle;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import net.kyori.adventure.audience.Audience;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -20,27 +21,27 @@ final class VelocityPlayer extends RNativeHandle<Player> implements RPlayer {
     }
 
     @Override
-    public Audience audience() {
+    public @NotNull Audience audience() {
         return handle();
     }
 
     @Override
-    public UUID uuid() {
+    public @NotNull UUID uuid() {
         return handle().getUniqueId();
     }
 
     @Override
-    public String name() {
+    public @NotNull String name() {
         return handle().getUsername();
     }
 
     @Override
-    public boolean hasPermission(String permission) {
+    public boolean hasPermission(@NotNull String permission) {
         return handle().hasPermission(permission);
     }
 
     @Override
-    public Optional<String> currentServerName() {
+    public @NotNull Optional<String> currentServerName() {
         return handle().getCurrentServer().map(sc -> sc.getServerInfo().getName());
     }
 }

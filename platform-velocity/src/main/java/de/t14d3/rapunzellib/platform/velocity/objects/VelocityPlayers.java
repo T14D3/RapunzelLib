@@ -4,6 +4,7 @@ import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import de.t14d3.rapunzellib.objects.Players;
 import de.t14d3.rapunzellib.objects.RPlayer;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -19,17 +20,17 @@ public final class VelocityPlayers implements Players {
     }
 
     @Override
-    public Collection<RPlayer> online() {
+    public @NotNull Collection<RPlayer> online() {
         return proxy.getAllPlayers().stream().map(this::wrapInternal).map(RPlayer.class::cast).toList();
     }
 
     @Override
-    public Optional<RPlayer> get(UUID uuid) {
+    public @NotNull Optional<RPlayer> get(@NotNull UUID uuid) {
         return proxy.getPlayer(uuid).map(this::wrapInternal);
     }
 
     @Override
-    public Optional<RPlayer> wrap(Object nativePlayer) {
+    public @NotNull Optional<RPlayer> wrap(@NotNull Object nativePlayer) {
         if (!(nativePlayer instanceof Player player)) return Optional.empty();
         return Optional.of(wrapInternal(player));
     }

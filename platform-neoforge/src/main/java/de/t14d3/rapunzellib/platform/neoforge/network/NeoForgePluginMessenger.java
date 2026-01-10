@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.network.MessageListener;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkConstants;
 import de.t14d3.rapunzellib.network.NetworkEnvelope;
+import de.t14d3.rapunzellib.network.json.JsonCodecs;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.PacketFlow;
@@ -16,7 +17,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
-import org.jspecify.annotations.NonNull;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.nio.charset.StandardCharsets;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * NeoForge transport using the vanilla custom-payload channel forwarded by a proxy (e.g. Velocity).
@@ -32,11 +34,15 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * <p>Requires a player connection to carry messages, same as Paper/Fabric plugin messaging.</p>
  */
 public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
+    private static final long NO_CARRIER_LOG_COOLDOWN_MS = 10_000L;
+
     private static final List<NeoForgePluginMessenger> MESSENGERS = new CopyOnWriteArrayList<>();
 
     private final MinecraftServer server;
     private final Logger logger;
-    private final Gson gson = new Gson();
+    private final Gson gson = JsonCodecs.gson();
+    private final AtomicLong lastNoCarrierLog = new AtomicLong(0L);
+    private final AtomicLong lastOversizeLog = new AtomicLong(0L);
 
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
     private volatile String networkServerName;
@@ -48,27 +54,27 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public void sendToAll(String channel, String data) {
+    public void sendToAll(@NotNull String channel, @NotNull String data) {
         sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.ALL, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToServer(String channel, String serverName, String data) {
+    public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
         sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.SERVER, serverName, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToProxy(String channel, String data) {
+    public void sendToProxy(@NotNull String channel, @NotNull String data) {
         sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.PROXY, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void registerListener(String channel, MessageListener listener) {
+    public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         listeners.computeIfAbsent(channel, k -> new CopyOnWriteArrayList<>()).add(listener);
     }
 
     @Override
-    public void unregisterListener(String channel, MessageListener listener) {
+    public void unregisterListener(@NotNull String channel, @NotNull MessageListener listener) {
         List<MessageListener> list = listeners.get(channel);
         if (list == null) return;
         list.remove(listener);
@@ -81,14 +87,14 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public String getServerName() {
+    public @NotNull String getServerName() {
         String current = networkServerName;
         if (current != null && !current.isBlank()) return current;
         return "unknown";
     }
 
     @Override
-    public String getProxyServerName() {
+    public @NotNull String getProxyServerName() {
         return "velocity";
     }
 
@@ -104,7 +110,7 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
         try {
             env = gson.fromJson(json, NetworkEnvelope.class);
         } catch (Exception e) {
-            logger.warn("Failed to parse network envelope: {}", e.getMessage());
+            logger.warn("Failed to parse network envelope", e);
             return;
         }
 
@@ -116,7 +122,7 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
             try {
                 listener.onMessage(env.getChannel(), env.getData(), env.getSourceServer());
             } catch (Exception e) {
-                logger.warn("Network listener error on channel {}: {}", env.getChannel(), e.getMessage());
+                logger.warn("Network listener error on channel {}", env.getChannel(), e);
             }
         }
     }
@@ -130,13 +136,37 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
         var playerList = server.getPlayerList();
 
         ServerPlayer carrier = playerList.getPlayers().stream().findFirst().orElse(null);
-        if (carrier == null) return;
+        if (carrier == null) {
+            long now = System.currentTimeMillis();
+            long last = lastNoCarrierLog.get();
+            if ((now - last) >= NO_CARRIER_LOG_COOLDOWN_MS && lastNoCarrierLog.compareAndSet(last, now)) {
+                logger.debug(
+                    "Dropping plugin message (no player carrier available): target={}, channel={}",
+                    (env != null) ? env.getTarget() : null,
+                    (env != null) ? env.getChannel() : null
+                );
+            }
+            return;
+        }
 
         String json = gson.toJson(env);
         // Avoid sending huge payloads; the vanilla limit is tight.
-        if (json.getBytes(StandardCharsets.UTF_8).length > 30_000) return;
+        int size = json.getBytes(StandardCharsets.UTF_8).length;
+        if (size > 30_000) {
+            long now = System.currentTimeMillis();
+            long last = lastOversizeLog.get();
+            if ((now - last) >= NO_CARRIER_LOG_COOLDOWN_MS && lastOversizeLog.compareAndSet(last, now)) {
+                logger.debug(
+                    "Dropping plugin message (payload too large: {} bytes): target={}, channel={}",
+                    size,
+                    (env != null) ? env.getTarget() : null,
+                    (env != null) ? env.getChannel() : null
+                );
+            }
+            return;
+        }
 
-        PacketDistributor.sendToPlayer(carrier, new BridgePayload(json));
+        PacketDistributor.sendToPlayer(carrier, new BridgePayload(json));       
     }
 
     @Override
@@ -160,7 +190,8 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
             for (NeoForgePluginMessenger messenger : List.copyOf(MESSENGERS)) {
                 try {
                     messenger.handlePluginMessage(payload.json());
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    messenger.logger.debug("Failed to handle NeoForge bridge payload", e);
                 }
             }
         });
@@ -177,7 +208,7 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
         );
 
         @Override
-        public @NonNull Type<? extends CustomPacketPayload> type() {
+        public @NotNull Type<? extends CustomPacketPayload> type() {
             return TYPE;
         }
 
