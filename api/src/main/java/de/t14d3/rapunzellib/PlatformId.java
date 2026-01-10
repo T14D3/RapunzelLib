@@ -4,6 +4,7 @@ public enum PlatformId {
     PAPER,
     VELOCITY,
     FABRIC,
-    NEOFORGE
+    NEOFORGE,
+    SPONGE
 }
 

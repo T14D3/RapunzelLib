@@ -30,8 +30,16 @@ public final class ServerRunnerMain {
         return "java";
     }
 
-    public static void main(String[] args) throws Exception {
-        System.exit(run(args));
+    public static void main(String[] args) {
+        int code;
+        try {
+            code = run(args);
+        } catch (Throwable t) {
+            System.err.println("[error] Unhandled exception: " + t.getMessage());
+            t.printStackTrace(System.err);
+            code = 1;
+        }
+        System.exit(code);
     }
 
     public static int run(String[] args) throws Exception {
@@ -94,7 +102,8 @@ public final class ServerRunnerMain {
                 try {
                     System.out.println("[mysql] mysqladmin ping did not succeed. Waiting 5s warmup anyway...");
                     Thread.sleep(5_000L);
-                } catch (InterruptedException ignored) {
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
             }
             mysqlJdbc = cfg.mysqlJdbc();
@@ -290,7 +299,14 @@ public final class ServerRunnerMain {
                 } else {
                     p.sendLine("stop");
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                String name;
+                try {
+                    name = (p != null) ? String.valueOf(p.name()) : "null";
+                } catch (Exception nameError) {
+                    name = "unknown";
+                }
+                System.err.println("[shutdown] Failed to request stop (" + name + "): " + e.getMessage());
             }
         }
 
@@ -307,7 +323,8 @@ public final class ServerRunnerMain {
             try {
                 //noinspection BusyWait
                 Thread.sleep(250);
-            } catch (InterruptedException ignored) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 break;
             }
         }
@@ -330,7 +347,8 @@ public final class ServerRunnerMain {
             try {
                 //noinspection BusyWait
                 Thread.sleep(250);
-            } catch (InterruptedException ignored) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
                 break;
             }
         }
@@ -342,7 +360,8 @@ public final class ServerRunnerMain {
         for (ServerProcess p : processes) {
             try {
                 if (p != null) p.waitFor(5_000L);
-            } catch (InterruptedException ignored) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
     }
@@ -668,7 +687,8 @@ public final class ServerRunnerMain {
         try {
             // Best-effort: ignore errors if it doesn't exist anymore.
             runCommand(workingDir, List.of("docker", "rm", "-f", containerName));
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            System.err.println("[mysql] Failed to cleanup container '" + containerName + "': " + e.getMessage());
         }
     }
 
@@ -749,7 +769,9 @@ public final class ServerRunnerMain {
             try {
                 //noinspection BusyWait
                 Thread.sleep(500);
-            } catch (InterruptedException ignored) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
             }
         }
         return false;

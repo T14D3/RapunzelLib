@@ -50,7 +50,6 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.event.world.WorldLoadEvent;
-import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.event.block.TNTPrimeEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -60,6 +59,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@SuppressWarnings("deprecation")
 final class PaperGameEventsBridge implements Listener, GameEventBridge {
     private final JavaPlugin plugin;
     private final GameEventBus bus;
@@ -472,6 +472,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onEntityPlacePre(EntityPlaceEvent event) {
         if (!bus.hasPreListeners(BlockPlacePre.class)) return;
+        if (event.getPlayer() == null) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
         Location loc = event.getEntity().getLocation();

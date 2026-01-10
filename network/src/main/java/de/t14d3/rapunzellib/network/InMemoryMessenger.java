@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib.network;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,27 +18,31 @@ public final class InMemoryMessenger implements Messenger {
     }
 
     @Override
-    public void sendToAll(String channel, String data) {
+    public void sendToAll(@NotNull String channel, @NotNull String data) {
         deliver(channel, data, serverName);
     }
 
     @Override
-    public void sendToServer(String channel, String serverName, String data) {
+    public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
+        if (serverName.isBlank()) return;
+        if (!serverName.equalsIgnoreCase(this.serverName)) return;
         deliver(channel, data, this.serverName);
     }
 
     @Override
-    public void sendToProxy(String channel, String data) {
+    public void sendToProxy(@NotNull String channel, @NotNull String data) {
+        if (proxyServerName == null || proxyServerName.isBlank()) return;
+        if (!proxyServerName.equalsIgnoreCase(this.serverName)) return;
         deliver(channel, data, serverName);
     }
 
     @Override
-    public void registerListener(String channel, MessageListener listener) {
+    public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         listeners.computeIfAbsent(channel, k -> new CopyOnWriteArrayList<>()).add(listener);
     }
 
     @Override
-    public void unregisterListener(String channel, MessageListener listener) {
+    public void unregisterListener(@NotNull String channel, @NotNull MessageListener listener) {
         List<MessageListener> list = listeners.get(channel);
         if (list == null) return;
         list.remove(listener);
@@ -48,12 +54,12 @@ public final class InMemoryMessenger implements Messenger {
     }
 
     @Override
-    public String getServerName() {
+    public @NotNull String getServerName() {
         return serverName;
     }
 
     @Override
-    public String getProxyServerName() {
+    public @NotNull String getProxyServerName() {
         return proxyServerName;
     }
 

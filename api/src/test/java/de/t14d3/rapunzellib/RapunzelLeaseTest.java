@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.context.ServiceRegistry;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
@@ -77,6 +78,25 @@ final class RapunzelLeaseTest {
         assertEquals(1, Rapunzel.ownerCount());
     }
 
+    @Test
+    void bootstrapOrAcquireSkipsFactoryWhenAlreadyBootstrapped(@TempDir Path dir) {
+        Rapunzel.shutdownAll();
+
+        Object ownerA = new Object();
+        Object ownerB = new Object();
+        TestContext ctx = new TestContext(dir);
+
+        Rapunzel.bootstrap(ownerA, ctx);
+
+        Rapunzel.Lease leaseB = Rapunzel.bootstrapOrAcquire(ownerB, () -> {
+            fail("contextFactory should not be invoked when already bootstrapped");
+            return new TestContext(dir.resolve("unused"));
+        });
+
+        assertSame(ctx, leaseB.context());
+        assertEquals(2, Rapunzel.ownerCount());
+    }
+
     private static final class TestContext implements RapunzelContext {
         private static final Logger LOGGER = LoggerFactory.getLogger(TestContext.class);
 
@@ -94,32 +114,32 @@ final class RapunzelLeaseTest {
         }
 
         @Override
-        public PlatformId platformId() {
+        public @NotNull PlatformId platformId() {
             return PlatformId.PAPER;
         }
 
         @Override
-        public Logger logger() {
+        public @NotNull Logger logger() {
             return LOGGER;
         }
 
         @Override
-        public Path dataDirectory() {
+        public @NotNull Path dataDirectory() {
             return dataDir;
         }
 
         @Override
-        public ResourceProvider resources() {
+        public @NotNull ResourceProvider resources() {
             return _path -> Optional.empty();
         }
 
         @Override
-        public Scheduler scheduler() {
+        public @NotNull Scheduler scheduler() {
             return scheduler;
         }
 
         @Override
-        public ServiceRegistry services() {
+        public @NotNull ServiceRegistry services() {
             return services;
         }
 
@@ -133,55 +153,55 @@ final class RapunzelLeaseTest {
         private final ConcurrentHashMap<Class<?>, Object> services = new ConcurrentHashMap<>();
 
         @Override
-        public <T> void register(Class<T> type, T instance) {
+        public <T> void register(@NotNull Class<T> type, @NotNull T instance) {
             services.put(Objects.requireNonNull(type, "type"), Objects.requireNonNull(instance, "instance"));
         }
 
         @Override
-        public <T> Optional<T> find(Class<T> type) {
+        public <T> @NotNull Optional<T> find(@NotNull Class<T> type) {
             Object instance = services.get(Objects.requireNonNull(type, "type"));
             if (instance == null) return Optional.empty();
             return Optional.of(type.cast(instance));
         }
 
         @Override
-        public List<Class<?>> serviceTypes() {
+        public @NotNull List<Class<?>> serviceTypes() {
             return services.keySet().stream().toList();
         }
 
         @Override
-        public List<Object> services() {
+        public @NotNull List<Object> services() {
             return services.values().stream().toList();
         }
     }
 
     private static final class InlineScheduler implements Scheduler {
         @Override
-        public ScheduledTask run(Runnable task) {
+        public @NotNull ScheduledTask run(@NotNull Runnable task) {
             task.run();
             return new NoopTask();
         }
 
         @Override
-        public ScheduledTask runAsync(Runnable task) {
+        public @NotNull ScheduledTask runAsync(@NotNull Runnable task) {
             task.run();
             return new NoopTask();
         }
 
         @Override
-        public ScheduledTask runLater(Duration delay, Runnable task) {
+        public @NotNull ScheduledTask runLater(@NotNull Duration delay, @NotNull Runnable task) {
             task.run();
             return new NoopTask();
         }
 
         @Override
-        public ScheduledTask runRepeating(Duration initialDelay, Duration period, Runnable task) {
+        public @NotNull ScheduledTask runRepeating(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
             task.run();
             return new NoopTask();
         }
 
         @Override
-        public ScheduledTask runRepeatingAsync(Duration initialDelay, Duration period, Runnable task) {
+        public @NotNull ScheduledTask runRepeatingAsync(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
             task.run();
             return new NoopTask();
         }

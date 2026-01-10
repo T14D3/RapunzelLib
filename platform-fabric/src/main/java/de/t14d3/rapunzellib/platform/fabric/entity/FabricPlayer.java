@@ -9,6 +9,7 @@ import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import net.kyori.adventure.audience.Audience;
 import net.minecraft.server.level.ServerPlayer;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -24,27 +25,27 @@ final class FabricPlayer extends RNativeHandle<ServerPlayer> implements RPlayer 
     }
 
     @Override
-    public Audience audience() {
+    public @NotNull Audience audience() {
         return handle();
     }
 
     @Override
-    public UUID uuid() {
+    public @NotNull UUID uuid() {
         return handle().getUUID();
     }
 
     @Override
-    public String name() {
+    public @NotNull String name() {
         return handle().getGameProfile().name();
     }
 
     @Override
-    public boolean hasPermission(String permission) {
+    public boolean hasPermission(@NotNull String permission) {
         return FabricPermissions.hasPermission(handle(), permission);
     }
 
     @Override
-    public Optional<RWorld> world() {
+    public @NotNull Optional<RWorld> world() {
         ServerPlayer player = handle();
         return Rapunzel.context().worlds()
             .wrap(player.level())
@@ -52,7 +53,7 @@ final class FabricPlayer extends RNativeHandle<ServerPlayer> implements RPlayer 
     }
 
     @Override
-    public Optional<RLocation> location() {
+    public @NotNull Optional<RLocation> location() {
         ServerPlayer player = handle();
         String key = player.level().dimension().location().toString();
         RWorldRef worldRef = new RWorldRef(key, key);
@@ -65,7 +66,7 @@ final class FabricPlayer extends RNativeHandle<ServerPlayer> implements RPlayer 
     }
 
     @Override
-    public void teleport(RLocation location) {
+    public void teleport(@NotNull RLocation location) {
         Objects.requireNonNull(location, "location");
         handle().teleportTo(location.x(), location.y(), location.z());
     }

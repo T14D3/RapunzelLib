@@ -4,23 +4,24 @@ import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RNative;
 import de.t14d3.rapunzellib.objects.RWorld;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 
 public interface RBlock extends RNative {
-    RWorld world();
+    @NotNull RWorld world();
 
-    RBlockPos pos();
+    @NotNull RBlockPos pos();
 
-    String typeKey();
+    @NotNull String typeKey();
 
-    RBlockData data();
+    @NotNull RBlockData data();
 
-    static Optional<RBlock> wrap(Object nativeBlock) {
+    static @NotNull Optional<RBlock> wrap(@NotNull Object nativeBlock) {
         return Rapunzel.blocks().wrap(nativeBlock);
     }
 
-    static RBlock at(RWorld world, RBlockPos pos) {
+    static @NotNull RBlock at(@NotNull RWorld world, @NotNull RBlockPos pos) {
         return Rapunzel.blocks().at(world, pos);
     }
 }

@@ -6,6 +6,7 @@ import de.t14d3.rapunzellib.objects.block.RBlockData;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -16,12 +17,12 @@ final class FabricBlockData extends RNativeHandle<BlockState> implements RBlockD
     }
 
     @Override
-    public String typeKey() {
+    public @NotNull String typeKey() {
         return BuiltInRegistries.BLOCK.getKey(handle().getBlock()).toString();
     }
 
     @Override
-    public String asString() {
+    public @NotNull String asString() {
         String key = typeKey();
         BlockState state = handle();
         Collection<Property<?>> properties = state.getProperties();

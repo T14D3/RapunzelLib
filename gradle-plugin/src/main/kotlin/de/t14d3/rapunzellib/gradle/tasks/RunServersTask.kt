@@ -160,9 +160,13 @@ abstract class RunServersTask : DefaultTask() {
 
         cliArgs.addAll(additionalArgs.get())
 
-        val exitCode = ServerRunnerMain.run(cliArgs.toTypedArray())
+        val exitCode = try {
+            ServerRunnerMain.run(cliArgs.toTypedArray())
+        } catch (t: Throwable) {
+            throw GradleException("server-runner failed: ${t.message}", t)
+        }
         if (exitCode != 0) {
-            throw GradleException("server-runner exited with code $exitCode")
+            throw GradleException("server-runner exited with code $exitCode")   
         }
     }
 }

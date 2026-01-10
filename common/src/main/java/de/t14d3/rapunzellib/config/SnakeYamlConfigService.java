@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.config;
 
 import de.t14d3.rapunzellib.context.ResourceProvider;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -19,12 +20,12 @@ public final class SnakeYamlConfigService implements ConfigService {
     }
 
     @Override
-    public YamlConfig load(Path file) {
-        return load(file, null);
+    public @NotNull YamlConfig load(@NotNull Path file) {
+        return load(file, file.getFileName().toString());
     }
 
     @Override
-    public YamlConfig load(Path file, String defaultResourcePath) {
+    public @NotNull YamlConfig load(@NotNull Path file, @NotNull String defaultResourcePath) {
         Objects.requireNonNull(file, "file");
 
         try {
@@ -33,7 +34,7 @@ public final class SnakeYamlConfigService implements ConfigService {
                 Files.createDirectories(parent);
             }
         } catch (IOException e) {
-            logger.error("Failed to create config directory: {}", e.getMessage());
+            logger.error("Failed to create config directory", e);
         }
 
         if (!Files.exists(file)) {
@@ -63,7 +64,7 @@ public final class SnakeYamlConfigService implements ConfigService {
             }
             Files.copy(in, targetFile);
         } catch (IOException e) {
-            logger.warn("Failed to copy default resource {} to {}: {}", normalized, targetFile, e.getMessage());
+            logger.warn("Failed to copy default resource {} to {}", normalized, targetFile, e);
             try {
                 if (!Files.exists(targetFile)) Files.createFile(targetFile);
             } catch (IOException ignored) {
@@ -76,4 +77,5 @@ public final class SnakeYamlConfigService implements ConfigService {
         return path;
     }
 }
+
 

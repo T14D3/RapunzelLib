@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib.context;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.InputStream;
 import java.util.Optional;
 
@@ -11,6 +13,6 @@ public interface ResourceProvider {
      * @param path resource path (e.g. {@code "messages.yml"}).
      * @return input stream, if found. Caller must close it.
      */
-    Optional<InputStream> open(String path);
+    @NotNull Optional<InputStream> open(@NotNull String path);
 }
 

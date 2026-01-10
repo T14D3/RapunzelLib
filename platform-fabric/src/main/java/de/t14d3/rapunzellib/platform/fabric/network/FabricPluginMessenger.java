@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.network.MessageListener;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkConstants;
 import de.t14d3.rapunzellib.network.NetworkEnvelope;
+import de.t14d3.rapunzellib.network.json.JsonCodecs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.network.codec.StreamCodec;
@@ -20,17 +21,21 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Fabric transport using the plugin messaging channel forwarded by a proxy (e.g. Velocity).
  *
  * <p>Requires a player connection to carry messages, same as Paper plugin messaging.</p>
  */
-public final class FabricPluginMessenger implements Messenger, AutoCloseable {
+public final class FabricPluginMessenger implements Messenger, AutoCloseable {  
+    private static final long NO_CARRIER_LOG_COOLDOWN_MS = 10_000L;
+
     private final MinecraftServer server;
     private final Logger logger;
-    private final Gson gson = new Gson();
+    private final Gson gson = JsonCodecs.gson();
     private final ResourceLocation channelId = ResourceLocation.parse(NetworkConstants.TRANSPORT_CHANNEL);
+    private final AtomicLong lastNoCarrierLog = new AtomicLong(0L);
 
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
     private volatile String networkServerName;
@@ -45,27 +50,27 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public void sendToAll(String channel, String data) {
+    public void sendToAll(@NotNull String channel, @NotNull String data) {
         sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.ALL, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToServer(String channel, String serverName, String data) {
+    public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
         sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.SERVER, serverName, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToProxy(String channel, String data) {
+    public void sendToProxy(@NotNull String channel, @NotNull String data) {
         sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.PROXY, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void registerListener(String channel, MessageListener listener) {
+    public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         listeners.computeIfAbsent(channel, k -> new CopyOnWriteArrayList<>()).add(listener);
     }
 
     @Override
-    public void unregisterListener(String channel, MessageListener listener) {
+    public void unregisterListener(@NotNull String channel, @NotNull MessageListener listener) {
         List<MessageListener> list = listeners.get(channel);
         if (list == null) return;
         list.remove(listener);
@@ -79,14 +84,14 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public String getServerName() {
+    public @NotNull String getServerName() {
         String current = networkServerName;
         if (current != null && !current.isBlank()) return current;
         return "unknown";
     }
 
     @Override
-    public String getProxyServerName() {
+    public @NotNull String getProxyServerName() {
         return "velocity";
     }
 
@@ -101,7 +106,7 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
             try {
                 env = gson.fromJson(payload.json(), NetworkEnvelope.class);
             } catch (Exception e) {
-                logger.warn("Failed to parse network envelope: {}", e.getMessage());
+                logger.warn("Failed to parse network envelope", e);
                 return;
             }
 
@@ -113,7 +118,7 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
                 try {
                     listener.onMessage(env.getChannel(), env.getData(), env.getSourceServer());
                 } catch (Exception e) {
-                    logger.warn("Network listener error on channel {}: {}", env.getChannel(), e.getMessage());
+                    logger.warn("Network listener error on channel {}", env.getChannel(), e);
                 }
             }
         });
@@ -124,7 +129,18 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
         if (playerList == null) return;
 
         ServerPlayer carrier = playerList.getPlayers().stream().findFirst().orElse(null);
-        if (carrier == null) return;
+        if (carrier == null) {
+            long now = System.currentTimeMillis();
+            long last = lastNoCarrierLog.get();
+            if ((now - last) >= NO_CARRIER_LOG_COOLDOWN_MS && lastNoCarrierLog.compareAndSet(last, now)) {
+                logger.debug(
+                    "Dropping plugin message (no player carrier available): target={}, channel={}",
+                    (env != null) ? env.getTarget() : null,
+                    (env != null) ? env.getChannel() : null
+                );
+            }
+            return;
+        }
 
         ServerPlayNetworking.send(carrier, new BridgePayload(gson.toJson(env)));
     }

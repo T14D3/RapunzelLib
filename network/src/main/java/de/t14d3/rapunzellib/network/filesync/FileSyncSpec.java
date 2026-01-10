@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib.network.filesync;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,9 +37,9 @@ public final class FileSyncSpec {
     private final boolean deleteExtraneous;
 
     private FileSyncSpec(
-        Path rootDirectory,
-        List<PathMatcher> includes,
-        List<PathMatcher> excludes,
+        @NotNull Path rootDirectory,
+        @NotNull List<PathMatcher> includes,
+        @NotNull List<PathMatcher> excludes,
         boolean deleteExtraneous
     ) {
         this.rootDirectory = Objects.requireNonNull(rootDirectory, "rootDirectory");

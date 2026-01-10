@@ -5,6 +5,7 @@ import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkEventBus;
+import de.t14d3.rapunzellib.network.json.JsonCodecs;
 import de.t14d3.rapunzellib.network.info.NetworkInfoRpc;
 import de.t14d3.rapunzellib.network.info.NetworkPlayerInfo;
 import de.t14d3.rapunzellib.network.rpc.RpcChannels;
@@ -25,7 +26,7 @@ public final class VelocityNetworkInfoResponder implements AutoCloseable {
     public VelocityNetworkInfoResponder(Messenger messenger, ProxyServer proxy, Logger logger) {
         this.proxy = Objects.requireNonNull(proxy, "proxy");
         this.logger = Objects.requireNonNull(logger, "logger");
-        this.gson = new Gson();
+        this.gson = JsonCodecs.gson();
         this.bus = new NetworkEventBus(Objects.requireNonNull(messenger, "messenger"), gson);
 
         this.subscription = bus.register(
@@ -48,7 +49,7 @@ public final class VelocityNetworkInfoResponder implements AutoCloseable {
                 default -> sendError(request.requestId(), sourceServer, "Unknown method: " + request.method());
             }
         } catch (Exception e) {
-            logger.warn("Failed to handle network info request from {}: {}", sourceServer, e.getMessage());
+            logger.warn("Failed to handle network info request from {}", sourceServer, e);
             sendError(request.requestId(), sourceServer, e.getMessage());
         }
     }

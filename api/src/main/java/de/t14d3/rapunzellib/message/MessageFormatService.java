@@ -1,27 +1,28 @@
 package de.t14d3.rapunzellib.message;
 
 import net.kyori.adventure.text.Component;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Set;
 
 public interface MessageFormatService {
     void reload();
 
-    boolean contains(String key);
+    boolean contains(@NotNull String key);
 
-    Set<String> keys();
+    @NotNull Set<String> keys();
 
-    String raw(String key);
+    @NotNull String raw(@NotNull String key);
 
-    Component component(String key);
+    @NotNull Component component(@NotNull String key);
 
-    Component component(String key, Placeholders placeholders);
+    @NotNull Component component(@NotNull String key, @NotNull Placeholders placeholders);
 
-    default Component component(MessageKey key) {
+    default @NotNull Component component(@NotNull MessageKey key) {
         return component(key.value());
     }
 
-    default Component component(MessageKey key, Placeholders placeholders) {
+    default @NotNull Component component(@NotNull MessageKey key, @NotNull Placeholders placeholders) {
         return component(key.value(), placeholders);
     }
 }

@@ -1,13 +1,15 @@
 package de.t14d3.rapunzellib.message;
 
-public record MessageKey(String value) {
+import org.jetbrains.annotations.NotNull;
+
+public record MessageKey(@NotNull String value) {
     public MessageKey {
-        if (value == null || value.isBlank()) {
+        if (value.isBlank()) {
             throw new IllegalArgumentException("value cannot be null/blank");
         }
     }
 
-    public static MessageKey of(String value) {
+    public static @NotNull MessageKey of(@NotNull String value) {
         return new MessageKey(value);
     }
 }

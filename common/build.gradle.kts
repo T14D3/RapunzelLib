@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     api(project(":api"))
+    implementation(libs.snakeyaml)
     implementation(libs.adventure.minimessage)
     implementation(libs.slf4j.api)
 

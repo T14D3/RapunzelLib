@@ -58,7 +58,7 @@ public final class SpoolDatabase implements AutoCloseable {
             try {
                 entityManager.flush();
             } catch (Exception e) {
-                logger.error("DB flush failed: {}", e.getMessage());
+                logger.error("DB flush failed", e);
             }
         });
     }
@@ -82,7 +82,7 @@ public final class SpoolDatabase implements AutoCloseable {
             Connection conn = entityManager.getExecutor().getConnection();
             if (conn != null) conn.close();
         } catch (Exception e) {
-            logger.debug("Error closing DB connection: {}", e.getMessage());
+            logger.debug("Error closing DB connection", e);
         }
     }
 

@@ -1,27 +1,28 @@
 package de.t14d3.rapunzellib.objects;
 
 import de.t14d3.rapunzellib.Rapunzel;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface RWorld extends RNative {
-    RWorldRef ref();
+    @NotNull RWorldRef ref();
 
-    default Optional<UUID> uuid() {
+    default @NotNull Optional<UUID> uuid() {
         return Optional.empty();
     }
 
-    static Collection<RWorld> all() {
+    static @NotNull Collection<RWorld> all() {
         return Rapunzel.worlds().all();
     }
 
-    static Optional<RWorld> getByName(String name) {
+    static @NotNull Optional<RWorld> getByName(@NotNull String name) {
         return Rapunzel.worlds().getByName(name);
     }
 
-    static Optional<RWorld> wrap(Object nativeWorld) {
+    static @NotNull Optional<RWorld> wrap(@NotNull Object nativeWorld) {
         return Rapunzel.worlds().wrap(nativeWorld);
     }
 }

@@ -1,6 +1,6 @@
 # RapunzelLib
 
-RapunzelLib is a Java 21 library for Minecraft plugins/mods that share code across **Paper**, **Velocity**, **Fabric**, and **NeoForge**. It provides a small, platform-neutral API plus platform-specific bootstraps and implementations.
+RapunzelLib is a Java 21 library for Minecraft plugins/mods that share code across **Paper**, **Velocity**, **Fabric**, **NeoForge**, and **Sponge (Vanilla)**. It provides a small, platform-neutral API plus platform-specific bootstraps and implementations.
 
 ## Modules
 
@@ -11,14 +11,17 @@ RapunzelLib is a Java 21 library for Minecraft plugins/mods that share code acro
 - `commands-paper` - optional Paper adapters (e.g. Bukkit sender → `RCommandSource`)
 - `commands-fabric` - optional Fabric adapters (e.g. `CommandSourceStack` → `RCommandSource`)
 - `commands-neoforge` - optional NeoForge adapters
+- `commands-sponge` - optional Sponge adapters (e.g. Sponge command source → `RCommandSource`)
 - `events` - platform-neutral game action events (sync cancellable + sync/async observers)
 - `events-paper` - Paper bridge (Bukkit/Paper listeners → Rapunzel events)
 - `events-fabric` - Fabric bridge (Fabric callbacks → Rapunzel events)
 - `events-neoforge` - NeoForge bridge
+- `events-sponge` - Sponge bridge
 - `platform-paper` - Paper bootstrap + wrappers + scheduler + plugin-messaging transport
 - `platform-velocity` - Velocity bootstrap + wrappers + scheduler + plugin-messaging transport + proxy-side responders
 - `platform-fabric` - Fabric bootstrap + wrappers + scheduler (network defaults to in-memory)
 - `platform-neoforge` - NeoForge bootstrap + wrappers + scheduler (network defaults to in-memory)
+- `platform-sponge` - Sponge bootstrap + wrappers + scheduler (network defaults to in-memory)
 - `network` - transport abstraction (`Messenger`), typed event bus, plugin-messaging payloads, Redis Pub/Sub transport, file sync, network info
 - `database-spool` - wrapper around `de.t14d3:spool` for simple DB usage + DB-backed network outbox (`DbQueuedMessenger`)
 - `gradle-plugin` - `de.t14d3.rapunzellib` Gradle plugin (templates, message validation, multi-server runner integration)
@@ -30,7 +33,7 @@ This project is published under:
 
 - **Group**: `de.t14d3.rapunzellib`
 - **BOM**: `bom`
-- **ArtifactIds** (match module names): `api`, `common`, `commands`, `commands-paper`, `commands-fabric`, `commands-neoforge`, `events`, `events-paper`, `events-fabric`, `events-neoforge`, `network`, `database-spool`, `platform-paper`, `platform-velocity`, `platform-fabric`, `platform-neoforge`, `tool-server-runner`
+- **ArtifactIds** (match module names): `api`, `common`, `commands`, `commands-paper`, `commands-fabric`, `commands-neoforge`, `commands-sponge`, `events`, `events-paper`, `events-fabric`, `events-neoforge`, `events-sponge`, `network`, `database-spool`, `platform-paper`, `platform-velocity`, `platform-fabric`, `platform-neoforge`, `platform-sponge`, `tool-server-runner`
 
 Note: jar file names are prefixed `rapunzellib-...`, but Maven artifactIds are the plain module names above.
 
@@ -49,7 +52,7 @@ Pick the platform module you run on:
 dependencies {
   implementation(platform("de.t14d3.rapunzellib:bom:<version>"))
   implementation("de.t14d3.rapunzellib:platform-paper")
-  // or: platform-velocity / platform-fabric / platform-neoforge
+  // or: platform-velocity / platform-fabric / platform-neoforge / platform-sponge
 }
 ```
 
@@ -68,6 +71,29 @@ Most non-`api` modules also publish a **`shaded` classifier** (e.g. `...:<versio
 
 Fabric also publishes an unremapped dev jar as `:dev-shaded`.
 
+## Gradle plugin (`de.t14d3.rapunzellib`)
+
+The `gradle-plugin` module publishes a Gradle plugin with developer tools:
+
+- `rapunzellibValidateMessages`: validates message key usage in compiled bytecode against your `messages.yml`.
+- `rapunzellibRunServers` / `rapunzellibRunPerfServers`: runs a local Velocity + multiple Paper backends using `tool-server-runner`.
+- `rapunzellibInitTemplate`: generates a small starter template (messages/config/Example.java).
+
+Example:
+
+```kotlin
+plugins {
+  id("de.t14d3.rapunzellib") version "<version>"
+}
+
+rapunzellib {
+  messagesFile.set(layout.projectDirectory.file("src/main/resources/messages.yml"))
+  failOnUnusedKeys.set(true)
+}
+```
+
+More details: `gradle-plugin/README.md`.
+
 ## Core API
 
 ### Bootstrapping (`RapunzelContext`)
@@ -75,6 +101,10 @@ Fabric also publishes an unremapped dev jar as `:dev-shaded`.
 `Rapunzel` is a global holder for exactly one `RapunzelContext`.
 
 The platform bootstraps create a context (`DefaultRapunzelContext`), register default services, and call `Rapunzel.bootstrap(owner, ctx)`.
+
+In shared runtimes where multiple components may call a platform bootstrap, the bootstraps use `Rapunzel.bootstrapOrAcquire(owner, ...)` so only the first call creates the global context; later calls simply acquire a lease for the existing context.
+
+If multiple plugins/mods shade RapunzelLib, which exact version provides the shared classes depends on the platform's classloading behavior and load order; keep your consumers reasonably version-aligned.
 
 **Paper**
 
@@ -131,6 +161,27 @@ public final class MyModBootstrap {
 
   public static void shutdown() {
     Rapunzel.shutdown(MOD_ID);
+  }
+}
+```
+
+**Sponge (Vanilla)**
+
+```java
+import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.platform.sponge.SpongeRapunzelBootstrap;
+import org.spongepowered.api.Server;
+import org.spongepowered.plugin.PluginContainer;
+
+import java.nio.file.Path;
+
+public final class MySpongePlugin {
+  public void startup(PluginContainer container, Server server, Path dataDir) {
+    SpongeRapunzelBootstrap.bootstrap(container, dataDir, server);
+  }
+
+  public void shutdown() {
+    Rapunzel.shutdown(this);
   }
 }
 ```
@@ -355,6 +406,8 @@ Plugin messaging has delivery constraints (e.g. requires a player connection). T
 - `DbQueuedMessenger` - wraps a `Messenger`, persists allowlisted channels to a shared DB and retries periodically
 - `NetworkQueueConfig` - reads outbox settings from `YamlConfig` (`network.queue.*`)
 
+Platform bootstraps that use plugin-messaging transports (Paper/Fabric/NeoForge/Velocity) call `NetworkQueueBootstrap.wrapIfEnabled(...)` automatically when `network.queue.enabled=true`. To persist queued messages, configure `network.queue.jdbc` (or `database.jdbc`) to point at a JDBC URL (e.g. SQLite).
+
 Config keys (with defaults):
 
 - `network.queue.enabled` (`true`)
@@ -421,7 +474,7 @@ if (q.enabled()) {
 - `Rapunzel.context()` throws until you bootstrap; only one global context is supported.
 - Plugin messaging transport needs a player connection:
   - Paper: `Messenger.isConnected()` is false with zero online players; sends are dropped.
-  - Velocity: forwarding to a backend server requires at least one player currently on that backend (or configure `VelocityPluginMessenger#setUndeliverableForwarder`, e.g. with `DbQueuedMessenger`).
+  - Velocity: forwarding to a backend server requires at least one player currently on that backend (queueing can be enabled via `network.queue.*`).
 - Platform differences are explicit:
   - Velocity has no worlds/blocks; some operations throw `UnsupportedOperationException`.
 - `YamlMessageFormatService` turns unknown MiniMessage tags into placeholders; avoid naming placeholders after built-in MiniMessage tags.

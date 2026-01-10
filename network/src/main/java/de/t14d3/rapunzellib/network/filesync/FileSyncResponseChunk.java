@@ -1,10 +1,12 @@
 package de.t14d3.rapunzellib.network.filesync;
 
+import org.jetbrains.annotations.NotNull;
+
 public record FileSyncResponseChunk(
-    String requestId,
-    String groupId,
-    int index,
-    String dataBase64
+        @NotNull String requestId,
+        @NotNull String groupId,
+        int index,
+        @NotNull String dataBase64
 ) {
 }
 

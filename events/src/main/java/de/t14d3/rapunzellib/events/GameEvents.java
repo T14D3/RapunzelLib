@@ -2,19 +2,20 @@ package de.t14d3.rapunzellib.events;
 
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.context.RapunzelContext;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.Method;
 import java.util.ServiceLoader;
 
 public final class GameEvents {
     private GameEvents() {
     }
 
-    public static GameEventBus bus() {
+    public static @NotNull GameEventBus bus() {
         return Rapunzel.context().services().get(GameEventBus.class);
     }
 
-    public static GameEventBus install(Object owner) {
+    public static @NotNull GameEventBus install(@Nullable Object owner) {
         RapunzelContext ctx = Rapunzel.context();
         if (ctx.services().find(GameEventBridge.class).isPresent()) {
             return ctx.services().get(GameEventBus.class);
@@ -22,10 +23,7 @@ public final class GameEvents {
 
         GameEventBus bus = ctx.services().find(GameEventBus.class).orElseGet(() -> {
             GameEventBus created = new GameEventBus(ctx.scheduler(), ctx.logger());
-            boolean tracked = registerService(ctx, GameEventBus.class, created);
-            if (!tracked) {
-                registerCloseable(ctx, created);
-            }
+            ctx.register(GameEventBus.class, created);
             return created;
         });
 
@@ -40,30 +38,7 @@ public final class GameEvents {
             ));
 
         GameEventBridge bridge = installer.install(ctx, bus, owner);
-        boolean tracked = registerService(ctx, GameEventBridge.class, bridge);
-        if (!tracked) {
-            registerCloseable(ctx, bridge);
-        }
+        ctx.register(GameEventBridge.class, bridge);
         return bus;
-    }
-
-    private static <T> boolean registerService(RapunzelContext ctx, Class<T> type, T instance) {
-        // Prefer DefaultRapunzelContext.register(...) so AutoCloseable services are tracked for shutdown.
-        try {
-            Method m = ctx.getClass().getMethod("register", Class.class, Object.class);
-            m.invoke(ctx, type, instance);
-            return true;
-        } catch (Exception ignored) {
-        }
-        ctx.services().register(type, instance);
-        return false;
-    }
-
-    private static void registerCloseable(RapunzelContext ctx, AutoCloseable closeable) {
-        try {
-            Method m = ctx.getClass().getMethod("registerCloseable", AutoCloseable.class);
-            m.invoke(ctx, closeable);
-        } catch (Exception ignored) {
-        }
     }
 }

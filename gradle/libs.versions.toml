@@ -17,12 +17,14 @@ gson = "2.10.1"
 slf4j = "2.0.7"
 asm = "9.7.1"
 brigadier = "1.0.18"
+fastutil = "8.5.11"
 
 paper-api = "1.21.10-R0.1-SNAPSHOT"
 userdev = "2.0.0-beta.19"
 velocity-api = "3.4.0-SNAPSHOT"
 neoforge = "21.10.64"
 neoforge-moddev = "2.0.137"
+sponge-api = "11.0.0"
 
 shadow = "9.0.0-beta8"
 
@@ -58,9 +60,12 @@ asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
 asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
 asm-analysis = { module = "org.ow2.asm:asm-analysis", version.ref = "asm" }
+fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
 
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
 
 velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "velocity-api" }
+
+sponge-api = { module = "org.spongepowered:spongeapi", version.ref = "sponge-api" }
 
 spool = { module = "de.t14d3:spool", version = "1.2-SNAPSHOT" }

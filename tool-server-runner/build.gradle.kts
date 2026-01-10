@@ -7,6 +7,7 @@ plugins {
 
 dependencies {
     implementation(libs.gson)
+    testImplementation(libs.junit.jupiter)
 }
 
 application {

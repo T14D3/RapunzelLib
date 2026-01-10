@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib.objects;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.util.Collection;
 import java.util.Optional;
 
@@ -11,23 +13,23 @@ public interface Worlds {
     /**
      * Returns all currently loaded worlds.
      */
-    Collection<RWorld> all();
+    @NotNull Collection<RWorld> all();
 
     /**
      * Returns a world by name, if available.
      */
-    Optional<RWorld> getByName(String name);
+    @NotNull Optional<RWorld> getByName(@NotNull String name);
 
     /**
      * Tries to wrap a native world.
      */
-    Optional<RWorld> wrap(Object nativeWorld);
+    @NotNull Optional<RWorld> wrap(@NotNull Object nativeWorld);
 
-    default RWorld requireByName(String name) {
+    default @NotNull RWorld requireByName(@NotNull String name) {
         return getByName(name).orElseThrow(() -> new IllegalArgumentException("Unknown world: " + name));
     }
 
-    default RWorld require(Object nativeWorld) {
+    default @NotNull RWorld require(@NotNull Object nativeWorld) {
         return wrap(nativeWorld).orElseThrow(() -> new IllegalArgumentException("Cannot wrap world: " + nativeWorld));
     }
 }

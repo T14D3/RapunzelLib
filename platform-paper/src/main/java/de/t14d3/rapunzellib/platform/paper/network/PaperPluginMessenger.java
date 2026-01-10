@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.network.MessageListener;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkConstants;
 import de.t14d3.rapunzellib.network.NetworkEnvelope;
+import de.t14d3.rapunzellib.network.json.JsonCodecs;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -17,12 +18,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class PaperPluginMessenger implements Messenger, PluginMessageListener, AutoCloseable {
+    private static final long NO_CARRIER_LOG_COOLDOWN_MS = 10_000L;
+
     private final JavaPlugin plugin;
     private final Logger logger;
-    private final Gson gson = new Gson();
+    private final Gson gson = JsonCodecs.gson();
     private volatile String networkServerName;
+    private final AtomicLong lastNoCarrierLog = new AtomicLong(0L);
 
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
 
@@ -35,27 +40,27 @@ public final class PaperPluginMessenger implements Messenger, PluginMessageListe
     }
 
     @Override
-    public void sendToAll(String channel, String data) {
+    public void sendToAll(@NotNull String channel, @NotNull String data) {
         sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.ALL, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToServer(String channel, String serverName, String data) {
+    public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
         sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.SERVER, serverName, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToProxy(String channel, String data) {
+    public void sendToProxy(@NotNull String channel, @NotNull String data) {
         sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.PROXY, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void registerListener(String channel, MessageListener listener) {
+    public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         listeners.computeIfAbsent(channel, k -> new CopyOnWriteArrayList<>()).add(listener);
     }
 
     @Override
-    public void unregisterListener(String channel, MessageListener listener) {
+    public void unregisterListener(@NotNull String channel, @NotNull MessageListener listener) {
         List<MessageListener> list = listeners.get(channel);
         if (list == null) return;
         list.remove(listener);
@@ -77,7 +82,7 @@ public final class PaperPluginMessenger implements Messenger, PluginMessageListe
     }
 
     @Override
-    public String getServerName() {
+    public @NotNull String getServerName() {
         String current = networkServerName;
         if (current != null && !current.isBlank()) {
             return current;
@@ -86,12 +91,12 @@ public final class PaperPluginMessenger implements Messenger, PluginMessageListe
     }
 
     @Override
-    public String getProxyServerName() {
+    public @NotNull String getProxyServerName() {
         return "velocity";
     }
 
     @Override
-    public void onPluginMessageReceived(@NotNull String channel, @NotNull Player player, byte[] message) {
+    public void onPluginMessageReceived(@NotNull String channel, @NotNull Player player, byte @NotNull [] message) {
         if (!NetworkConstants.TRANSPORT_CHANNEL.equals(channel)) return;
 
         String json = new String(message, StandardCharsets.UTF_8);
@@ -99,7 +104,7 @@ public final class PaperPluginMessenger implements Messenger, PluginMessageListe
         try {
             env = gson.fromJson(json, NetworkEnvelope.class);
         } catch (Exception e) {
-            logger.warn("Failed to parse network envelope: {}", e.getMessage());
+            logger.warn("Failed to parse network envelope", e);
             return;
         }
 
@@ -111,16 +116,27 @@ public final class PaperPluginMessenger implements Messenger, PluginMessageListe
             try {
                 listener.onMessage(env.getChannel(), env.getData(), env.getSourceServer());
             } catch (Exception e) {
-                logger.warn("Network listener error on channel {}: {}", env.getChannel(), e.getMessage());
+                logger.warn("Network listener error on channel {}", env.getChannel(), e);
             }
         }
     }
 
     private void sendEnvelope(NetworkEnvelope env) {
         Player carrier = Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
-        if (carrier == null) return;
+        if (carrier == null) {
+            long now = System.currentTimeMillis();
+            long last = lastNoCarrierLog.get();
+            if ((now - last) >= NO_CARRIER_LOG_COOLDOWN_MS && lastNoCarrierLog.compareAndSet(last, now)) {
+                logger.debug(
+                    "Dropping plugin message (no player carrier available): target={}, channel={}",
+                    (env != null) ? env.getTarget() : null,
+                    (env != null) ? env.getChannel() : null
+                );
+            }
+            return;
+        }
 
-        byte[] bytes = gson.toJson(env).getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = gson.toJson(env).getBytes(StandardCharsets.UTF_8);   
         carrier.sendPluginMessage(plugin, NetworkConstants.TRANSPORT_CHANNEL, bytes);
     }
 

@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import de.t14d3.rapunzellib.network.MessageListener;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkEnvelope;
+import de.t14d3.rapunzellib.network.json.JsonCodecs;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
     private final RedisPubSubConfig config;
     private final Logger logger;
-    private final Gson gson = new Gson();
+    private final Gson gson = JsonCodecs.gson();
 
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
 
@@ -41,27 +43,27 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public void sendToAll(String channel, String data) {
+    public void sendToAll(@NotNull String channel, @NotNull String data) {
         publish(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.ALL, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToServer(String channel, String serverName, String data) {
+    public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
         publish(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.SERVER, serverName, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void sendToProxy(String channel, String data) {
+    public void sendToProxy(@NotNull String channel, @NotNull String data) {
         publish(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.PROXY, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
-    public void registerListener(String channel, MessageListener listener) {
+    public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         listeners.computeIfAbsent(channel, k -> new CopyOnWriteArrayList<>()).add(listener);
     }
 
     @Override
-    public void unregisterListener(String channel, MessageListener listener) {
+    public void unregisterListener(@NotNull String channel, @NotNull MessageListener listener) {
         List<MessageListener> list = listeners.get(channel);
         if (list == null) return;
         list.remove(listener);
@@ -73,12 +75,12 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
     }
 
     @Override
-    public String getServerName() {
+    public @NotNull String getServerName() {
         return config.serverName();
     }
 
     @Override
-    public String getProxyServerName() {
+    public @NotNull String getProxyServerName() {
         return config.proxyServerName();
     }
 
@@ -92,7 +94,7 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
                 try {
                     publishConnection = RedisConnection.connect(config, false);
                 } catch (Exception e) {
-                    logger.warn("Redis publish connect failed: {}", e.getMessage());
+                    logger.warn("Redis publish connect failed", e);
                     closePublishConnection();
                     return;
                 }
@@ -102,7 +104,7 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
                 publishConnection.publish(config.transportChannel(), payload);
                 return;
             } catch (Exception first) {
-                logger.warn("Redis publish failed (will retry once): {}", first.getMessage());
+                logger.warn("Redis publish failed (will retry once)", first);
                 closePublishConnection();
             }
 
@@ -110,7 +112,7 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
                 publishConnection = RedisConnection.connect(config, false);
                 publishConnection.publish(config.transportChannel(), payload);
             } catch (Exception second) {
-                logger.warn("Redis publish retry failed: {}", second.getMessage());
+                logger.warn("Redis publish retry failed", second);
                 closePublishConnection();
             }
         }
@@ -140,7 +142,7 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
             } catch (Exception e) {
                 connected = false;
                 if (running) {
-                    logger.warn("Redis subscribe loop error: {}", e.getMessage());
+                    logger.warn("Redis subscribe loop error", e);
                     sleepQuietly(config.reconnectDelayMillis());
                 }
             } finally {
@@ -162,7 +164,8 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
             NetworkEnvelope env;
             try {
                 env = gson.fromJson(payload, NetworkEnvelope.class);
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.debug("Failed to parse network envelope from redis pubsub payload", e);
                 return;
             }
 
@@ -198,7 +201,7 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
             try {
                 listener.onMessage(env.getChannel(), env.getData(), env.getSourceServer());
             } catch (Exception e) {
-                logger.warn("Network listener error on channel {}: {}", env.getChannel(), e.getMessage());
+                logger.warn("Network listener error on channel {}", env.getChannel(), e);
             }
         }
     }
