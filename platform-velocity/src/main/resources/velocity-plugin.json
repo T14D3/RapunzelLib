@@ -1,0 +1,10 @@
+{
+  "id": "rapunzellib_platform_velocity",
+  "name": "RapunzelLib (Velocity Platform)",
+  "version": "${version}",
+  "description": "Canonical Velocity host wrapper for RapunzelLib platform bootstrap.",
+  "authors": [
+    "t14d3"
+  ],
+  "main": "de.t14d3.rapunzellib.platform.velocity.VelocityPlatformPlugin"
+}

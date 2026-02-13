@@ -1,0 +1,8 @@
+name: RapunzelLibPlatformPaper
+main: de.t14d3.rapunzellib.platform.paper.PaperPlatformPlugin
+version: ${version}
+description: Dynamically loaded RapunzelLib Paper platform companion plugin.
+authors:
+  - t14d3
+api-version: '1.21'
+load: STARTUP

@@ -17,7 +17,7 @@ public final class BlockBreakPre extends BaseCancellablePreEvent {
     public BlockBreakPre(RPlayer player, RBlock block, boolean isCancelled) {
         this.player = Objects.requireNonNull(player, "player");
         this.block = Objects.requireNonNull(block, "block");
-        this.cancelled = isCancelled;
+        setCancelled(isCancelled);
     }
 
     public RPlayer player() {

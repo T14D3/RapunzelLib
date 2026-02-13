@@ -1,11 +1,8 @@
 plugins {
-    `java-library`
+    alias(libs.plugins.feature.platform.module.conventions)
+    alias(libs.plugins.paper.api.module.conventions)
 }
 
 dependencies {
-    api(project(":commands"))
-    compileOnly(libs.paper.api)
-    compileOnly(libs.annotations)
-    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.paper.api)
 }
-

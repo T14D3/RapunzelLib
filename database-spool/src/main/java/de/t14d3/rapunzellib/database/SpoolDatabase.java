@@ -5,9 +5,11 @@ import org.slf4j.Logger;
 
 import java.sql.Connection;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -28,6 +30,8 @@ public final class SpoolDatabase implements AutoCloseable {
     private final EntityManager entityManager;
     private final ExecutorService flushExecutor;
     private final Logger logger;
+    private final AtomicBoolean flushRequested = new AtomicBoolean(false);
+    private final AtomicBoolean flushWorkerScheduled = new AtomicBoolean(false);
 
     private SpoolDatabase(EntityManager entityManager, ExecutorService flushExecutor, Logger logger) {
         this.entityManager = Objects.requireNonNull(entityManager, "entityManager");
@@ -64,7 +68,36 @@ public final class SpoolDatabase implements AutoCloseable {
     }
 
     public void flushAsync() {
-        flushExecutor.execute(this::flush);
+        flushRequested.set(true);
+        scheduleFlushWorker();
+    }
+
+    public CompletableFuture<Void> runAsync(Runnable runnable) {
+        if (runnable == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.runAsync(runnable, flushExecutor);
+    }
+
+    public <T> CompletableFuture<T> supplyAsync(Supplier<T> supplier) {
+        if (supplier == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.supplyAsync(supplier, flushExecutor);
+    }
+
+    public CompletableFuture<Void> runLockedAsync(Runnable runnable) {
+        if (runnable == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return runAsync(() -> runLocked(runnable));
+    }
+
+    public <T> CompletableFuture<T> lockedAsync(Supplier<T> supplier) {
+        if (supplier == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return supplyAsync(() -> locked(supplier));
     }
 
     public void transactional(Runnable work) {
@@ -84,6 +117,26 @@ public final class SpoolDatabase implements AutoCloseable {
         } catch (Exception e) {
             logger.debug("Error closing DB connection", e);
         }
+    }
+
+    private void scheduleFlushWorker() {
+        if (!flushWorkerScheduled.compareAndSet(false, true)) {
+            return;
+        }
+
+        flushExecutor.execute(() -> {
+            try {
+                do {
+                    flushRequested.set(false);
+                    flush();
+                } while (flushRequested.get());
+            } finally {
+                flushWorkerScheduled.set(false);
+                if (flushRequested.get()) {
+                    scheduleFlushWorker();
+                }
+            }
+        });
     }
 
     public static final class Builder {
@@ -165,4 +218,3 @@ public final class SpoolDatabase implements AutoCloseable {
         }
     }
 }
-

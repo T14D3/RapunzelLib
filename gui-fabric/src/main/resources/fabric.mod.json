@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "rapunzellib_gui_fabric",
+  "version": "${version}",
+  "name": "RapunzelLib GUI (Fabric)",
+  "description": "Fabric GUI implementation for RapunzelLib supporting inventory and dialog-based GUIs.",
+  "authors": [
+    "t14d3"
+  ],
+  "environment": "server",
+  "depends": {
+    "fabric-networking-api-v1": "*",
+    "fabricloader": ">=0.16.0",
+    "minecraft": ">=1.21"
+  }
+}

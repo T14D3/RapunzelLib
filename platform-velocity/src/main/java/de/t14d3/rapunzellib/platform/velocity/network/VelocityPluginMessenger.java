@@ -29,7 +29,6 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
 
     public static final ChannelIdentifier CHANNEL_ID = MinecraftChannelIdentifier.from(NetworkConstants.TRANSPORT_CHANNEL);
 
-    private final Object plugin;
     private final ProxyServer proxy;
     private final Logger logger;
     private final Gson gson = JsonCodecs.gson();
@@ -47,7 +46,6 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
     private volatile Messenger undeliverableForwarder;
 
     public VelocityPluginMessenger(Object plugin, ProxyServer proxy, Logger logger) {
-        this.plugin = plugin;
         this.proxy = proxy;
         this.logger = logger;
 

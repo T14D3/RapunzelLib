@@ -7,33 +7,64 @@ adventure = "4.25.0"
 adventure-platform-fabric = "6.2.0"
 adventure-platform-neoforge = "6.8.0"
 
-fabric-api = "0.138.4+1.21.10"
-minecraft = "1.21.10"
+fabric-api = "0.138.4+1.21.11"
+fabric-command-api-v2 = "2.4.5+129f1f4cb0"
+fabric-events-interaction-v0 = "4.0.41+129f1f4cb0"
+fabric-lifecycle-events-v1 = "2.6.14+129f1f4cb0"
+fabric-networking-api-v1 = "5.1.3+129f1f4cb0"
+minecraft = "1.21.11"
 fabric-loader = "0.18.3"
-fabric-loom = "1.11.7"
+fabric-loom = "1.13.3"
 
 snakeyaml = "2.0"
 gson = "2.10.1"
-slf4j = "2.0.7"
+slf4j = "2.0.16"
 asm = "9.7.1"
 brigadier = "1.0.18"
 fastutil = "8.5.11"
 
-paper-api = "1.21.10-R0.1-SNAPSHOT"
+paper-api = "1.21.11-R0.1-SNAPSHOT"
 userdev = "2.0.0-beta.19"
+vanilla-gradle = "0.2.2"
 velocity-api = "3.4.0-SNAPSHOT"
-neoforge = "21.10.64"
+neoforge = "21.11.42"
 neoforge-moddev = "2.0.137"
 sponge-api = "11.0.0"
 
 shadow = "9.0.0-beta8"
 
+# Mixin for NeoForge
+mixin = "0.8.7"
+mixin-plugin = "0.8-SNAPSHOT"
+
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 
-userdev = { id = "io.papermc.paperweight.userdev", version.ref = "userdev" }    
+userdev = { id = "io.papermc.paperweight.userdev", version.ref = "userdev" }
+vanilla-gradle = { id = "org.spongepowered.gradle.vanilla", version.ref = "vanilla-gradle" }
 neoforge-moddev = { id = "net.neoforged.moddev", version.ref = "neoforge-moddev" }
 fabric-loom = { id = "fabric-loom", version.ref = "fabric-loom" }
+mixin = { id = "org.spongepowered.mixin", version.ref = "mixin-plugin" }
+rapunzellib = { id = "de.t14d3.rapunzellib" }
+
+
+root-subproject-conventions = { id = "de.t14d3.rapunzellib.root-subproject-conventions" }
+root-publishing-conventions = { id = "de.t14d3.rapunzellib.root-publishing-conventions" }
+feature-platform-module-conventions = { id = "de.t14d3.rapunzellib.feature-platform-module-conventions" }
+fabric-module-conventions = { id = "de.t14d3.rapunzellib.fabric-module-conventions" }
+neoforge-module-conventions = { id = "de.t14d3.rapunzellib.neoforge-module-conventions" }
+paper-api-module-conventions = { id = "de.t14d3.rapunzellib.paper-api-module-conventions" }
+paper-userdev-module-conventions = { id = "de.t14d3.rapunzellib.paper-userdev-module-conventions" }
+vanilla-module-conventions = { id = "de.t14d3.rapunzellib.vanilla-module-conventions" }
+sponge-module-conventions = { id = "de.t14d3.rapunzellib.sponge-module-conventions" }
+velocity-module-conventions = { id = "de.t14d3.rapunzellib.velocity-module-conventions" }
+common-module-conventions = { id = "de.t14d3.rapunzellib.common-module-conventions" }
+database-spool-module-conventions = { id = "de.t14d3.rapunzellib.database-spool-module-conventions" }
+gui-platform-module-conventions = { id = "de.t14d3.rapunzellib.gui-platform-module-conventions" }
+network-module-conventions = { id = "de.t14d3.rapunzellib.network-module-conventions" }
+backend-platform-module-conventions = { id = "de.t14d3.rapunzellib.backend-platform-module-conventions" }
+platform-fabric-module-conventions = { id = "de.t14d3.rapunzellib.platform-fabric-module-conventions" }
+platform-neoforge-module-conventions = { id = "de.t14d3.rapunzellib.platform-neoforge-module-conventions" }
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
@@ -43,10 +74,16 @@ annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-a
 
 adventure-api = { module = "net.kyori:adventure-api", version.ref = "adventure" }
 adventure-minimessage = { module = "net.kyori:adventure-text-minimessage", version.ref = "adventure" }
+adventure-serializer-gson = { module = "net.kyori:adventure-text-serializer-gson", version.ref = "adventure" }
+adventure-serializer-plain = { module = "net.kyori:adventure-text-serializer-plain", version.ref = "adventure" }
 adventure-platform-fabric = { module = "net.kyori:adventure-platform-fabric", version.ref = "adventure-platform-fabric" }
 adventure-platform-neoforge = { module = "net.kyori:adventure-platform-neoforge", version.ref = "adventure-platform-neoforge" }
 
 fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }
+fabric-command-api-v2 = { module = "net.fabricmc.fabric-api:fabric-command-api-v2", version.ref = "fabric-command-api-v2" }
+fabric-events-interaction-v0 = { module = "net.fabricmc.fabric-api:fabric-events-interaction-v0", version.ref = "fabric-events-interaction-v0" }
+fabric-lifecycle-events-v1 = { module = "net.fabricmc.fabric-api:fabric-lifecycle-events-v1", version.ref = "fabric-lifecycle-events-v1" }
+fabric-networking-api-v1 = { module = "net.fabricmc.fabric-api:fabric-networking-api-v1", version.ref = "fabric-networking-api-v1" }
 minecraft = { module = "com.mojang:minecraft", version.ref = "minecraft" }
 fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
 
@@ -63,9 +100,16 @@ asm-analysis = { module = "org.ow2.asm:asm-analysis", version.ref = "asm" }
 fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
 
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
+paperweight-userdev = { module = "io.papermc.paperweight:paperweight-userdev", version.ref = "userdev" }
+vanillagradle = { module = "org.spongepowered:vanillagradle", version.ref = "vanilla-gradle" }
+fabric-loom-gradle = { module = "net.fabricmc:fabric-loom", version.ref = "fabric-loom" }
+neoforge-moddev-gradle = { module = "net.neoforged:moddev-gradle", version.ref = "neoforge-moddev" }
 
 velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "velocity-api" }
 
 sponge-api = { module = "org.spongepowered:spongeapi", version.ref = "sponge-api" }
 
 spool = { module = "de.t14d3:spool", version = "1.2-SNAPSHOT" }
+
+# Mixin for NeoForge
+mixin = { module = "org.spongepowered:mixin", version.ref = "mixin" }

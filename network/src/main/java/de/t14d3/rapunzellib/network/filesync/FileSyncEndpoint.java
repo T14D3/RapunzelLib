@@ -2,8 +2,9 @@ package de.t14d3.rapunzellib.network.filesync;
 
 import com.google.gson.Gson;
 import de.t14d3.rapunzellib.network.Messenger;
-import de.t14d3.rapunzellib.network.NetworkEventBus;
 import de.t14d3.rapunzellib.network.json.JsonCodecs;
+import de.t14d3.rapunzellib.network.runtime.DefaultNetworkRuntimeGateway;
+import de.t14d3.rapunzellib.network.runtime.NetworkRuntimeGateway;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.slf4j.Logger;
@@ -44,10 +45,9 @@ public final class FileSyncEndpoint implements AutoCloseable {
     private static final int DEFAULT_MAX_CHUNK_BYTES = 8 * 1024;
     private static final long DEFAULT_MAX_PAYLOAD_BYTES = 5L * 1024L * 1024L;
 
-    private final Messenger messenger;
+    private final NetworkRuntimeGateway gateway;
     private final Scheduler scheduler;
     private final Logger logger;
-    private final NetworkEventBus bus;
 
     private final String groupId;
     private final FileSyncSpec spec;
@@ -60,10 +60,10 @@ public final class FileSyncEndpoint implements AutoCloseable {
     private final Listener listener;
     private final boolean autoRequestOnInvalidate;
 
-    private final NetworkEventBus.Subscription reqSub;
-    private final NetworkEventBus.Subscription resMetaSub;
-    private final NetworkEventBus.Subscription resChunkSub;
-    private final NetworkEventBus.Subscription invalidateSub;
+    private final NetworkRuntimeGateway.Subscription reqSub;
+    private final NetworkRuntimeGateway.Subscription resMetaSub;
+    private final NetworkRuntimeGateway.Subscription resChunkSub;
+    private final NetworkRuntimeGateway.Subscription invalidateSub;
 
     private final Map<String, PendingSync> pending = new ConcurrentHashMap<>();
 
@@ -78,7 +78,35 @@ public final class FileSyncEndpoint implements AutoCloseable {
         boolean autoRequestOnInvalidate
     ) {
         this(
-            messenger,
+            DefaultNetworkRuntimeGateway.compatibility(messenger),
+            scheduler,
+            logger,
+            groupId,
+            spec,
+            role,
+            authorityServerName,
+            autoRequestOnInvalidate,
+            Duration.ofSeconds(5),
+            Duration.ofSeconds(20),
+            DEFAULT_MAX_CHUNK_BYTES,
+            DEFAULT_MAX_PAYLOAD_BYTES,
+            null,
+            null
+        );
+    }
+
+    public FileSyncEndpoint(
+        NetworkRuntimeGateway gateway,
+        Scheduler scheduler,
+        Logger logger,
+        String groupId,
+        FileSyncSpec spec,
+        FileSyncRole role,
+        String authorityServerName,
+        boolean autoRequestOnInvalidate
+    ) {
+        this(
+            gateway,
             scheduler,
             logger,
             groupId,
@@ -111,7 +139,41 @@ public final class FileSyncEndpoint implements AutoCloseable {
         Listener listener,
         Gson gson
     ) {
-        this.messenger = Objects.requireNonNull(messenger, "messenger");
+        this(
+            DefaultNetworkRuntimeGateway.compatibility(messenger, gson != null ? gson : JsonCodecs.gson()),
+            scheduler,
+            logger,
+            groupId,
+            spec,
+            role,
+            authorityServerName,
+            autoRequestOnInvalidate,
+            requestTimeout,
+            transferTimeout,
+            maxChunkBytes,
+            maxPayloadBytes,
+            listener,
+            gson
+        );
+    }
+
+    public FileSyncEndpoint(
+        NetworkRuntimeGateway gateway,
+        Scheduler scheduler,
+        Logger logger,
+        String groupId,
+        FileSyncSpec spec,
+        FileSyncRole role,
+        String authorityServerName,
+        boolean autoRequestOnInvalidate,
+        Duration requestTimeout,
+        Duration transferTimeout,
+        int maxChunkBytes,
+        long maxPayloadBytes,
+        Listener listener,
+        Gson gson
+    ) {
+        this.gateway = Objects.requireNonNull(gateway, "gateway");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.groupId = requireNonBlank(groupId, "groupId");
@@ -128,29 +190,10 @@ public final class FileSyncEndpoint implements AutoCloseable {
         this.listener = (listener != null) ? listener : new Listener() {
         };
 
-        Gson effectiveGson = (gson != null) ? gson : JsonCodecs.gson();
-        this.bus = new NetworkEventBus(messenger, effectiveGson);
-
-        this.reqSub = bus.register(
-            FileSyncChannels.REQUEST,
-            FileSyncRequest.class,
-            this::handleRequest
-        );
-        this.resMetaSub = bus.register(
-            FileSyncChannels.RESPONSE_META,
-            FileSyncResponseMeta.class,
-            this::handleResponseMeta
-        );
-        this.resChunkSub = bus.register(
-            FileSyncChannels.RESPONSE_CHUNK,
-            FileSyncResponseChunk.class,
-            this::handleResponseChunk
-        );
-        this.invalidateSub = bus.register(
-            FileSyncChannels.INVALIDATE,
-            FileSyncInvalidate.class,
-            this::handleInvalidate
-        );
+        this.reqSub = gateway.subscribe(FileSyncChannels.REQUEST_TOPIC, this::handleRequest);
+        this.resMetaSub = gateway.subscribe(FileSyncChannels.RESPONSE_META_TOPIC, this::handleResponseMeta);
+        this.resChunkSub = gateway.subscribe(FileSyncChannels.RESPONSE_CHUNK_TOPIC, this::handleResponseChunk);
+        this.invalidateSub = gateway.subscribe(FileSyncChannels.INVALIDATE_TOPIC, this::handleInvalidate);
     }
 
     public String groupId() {
@@ -165,8 +208,8 @@ public final class FileSyncEndpoint implements AutoCloseable {
         if (role != FileSyncRole.AUTHORITY) {
             throw new IllegalStateException("Only AUTHORITY can broadcast invalidates");
         }
-        bus.sendToAll(
-            FileSyncChannels.INVALIDATE,
+        gateway.publishToAll(
+            FileSyncChannels.INVALIDATE_TOPIC,
             new FileSyncInvalidate(groupId, UUID.randomUUID().toString(), System.currentTimeMillis())
         );
     }
@@ -175,7 +218,7 @@ public final class FileSyncEndpoint implements AutoCloseable {
         if (role != FileSyncRole.FOLLOWER) {
             return CompletableFuture.failedFuture(new IllegalStateException("Only FOLLOWER can request sync"));
         }
-        if (!messenger.isConnected()) {
+        if (!gateway.isConnected()) {
             return CompletableFuture.failedFuture(new IllegalStateException(
                 "Network messenger is not connected (plugin messaging requires at least one player online)"
             ));
@@ -203,7 +246,11 @@ public final class FileSyncEndpoint implements AutoCloseable {
             pending.put(requestId, req);
 
             try {
-                bus.sendToServer(FileSyncChannels.REQUEST, authorityServerName, new FileSyncRequest(requestId, groupId, manifest));
+                gateway.publishToServer(
+                    FileSyncChannels.REQUEST_TOPIC,
+                    authorityServerName,
+                    new FileSyncRequest(requestId, groupId, manifest)
+                );
             } catch (Exception e) {
                 pending.remove(requestId);
                 timeoutTask.cancel();
@@ -222,7 +269,7 @@ public final class FileSyncEndpoint implements AutoCloseable {
             return;
         }
 
-        if (!messenger.isConnected()) return;
+        if (!gateway.isConnected()) return;
         if (!pending.isEmpty()) return;
 
         requestSync().whenComplete((result, error) -> {
@@ -279,7 +326,7 @@ public final class FileSyncEndpoint implements AutoCloseable {
                     zip.length,
                     FileSyncUtil.sha256Hex(zip)
                 );
-                bus.sendToServer(FileSyncChannels.RESPONSE_META, sourceServer, meta);
+                gateway.publishToServer(FileSyncChannels.RESPONSE_META_TOPIC, sourceServer, meta);
 
                 if (zip.length == 0) return;
                 for (int i = 0; i < chunkCount; i++) {
@@ -288,8 +335,8 @@ public final class FileSyncEndpoint implements AutoCloseable {
                     byte[] slice = new byte[len];
                     System.arraycopy(zip, from, slice, 0, len);
                     String b64 = Base64.getEncoder().encodeToString(slice);
-                    bus.sendToServer(
-                        FileSyncChannels.RESPONSE_CHUNK,
+                    gateway.publishToServer(
+                        FileSyncChannels.RESPONSE_CHUNK_TOPIC,
                         sourceServer,
                         new FileSyncResponseChunk(request.requestId(), groupId, i, b64)
                     );
@@ -303,8 +350,8 @@ public final class FileSyncEndpoint implements AutoCloseable {
 
     private void sendError(String requestId, String targetServer, String message) {
         try {
-            bus.sendToServer(
-                FileSyncChannels.RESPONSE_META,
+            gateway.publishToServer(
+                FileSyncChannels.RESPONSE_META_TOPIC,
                 targetServer,
                 new FileSyncResponseMeta(requestId, groupId, false, message, List.of(), 0, 0, null)
             );
@@ -525,4 +572,3 @@ public final class FileSyncEndpoint implements AutoCloseable {
         }
     }
 }
-

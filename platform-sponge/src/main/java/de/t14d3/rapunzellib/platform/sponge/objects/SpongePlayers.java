@@ -1,7 +1,7 @@
 package de.t14d3.rapunzellib.platform.sponge.objects;
 
-import de.t14d3.rapunzellib.objects.Players;
-import de.t14d3.rapunzellib.objects.RPlayer;
+import de.t14d3.rapunzellib.common.objects.AbstractPlayerStore;
+import de.t14d3.rapunzellib.platform.sponge.attachments.SpongeAttachmentService;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.entity.living.player.server.ServerPlayer;
@@ -9,39 +9,49 @@ import org.spongepowered.api.entity.living.player.server.ServerPlayer;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
-public final class SpongePlayers implements Players {
-    private final ConcurrentHashMap<UUID, SpongePlayer> cache = new ConcurrentHashMap<>();
+public final class SpongePlayers extends AbstractPlayerStore<ServerPlayer, SpongePlayer> {
+    private final SpongeAttachmentService attachmentService;
+    private final SpongeWorlds worlds;
 
-    @Override
-    public @NotNull Collection<RPlayer> online() {
-        if (!Sponge.isServerAvailable()) return java.util.List.of();
-        return Sponge.server().onlinePlayers().stream()
-            .map(this::wrapInternal)
-            .map(RPlayer.class::cast)
-            .toList();
+    public SpongePlayers(@NotNull SpongeAttachmentService attachmentService, @NotNull SpongeWorlds worlds) {
+        this.attachmentService = attachmentService;
+        this.worlds = worlds;
     }
 
     @Override
-    public @NotNull Optional<RPlayer> get(@NotNull UUID uuid) {
-        if (uuid == null) return Optional.empty();
-        if (!Sponge.isServerAvailable()) return Optional.empty();
-        return Sponge.server().player(uuid).map(this::wrapInternal).map(RPlayer.class::cast);
+    protected @NotNull Collection<? extends ServerPlayer> nativeOnlinePlayers() {
+        if (!Sponge.isServerAvailable()) {
+            return java.util.List.of();
+        }
+        return Sponge.server().onlinePlayers();
     }
 
     @Override
-    public @NotNull Optional<RPlayer> wrap(@NotNull Object nativePlayer) {
-        if (!(nativePlayer instanceof ServerPlayer player)) return Optional.empty();
-        return Optional.of(wrapInternal(player));
+    protected @NotNull Optional<? extends ServerPlayer> findNativePlayer(@NotNull UUID uuid) {
+        if (!Sponge.isServerAvailable()) {
+            return Optional.empty();
+        }
+        return Sponge.server().player(uuid);
     }
 
-    private SpongePlayer wrapInternal(ServerPlayer nativePlayer) {
-        UUID uuid = nativePlayer.profile().uuid();
-        return cache.compute(uuid, (ignored, existing) -> {
-            if (existing == null) return new SpongePlayer(nativePlayer);
-            existing.updateHandle(nativePlayer);
-            return existing;
-        });
+    @Override
+    protected @NotNull Optional<? extends ServerPlayer> adaptNativePlayer(@NotNull Object nativePlayer) {
+        return nativePlayer instanceof ServerPlayer player ? Optional.of(player) : Optional.empty();
+    }
+
+    @Override
+    protected @NotNull UUID playerId(@NotNull ServerPlayer nativePlayer) {
+        return nativePlayer.profile().uuid();
+    }
+
+    @Override
+    protected @NotNull SpongePlayer createWrapper(@NotNull ServerPlayer nativeHandle) {
+        return new SpongePlayer(nativeHandle, attachmentService, worlds);
+    }
+
+    @Override
+    protected void updateWrapper(@NotNull SpongePlayer existingWrapper, @NotNull ServerPlayer nativeHandle) {
+        existingWrapper.updateHandle(nativeHandle);
     }
 }

@@ -1,0 +1,24 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "de.t14d3.rapunzellib.events.fabric.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "EntitySpawnMixin",
+    "InteractEntityMixin",
+    "InteractEntityAtMixin",
+    "AttackEntityMixin",
+    "EntityHurtMixin",
+    "BlockFormMixin",
+    "BlockPhysicsMixin",
+    "BlockSpreadMixin",
+    "BlockTransformMixin",
+    "ExplosionMixin",
+    "TntPrimeMixin",
+    "BucketItemMixin",
+    "BucketEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

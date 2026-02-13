@@ -1,0 +1,5 @@
+de.t14d3.rapunzellib.context.fixtures.TestCompletePaperFeatureInstaller
+de.t14d3.rapunzellib.context.fixtures.TestCompleteVelocityFeatureInstaller
+de.t14d3.rapunzellib.context.fixtures.TestCompleteFabricFeatureInstaller
+de.t14d3.rapunzellib.context.fixtures.TestCompleteNeoForgeFeatureInstaller
+de.t14d3.rapunzellib.context.fixtures.TestCompleteSpongeFeatureInstaller

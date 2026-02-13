@@ -2,13 +2,13 @@ package de.t14d3.rapunzellib.network.queue;
 
 import de.t14d3.rapunzellib.database.SpoolDatabase;
 import de.t14d3.rapunzellib.network.Messenger;
+import de.t14d3.rapunzellib.network.outbox.NetworkOutboxPolicy;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.slf4j.Logger;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -80,7 +80,7 @@ public final class NetworkQueueBootstrap {
             store = new DbQueuedMessenger.InMemoryOutboxStore();
         }
 
-        Set<String> allowlist = queue.channelAllowlist();
+        NetworkOutboxPolicy outboxPolicy = queue.outboxPolicy();
         Duration flushPeriod = queue.flushPeriod();
         int maxBatchSize = queue.maxBatchSize();
         Duration maxAge = queue.maxAge();
@@ -91,7 +91,7 @@ public final class NetworkQueueBootstrap {
             scheduler,
             logger,
             ownerId,
-            allowlist,
+            outboxPolicy,
             flushPeriod,
             maxBatchSize,
             maxAge,
@@ -109,4 +109,3 @@ public final class NetworkQueueBootstrap {
         return trimmed;
     }
 }
-

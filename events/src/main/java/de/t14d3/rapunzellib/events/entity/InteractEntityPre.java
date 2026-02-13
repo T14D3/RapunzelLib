@@ -1,43 +1,57 @@
 package de.t14d3.rapunzellib.events.entity;
 
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.BaseCancellablePreEvent;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.REntity;
+import de.t14d3.rapunzellib.objects.RLivingEntity;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.snapshot.REntitySnapshot;
 
 import java.util.Objects;
 
 public final class InteractEntityPre extends BaseCancellablePreEvent {
     private final RPlayer player;
-    private final RWorldRef world;
-    private final RBlockPos pos;
-    private final String entityTypeKey;
+    private final REntity entity;
+    private final REntitySnapshot snapshot;
 
-    public InteractEntityPre(RPlayer player, RWorldRef world, RBlockPos pos, String entityTypeKey) {
-        this(player, world, pos, entityTypeKey, false);
+    public InteractEntityPre(RPlayer player, REntity entity) {
+        this(player, entity, false);
     }
 
-    public InteractEntityPre(RPlayer player, RWorldRef world, RBlockPos pos, String entityTypeKey, boolean isCancelled) {
+    public InteractEntityPre(RPlayer player, REntity entity, boolean isCancelled) {
         this.player = Objects.requireNonNull(player, "player");
-        this.world = Objects.requireNonNull(world, "world");
-        this.pos = Objects.requireNonNull(pos, "pos");
-        this.entityTypeKey = Objects.requireNonNull(entityTypeKey, "entityTypeKey");
-        this.cancelled = isCancelled;
+        this.entity = Objects.requireNonNull(entity, "entity");
+        this.snapshot = entity.snapshot();
+        setCancelled(isCancelled);
     }
 
     public RPlayer player() {
         return player;
     }
 
+    public REntity entity() {
+        return entity;
+    }
+
+    public java.util.Optional<RLivingEntity> livingEntity() {
+        return entity.asLivingEntity();
+    }
+
+    public REntitySnapshot snapshot() {
+        return snapshot;
+    }
+
     public RWorldRef world() {
-        return world;
+        return snapshot.world();
     }
 
     public RBlockPos pos() {
-        return pos;
+        return snapshot.pos();
     }
 
-    public String entityTypeKey() {
-        return entityTypeKey;
+    public RKey entityTypeKey() {
+        return snapshot.entityTypeKey();
     }
 }

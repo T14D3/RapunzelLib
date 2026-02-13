@@ -1,36 +1,23 @@
 package de.t14d3.rapunzellib.platform.paper.objects;
 
 import de.t14d3.rapunzellib.PlatformId;
-import de.t14d3.rapunzellib.objects.RNativeHandle;
-import de.t14d3.rapunzellib.objects.RWorld;
-import de.t14d3.rapunzellib.objects.RWorldRef;
-import org.bukkit.World;
-import org.jetbrains.annotations.NotNull;
+import de.t14d3.rapunzellib.platform.shared.entity.SharedWorldBase;
+import de.t14d3.rapunzellib.platform.paper.PaperHandleBridge;
+import net.minecraft.server.level.ServerLevel;
 
-import java.util.Optional;
-import java.util.UUID;
+import java.util.Objects;
 
-final class PaperWorld extends RNativeHandle<World> implements RWorld {
-
-    PaperWorld(World world) {
-        super(PlatformId.PAPER, world);
+final class PaperWorld extends SharedWorldBase {
+    PaperWorld(ServerLevel world, PaperWorlds worlds) {
+        super(
+            PlatformId.PAPER,
+            Objects.requireNonNull(world, "world"),
+            PaperPersistentAttachments.forWorld(PaperHandleBridge.worldUuid(world)),
+            Objects.requireNonNull(worlds, "worlds")
+        );
     }
 
-    void updateHandle(World newHandle) {
+    void updateHandle(ServerLevel newHandle) {
         updateNativeHandle(newHandle);
     }
-
-    @Override
-    public @NotNull RWorldRef ref() {
-        World world = handle();
-        world.getKey();
-        String key = world.getKey().toString();
-        return new RWorldRef(world.getName(), key);
-    }
-
-    @Override
-    public @NotNull Optional<UUID> uuid() {
-        return Optional.of(handle().getUID());
-    }
 }
-

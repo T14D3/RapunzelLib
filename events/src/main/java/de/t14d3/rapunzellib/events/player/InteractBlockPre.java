@@ -32,7 +32,7 @@ public final class InteractBlockPre extends BaseCancellablePreEvent {
         this.block = Objects.requireNonNull(block, "block");
         this.action = Objects.requireNonNull(action, "action");
         this.hand = Objects.requireNonNull(hand, "hand");
-        this.cancelled = isCancelled;
+        setCancelled(isCancelled);
     }
 
     public RPlayer player() {

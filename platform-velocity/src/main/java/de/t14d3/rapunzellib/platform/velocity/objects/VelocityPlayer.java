@@ -3,7 +3,7 @@ package de.t14d3.rapunzellib.platform.velocity.objects;
 import com.velocitypowered.api.proxy.Player;
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.objects.RNativeHandle;
-import de.t14d3.rapunzellib.objects.RPlayer;
+import de.t14d3.rapunzellib.objects.RProxyPlayer;
 import net.kyori.adventure.audience.Audience;
 import org.jetbrains.annotations.NotNull;
 
@@ -11,9 +11,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-final class VelocityPlayer extends RNativeHandle<Player> implements RPlayer {
-    VelocityPlayer(Player handle) {
-        super(PlatformId.VELOCITY, Objects.requireNonNull(handle, "handle"));
+final class VelocityPlayer extends RNativeHandle<Player> implements RProxyPlayer {
+    VelocityPlayer(Player handle, VelocityPersistentAttachmentsStore persistentAttachmentsStore) {
+        super(
+            PlatformId.VELOCITY,
+            Objects.requireNonNull(handle, "handle"),
+            new VelocityPersistentAttachments(persistentAttachmentsStore, handle.getUniqueId())
+        );
     }
 
     void updateHandle(Player newHandle) {
@@ -45,4 +49,3 @@ final class VelocityPlayer extends RNativeHandle<Player> implements RPlayer {
         return handle().getCurrentServer().map(sc -> sc.getServerInfo().getName());
     }
 }
-

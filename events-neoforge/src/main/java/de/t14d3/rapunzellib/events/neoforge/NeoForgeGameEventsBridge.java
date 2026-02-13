@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.events.neoforge;
 
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
@@ -10,11 +11,15 @@ import de.t14d3.rapunzellib.events.block.BlockPlacePost;
 import de.t14d3.rapunzellib.events.block.BlockPlacePre;
 import de.t14d3.rapunzellib.events.block.BlockPlaceSnapshot;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPre;
+import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
+import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
+import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
+import de.t14d3.rapunzellib.events.shared.SharedEntityDamageHooks;
+import de.t14d3.rapunzellib.events.shared.SharedEntityInteractionHooks;
+import de.t14d3.rapunzellib.events.shared.SharedEntitySpawnHooks;
+import de.t14d3.rapunzellib.events.shared.SharedLifecycleEventHooks;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
-import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
-import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
-import de.t14d3.rapunzellib.events.world.WorldLoadPost;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorld;
@@ -25,25 +30,39 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.UUID;
 
 final class NeoForgeGameEventsBridge implements GameEventBridge {
     private final GameEventBus bus;
 
+    static @NotNull GameEventBridge install(@NotNull GameEventBus bus) {
+        NeoForgeGameEventsBridge bridge = new NeoForgeGameEventsBridge(bus);
+        bridge.register();
+        return bridge;
+    }
+
     NeoForgeGameEventsBridge(GameEventBus bus) {
         this.bus = bus;
     }
 
     void register() {
+        SharedLifecycleEventHooks.initializeMixins(bus);
         NeoForge.EVENT_BUS.register(this);
     }
 
@@ -54,26 +73,21 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
 
     @SubscribeEvent
     public void onWorldLoad(LevelEvent.Load event) {
-        if (!bus.hasPostListeners(WorldLoadPost.class)) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
-        String id = level.dimension().location().toString();
-        bus.dispatchPost(new WorldLoadPost(new RWorldRef(id, id)));
+        SharedLifecycleEventHooks.dispatchWorldLoadPost(bus, level);
     }
 
     @SubscribeEvent
     public void onChunkUnload(ChunkEvent.Unload event) {
-        if (!bus.hasPostListeners(ChunkUnloadPost.class)) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         var chunk = event.getChunk();
-        String id = level.dimension().location().toString();
-        bus.dispatchPost(new ChunkUnloadPost(new RWorldRef(id, id), chunk.getPos().x, chunk.getPos().z));
+        SharedLifecycleEventHooks.dispatchChunkUnloadPost(bus, level, chunk.getPos().x, chunk.getPos().z);
     }
 
     @SubscribeEvent
     public void onPlayerQuit(PlayerEvent.PlayerLoggedOutEvent event) {
-        if (!bus.hasPostListeners(PlayerQuitPost.class)) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        bus.dispatchPost(new PlayerQuitPost(player.getUUID(), player.getName().getString()));
+        SharedLifecycleEventHooks.dispatchPlayerQuitPost(bus, player);
     }
 
     @SubscribeEvent
@@ -108,7 +122,7 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
 
         if (!needsPost && !needsAsync) return;
         UUID uuid = rPlayer.uuid();
-        String typeKey = typeKey(event.getState());
+        RKey typeKey = typeKey(event.getState());
         level.getServer().execute(() -> {
             if (needsPost) bus.dispatchPost(new BlockBreakPost(rPlayer, Rapunzel.blocks().at(rWorld, rPos), false));
             if (needsAsync) bus.dispatchAsync(new BlockBreakSnapshot(uuid, rWorld.ref(), rPos, typeKey, false));
@@ -128,9 +142,9 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         BlockPos pos = event.getPos();
         RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
         RPlayer rPlayer = Rapunzel.players().require(player);
-        String worldId = level.dimension().location().toString();
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
-        String placedKey = BuiltInRegistries.BLOCK.getKey(event.getPlacedBlock().getBlock()).toString();
+        RKey worldKey = RKey.of(level.dimension().identifier().toString());
+        RWorldRef worldRef = new RWorldRef(null, worldKey);
+        RKey placedKey = RKey.of(BuiltInRegistries.BLOCK.getKey(event.getPlacedBlock().getBlock()).toString());
         boolean cancelled = event.isCanceled();
 
         if (needsPre) {
@@ -210,20 +224,9 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
     public void onInteractEntity(PlayerInteractEvent.EntityInteract event) {
         if (!bus.hasPreListeners(InteractEntityPre.class)) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (!(event.getLevel() instanceof ServerLevel)) return;
 
-        var target = event.getTarget();
-
-        RPlayer rPlayer = Rapunzel.players().require(player);
-        String worldId = level.dimension().location().toString();
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
-        BlockPos pos = target.blockPosition();
-        RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
-        String typeKey = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
-
-        InteractEntityPre pre = new InteractEntityPre(rPlayer, worldRef, rPos, typeKey, event.isCanceled());
-        bus.dispatchPre(pre);
-        if (pre.isDenied()) {
+        if (SharedEntityInteractionHooks.dispatchInteractPre(bus, player, event.getTarget(), event.isCanceled())) {
             event.setCanceled(true);
         }
     }
@@ -233,20 +236,66 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         if (!bus.hasPreListeners(AttackEntityPre.class)) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
-        var target = event.getTarget();
-
-        RPlayer rPlayer = Rapunzel.players().require(player);
-        String worldId = player.level().dimension().location().toString();
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
-        BlockPos pos = target.blockPosition();
-        RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
-        String typeKey = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType()).toString();
-
-        AttackEntityPre pre = new AttackEntityPre(rPlayer, worldRef, rPos, typeKey, event.isCanceled());
-        bus.dispatchPre(pre);
-        if (pre.isDenied()) {
+        if (SharedEntityInteractionHooks.dispatchAttackPre(bus, player, event.getTarget(), event.isCanceled())) {
             event.setCanceled(true);
         }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public void onInteractEntityPost(PlayerInteractEvent.EntityInteract event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(event.getLevel() instanceof ServerLevel)) return;
+
+        SharedEntityInteractionHooks.dispatchInteractPost(bus, player, event.getTarget(), event.isCanceled());
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public void onAttackEntityPost(AttackEntityEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+
+        SharedEntityInteractionHooks.dispatchAttackPost(bus, player, event.getTarget(), event.isCanceled());
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
+    public void onEntityJoinLevelPre(EntityJoinLevelEvent event) {
+        if (!bus.hasPreListeners(EntitySpawnPre.class)) return;
+        if (event.loadedFromDisk()) return;
+        if (!(event.getLevel() instanceof ServerLevel)) return;
+
+        if (SharedEntitySpawnHooks.dispatchSpawnPre(bus, event.getEntity(), spawnReason(event), event.isCanceled())) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        boolean needsPost = bus.hasPostListeners(EntitySpawnPost.class);
+        boolean needsAsync = bus.hasAsyncListeners(EntitySpawnSnapshot.class);
+        if (!needsPost && !needsAsync) return;
+        if (event.loadedFromDisk()) return;
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
+
+        String reason = spawnReason(event);
+        Entity entity = event.getEntity();
+
+        if (event.isCanceled()) {
+            SharedEntitySpawnHooks.dispatchCancelledSpawnSnapshot(bus, entity, reason);
+            return;
+        }
+
+        level.getServer().execute(() -> SharedEntitySpawnHooks.dispatchSpawnOutcome(bus, entity, reason, false));
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public void onEntityHurtCancelled(LivingIncomingDamageEvent event) {
+        if (!event.isCanceled()) return;
+
+        SharedEntityDamageHooks.dispatchHurtOutcome(bus, event.getEntity(), damageTypeKey(event.getSource()), true);
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onEntityHurtPost(LivingDamageEvent.Post event) {
+        SharedEntityDamageHooks.dispatchHurtOutcome(bus, event.getEntity(), damageTypeKey(event.getSource()), false);
     }
 
     private static InteractBlockPre.Hand mapHand(InteractionHand hand) {
@@ -257,8 +306,16 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         };
     }
 
-    private static String typeKey(net.minecraft.world.level.block.state.BlockState state) {
-        if (state == null) return "minecraft:air";
-        return BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+    private static RKey typeKey(net.minecraft.world.level.block.state.BlockState state) {
+        if (state == null) return RKey.of("minecraft:air");
+        return RKey.of(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+    }
+
+    private static String spawnReason(EntityJoinLevelEvent event) {
+        return "unknown";
+    }
+
+    private static String damageTypeKey(DamageSource source) {
+        return source.type().msgId();
     }
 }

@@ -2,26 +2,19 @@ package de.t14d3.rapunzellib.platform.neoforge;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
-import de.t14d3.rapunzellib.RapunzelLibVersion;
+import de.t14d3.rapunzellib.bootstrap.BootstrapHandle;
 import de.t14d3.rapunzellib.common.bootstrap.BootstrapServices;
-import de.t14d3.rapunzellib.common.context.DefaultRapunzelContext;
-import de.t14d3.rapunzellib.config.ConfigService;
+import de.t14d3.rapunzellib.network.bootstrap.BackendTransportBootstrap;
+import de.t14d3.rapunzellib.network.bootstrap.SharedBackendBootstrap;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
-import de.t14d3.rapunzellib.network.InMemoryMessenger;
-import de.t14d3.rapunzellib.network.Messenger;
-import de.t14d3.rapunzellib.network.bootstrap.MessengerTransportBootstrap;
-import de.t14d3.rapunzellib.network.info.NetworkInfoClient;
-import de.t14d3.rapunzellib.network.info.NetworkInfoService;
-import de.t14d3.rapunzellib.network.queue.NetworkQueueBootstrap;
-import de.t14d3.rapunzellib.objects.Players;
-import de.t14d3.rapunzellib.objects.Worlds;
-import de.t14d3.rapunzellib.objects.block.Blocks;
-import de.t14d3.rapunzellib.platform.neoforge.entity.NeoForgeBlocks;
-import de.t14d3.rapunzellib.platform.neoforge.entity.NeoForgePlayers;
-import de.t14d3.rapunzellib.platform.neoforge.entity.NeoForgeWorlds;
+import de.t14d3.rapunzellib.network.queue.NetworkQueueTransportDecorator;
+import de.t14d3.rapunzellib.platform.PlatformFeatures;
 import de.t14d3.rapunzellib.platform.neoforge.network.NeoForgePluginMessenger;
 import de.t14d3.rapunzellib.platform.neoforge.scheduler.NeoForgeScheduler;
+import de.t14d3.rapunzellib.runtime.EngineFamily;
+import de.t14d3.rapunzellib.runtime.PlatformRuntime;
+import de.t14d3.rapunzellib.runtime.RuntimeProfiles;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
@@ -31,126 +24,79 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 public final class NeoForgeRapunzelBootstrap {
-    public static final String MOD_ID = "rapunzellib_platform_neoforge";        
+    public static final String MOD_ID = "rapunzellib_platform_neoforge";
 
     private NeoForgeRapunzelBootstrap() {
     }
 
     public static RapunzelContext bootstrap(
-        String modId,
-        MinecraftServer server,
-        Logger logger,
-        Path dataDirectory,
-        Class<?> resourceAnchor
+            String modId,
+            MinecraftServer server,
+            Logger logger,
+            Path dataDirectory,
+            Class<?> resourceAnchor
+    ) {
+        return bootstrapHandle(modId, server, logger, dataDirectory, resourceAnchor).context();
+    }
+
+    public static BootstrapHandle bootstrapHandle(
+            String modId,
+            MinecraftServer server,
+            Logger logger,
+            Path dataDirectory,
+            Class<?> resourceAnchor
+    ) {
+        return Rapunzel.bootstrap(modId, () -> createContext(modId, server, logger, dataDirectory, resourceAnchor));
+    }
+
+    public static RapunzelContext createContext(
+            String modId,
+            MinecraftServer server,
+            Logger logger,
+            Path dataDirectory,
+            Class<?> resourceAnchor
     ) {
         Objects.requireNonNull(modId, "modId");
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(logger, "logger");
         Objects.requireNonNull(dataDirectory, "dataDirectory");
 
-        AtomicReference<RapunzelContext> created = new AtomicReference<>();
-        Rapunzel.Lease lease = Rapunzel.bootstrapOrAcquire(modId, () -> {
-            logger.info("Bootstrapping RapunzelLib {}", RapunzelLibVersion.current());
-
-            try {
-                Files.createDirectories(dataDirectory);
-            } catch (Exception e) {
-                logger.debug("Failed to create NeoForge data directory {}", dataDirectory, e);
-            }
-
-            ResourceProvider resources = path -> Optional.ofNullable(openResource(resourceAnchor, path));
-            Scheduler scheduler = new NeoForgeScheduler(server);
-
-            DefaultRapunzelContext ctx =
-                BootstrapServices.createContext(PlatformId.NEOFORGE, logger, dataDirectory, resources, scheduler);
-            created.set(ctx);
-
-            ConfigService configService = BootstrapServices.registerYamlConfig(ctx, resources, logger);
-            BootstrapServices.registerYamlMessages(ctx, configService, logger, dataDirectory);
-
-            NeoForgePlayers players = new NeoForgePlayers(server);
-            ctx.register(Players.class, players);
-            ctx.register(NeoForgePlayers.class, players);
-
-            NeoForgeWorlds worlds = new NeoForgeWorlds(server);
-            ctx.register(Worlds.class, worlds);
-            ctx.register(NeoForgeWorlds.class, worlds);
-
-            NeoForgeBlocks blocks = new NeoForgeBlocks();
-            ctx.register(Blocks.class, blocks);
-            ctx.register(NeoForgeBlocks.class, blocks);
-
-            InMemoryMessenger inMemoryMessenger = new InMemoryMessenger(modId, "velocity");
-            Messenger messenger = inMemoryMessenger;
-            ctx.register(Messenger.class, messenger);
-            ctx.register(InMemoryMessenger.class, inMemoryMessenger);
-
-            // Optional transport: Redis (recommended for NeoForge backend usage).
-            try {
-                var transportConfig = configService.load(dataDirectory.resolve("config.yml"), "config.yml");
-                String transport = transportConfig.getString("network.transport", "plugin");
-                switch (transport.trim().toLowerCase()) {
-                    case "redis" -> {
-                        var result = MessengerTransportBootstrap.bootstrap(
-                            transportConfig,
-                            PlatformId.NEOFORGE,
-                            logger,
-                            ctx.services()
-                        );
-                        messenger = result.messenger();
-                        ctx.services().register(Messenger.class, messenger);
-                        ctx.registerCloseable(result.closeable());
-                    }
-                    case "plugin" -> {
-                        NeoForgePluginMessenger pluginMessenger = new NeoForgePluginMessenger(server, logger);
-
-                        String ownerId = PlatformId.NEOFORGE.name() + ":" + dataDirectory.toAbsolutePath().normalize();
-                        NetworkQueueBootstrap.Result queued = NetworkQueueBootstrap.wrapIfEnabled(
-                            pluginMessenger,
-                            transportConfig,
-                            scheduler,
-                            logger,
-                            ownerId
-                        );
-                        messenger = queued.messenger();
-                        ctx.services().register(Messenger.class, messenger);
-                        ctx.register(NeoForgePluginMessenger.class, pluginMessenger);
-                        if (messenger instanceof AutoCloseable toClose && messenger != pluginMessenger) {
-                            ctx.registerCloseable(toClose);
-                        }
-                    }
-                    default -> {
-                        // keep in-memory
-                    }
-                }
-
-                // When we have a real transport, expose network info client.
-                if (!(messenger instanceof InMemoryMessenger)) {
-                    NetworkInfoClient networkInfo = new NetworkInfoClient(messenger, scheduler, logger);
-                    ctx.register(NetworkInfoService.class, networkInfo);        
-                    ctx.register(NetworkInfoClient.class, networkInfo);
-
-                    if (messenger instanceof NeoForgePluginMessenger pluginMessenger) {
-                        networkInfo.networkServerName()
-                            .thenAccept(pluginMessenger::setNetworkServerName)
-                            .exceptionally(ignored -> null);
-                    }
-                }
-            } catch (Exception e) {
-                logger.warn("Failed to initialize network transport; using in-memory.", e);
-                ctx.services().register(Messenger.class, inMemoryMessenger);
-            }
-
-            return ctx;
-        });
-
-        if (created.get() == null) {
-            logger.debug("RapunzelLib already bootstrapped; acquiring lease for {}", modId);
+        try {
+            Files.createDirectories(dataDirectory);
+        } catch (Exception e) {
+            logger.debug("Failed to create NeoForge data directory {}", dataDirectory, e);
         }
-        return lease.context();
+
+        ResourceProvider resources = path -> Optional.ofNullable(openResource(resourceAnchor, path));
+        Scheduler scheduler = new NeoForgeScheduler(server);
+        PlatformRuntime runtime = BootstrapServices.serverRuntime(
+            PlatformId.NEOFORGE,
+            EngineFamily.MOJANG_SERVER,
+            server,
+            RuntimeProfiles.SERVER_STANDARD
+        );
+
+        return SharedBackendBootstrap.createContext(
+                modId,
+                modId,
+                modId,
+                runtime,
+                logger,
+                dataDirectory,
+                resources,
+                scheduler,
+                ctx -> {
+                    ctx.register(MinecraftServer.class, server);
+                    PlatformFeatures.install(ctx);
+                },
+                new BackendTransportBootstrap.Hooks(
+                    NetworkQueueTransportDecorator.pluginHooks(() -> new NeoForgePluginMessenger(server, logger))
+                ),
+                NeoForgePluginMessenger.class,
+                NeoForgePluginMessenger::setNetworkServerName
+        );
     }
 
     private static InputStream openResource(Class<?> anchor, String path) {

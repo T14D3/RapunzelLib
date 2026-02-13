@@ -1,15 +1,29 @@
 package de.t14d3.rapunzellib.events;
 
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
+import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.RWorldRef;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+/**
+ * Thread-safe event bus for dispatching game events to registered listeners.
+ *
+ * <p>This class is thread-safe and can be safely accessed from multiple threads
+ * concurrently. All listener registration and event dispatch operations are
+ * synchronized appropriately.</p>
+ *
+ * <p>Listeners can be registered for pre-events, post-events, and async snapshot events.
+ * Each type is dispatched separately with appropriate threading guarantees.</p>
+ */
 @SuppressWarnings("UnusedReturnValue")
 public final class GameEventBus implements AutoCloseable {
     public interface Subscription extends AutoCloseable {
@@ -25,28 +39,19 @@ public final class GameEventBus implements AutoCloseable {
     private final Map<Class<?>, ListenerList> asyncListeners = new ConcurrentHashMap<>();
 
     public GameEventBus(@NotNull Scheduler scheduler, @NotNull Logger logger) {
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");        
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.logger = Objects.requireNonNull(logger, "logger");
     }
 
-    public <E extends CancellablePreEvent> @NotNull Subscription onPre(
-        @NotNull Class<E> eventType,
-        @NotNull Consumer<E> listener
-    ) {
+    public <E extends CancellablePreEvent> @NotNull Subscription onPre(@NotNull Class<E> eventType, @NotNull Consumer<E> listener) {
         return register(preListeners, eventType, listener);
     }
 
-    public <E extends GamePostEvent> @NotNull Subscription onPost(
-        @NotNull Class<E> eventType,
-        @NotNull Consumer<E> listener
-    ) {
+    public <E extends GamePostEvent> @NotNull Subscription onPost(@NotNull Class<E> eventType, @NotNull Consumer<E> listener) {
         return register(postListeners, eventType, listener);
     }
 
-    public <E extends GameEventSnapshot> @NotNull Subscription onAsync(
-        @NotNull Class<E> eventType,
-        @NotNull Consumer<E> listener
-    ) {
+    public <E extends GameEventSnapshot> @NotNull Subscription onAsync(@NotNull Class<E> eventType, @NotNull Consumer<E> listener) {
         return register(asyncListeners, eventType, listener);
     }
 
@@ -83,6 +88,23 @@ public final class GameEventBus implements AutoCloseable {
         });
     }
 
+    /**
+     * Dispatches entity event data asynchronously.
+     * Creates an EntityEventData snapshot and dispatches it to registered listeners.
+     */
+    public void dispatchAsync(UUID playerUuid, RWorldRef world, RBlockPos pos, RKey entityTypeKey, boolean cancelled) {
+        EntityEventData data = new EntityEventData(playerUuid, world, pos, entityTypeKey, cancelled);
+        ListenerList list = asyncListeners.get(EntityEventData.class);
+        if (list == null) return;
+        Consumer<?>[] listeners = list.snapshot();
+
+        scheduler.runAsync(() -> {
+            for (Consumer<?> listener : listeners) {
+                dispatchUnchecked(listener, data);
+            }
+        });
+    }
+
     public boolean hasPreListeners(@NotNull Class<? extends GamePreEvent> type) {
         ListenerList list = preListeners.get(type);
         return list != null && list.hasListeners();
@@ -95,6 +117,14 @@ public final class GameEventBus implements AutoCloseable {
 
     public boolean hasAsyncListeners(@NotNull Class<? extends GameEventSnapshot> type) {
         ListenerList list = asyncListeners.get(type);
+        return list != null && list.hasListeners();
+    }
+
+    /**
+     * Checks if there are any async listeners registered for entity events.
+     */
+    public boolean hasAsyncEntityListeners() {
+        ListenerList list = asyncListeners.get(EntityEventData.class);
         return list != null && list.hasListeners();
     }
 
@@ -129,6 +159,13 @@ public final class GameEventBus implements AutoCloseable {
         preListeners.clear();
         postListeners.clear();
         asyncListeners.clear();
+    }
+
+    /**
+     * Simple data holder for entity events (attack, interact, etc.)
+     */
+    public record EntityEventData(UUID playerUuid, RWorldRef world, RBlockPos pos, RKey entityTypeKey,
+                                  boolean cancelled) implements GameEventSnapshot {
     }
 
     private static final class ListenerList {

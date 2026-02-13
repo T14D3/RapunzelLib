@@ -2,45 +2,50 @@ package de.t14d3.rapunzellib.platform.velocity.objects;
 
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
-import de.t14d3.rapunzellib.objects.Players;
-import de.t14d3.rapunzellib.objects.RPlayer;
+import de.t14d3.rapunzellib.common.objects.AbstractPlayerStore;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
-public final class VelocityPlayers implements Players {
+public final class VelocityPlayers extends AbstractPlayerStore<Player, VelocityPlayer> {
     private final ProxyServer proxy;
-    private final ConcurrentHashMap<UUID, VelocityPlayer> cache = new ConcurrentHashMap<>();
+    private final VelocityPersistentAttachmentsStore persistentAttachmentsStore;
 
-    public VelocityPlayers(ProxyServer proxy) {
-        this.proxy = proxy;
+    public VelocityPlayers(@NotNull ProxyServer proxy, @NotNull VelocityPersistentAttachmentsStore persistentAttachmentsStore) {
+        this.proxy = Objects.requireNonNull(proxy, "proxy");
+        this.persistentAttachmentsStore = Objects.requireNonNull(persistentAttachmentsStore, "persistentAttachmentsStore");
     }
 
     @Override
-    public @NotNull Collection<RPlayer> online() {
-        return proxy.getAllPlayers().stream().map(this::wrapInternal).map(RPlayer.class::cast).toList();
+    protected @NotNull Collection<? extends Player> nativeOnlinePlayers() {
+        return proxy.getAllPlayers();
     }
 
     @Override
-    public @NotNull Optional<RPlayer> get(@NotNull UUID uuid) {
-        return proxy.getPlayer(uuid).map(this::wrapInternal);
+    protected @NotNull Optional<? extends Player> findNativePlayer(@NotNull UUID uuid) {
+        return proxy.getPlayer(uuid);
     }
 
     @Override
-    public @NotNull Optional<RPlayer> wrap(@NotNull Object nativePlayer) {
-        if (!(nativePlayer instanceof Player player)) return Optional.empty();
-        return Optional.of(wrapInternal(player));
+    protected @NotNull Optional<? extends Player> adaptNativePlayer(@NotNull Object nativePlayer) {
+        return nativePlayer instanceof Player player ? Optional.of(player) : Optional.empty();
     }
 
-    private VelocityPlayer wrapInternal(Player player) {
-        return cache.compute(player.getUniqueId(), (uuid, existing) -> {
-            if (existing == null) return new VelocityPlayer(player);
-            existing.updateHandle(player);
-            return existing;
-        });
+    @Override
+    protected @NotNull UUID playerId(@NotNull Player nativePlayer) {
+        return nativePlayer.getUniqueId();
+    }
+
+    @Override
+    protected @NotNull VelocityPlayer createWrapper(@NotNull Player nativeHandle) {
+        return new VelocityPlayer(nativeHandle, persistentAttachmentsStore);
+    }
+
+    @Override
+    protected void updateWrapper(@NotNull VelocityPlayer existingWrapper, @NotNull Player nativeHandle) {
+        existingWrapper.updateHandle(nativeHandle);
     }
 }
-

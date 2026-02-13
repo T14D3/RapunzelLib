@@ -1,0 +1,16 @@
+{
+ "required": true,
+ "minVersion": "0.8",
+ "package": "de.t14d3.rapunzellib.events.neoforge.mixin",
+ "compatibilityLevel": "JAVA_21",
+ "mixins": [
+ "BlockFormMixin",
+ "BlockPhysicsMixin",
+ "BlockSpreadMixin",
+ "BlockTransformMixin"
+ ],
+ "client": [],
+ "injectors": {
+ "defaultRequire": 1
+ }
+}

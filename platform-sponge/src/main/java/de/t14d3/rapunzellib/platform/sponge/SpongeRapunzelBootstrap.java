@@ -2,22 +2,25 @@ package de.t14d3.rapunzellib.platform.sponge;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
-import de.t14d3.rapunzellib.RapunzelLibVersion;
+import de.t14d3.rapunzellib.bootstrap.BootstrapHandle;
 import de.t14d3.rapunzellib.common.bootstrap.BootstrapServices;
-import de.t14d3.rapunzellib.common.context.DefaultRapunzelContext;
-import de.t14d3.rapunzellib.config.ConfigService;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.network.InMemoryMessenger;
 import de.t14d3.rapunzellib.network.Messenger;
-import de.t14d3.rapunzellib.network.bootstrap.MessengerTransportBootstrap;
-import de.t14d3.rapunzellib.objects.Players;
-import de.t14d3.rapunzellib.objects.Worlds;
-import de.t14d3.rapunzellib.objects.block.Blocks;
-import de.t14d3.rapunzellib.platform.sponge.objects.SpongeBlocks;
-import de.t14d3.rapunzellib.platform.sponge.objects.SpongePlayers;
-import de.t14d3.rapunzellib.platform.sponge.objects.SpongeWorlds;
+import de.t14d3.rapunzellib.network.bootstrap.BackendNetworkInfoBootstrap;
+import de.t14d3.rapunzellib.network.bootstrap.BackendTransportBootstrap;
+import de.t14d3.rapunzellib.network.bootstrap.SharedBackendBootstrap;
+import de.t14d3.rapunzellib.network.info.NetworkInfoClient;
+import de.t14d3.rapunzellib.network.runtime.NetworkRuntimeGateway;
+import de.t14d3.rapunzellib.network.queue.NetworkQueueTransportDecorator;
+import de.t14d3.rapunzellib.platform.PlatformFeatures;
+import de.t14d3.rapunzellib.platform.sponge.attachments.SpongeAttachmentService;
+import de.t14d3.rapunzellib.platform.sponge.attachments.SpongePersistentAttachmentsStore;
 import de.t14d3.rapunzellib.platform.sponge.scheduler.SpongeScheduler;
+import de.t14d3.rapunzellib.runtime.EngineFamily;
+import de.t14d3.rapunzellib.runtime.PlatformRuntime;
+import de.t14d3.rapunzellib.runtime.RuntimeProfiles;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +30,8 @@ import org.spongepowered.plugin.PluginContainer;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 public final class SpongeRapunzelBootstrap {
     private SpongeRapunzelBootstrap() {
@@ -39,69 +42,94 @@ public final class SpongeRapunzelBootstrap {
             Path dataDirectory,
             Server server
     ) {
+        return bootstrapHandle(container, dataDirectory, server).context();
+    }
+
+    public static BootstrapHandle bootstrapHandle(
+            PluginContainer container,
+            Path dataDirectory,
+            Server server
+    ) {
+        SpongePlatformBootstrapHost.prepareBootstrap(container);
+        return Rapunzel.bootstrap(container.instance(), () -> createContext(container, dataDirectory, server));
+    }
+
+    public static RapunzelContext createContext(
+            PluginContainer container,
+            Path dataDirectory,
+            Server server
+    ) {
         if (container == null) throw new IllegalArgumentException("container cannot be null");
 
         Object plugin = container.instance();
-            String pluginId = container.metadata().id();
-            Logger logger = LoggerFactory.getLogger(pluginId);
-            Class<?> resourceAnchor = plugin.getClass();
+        String pluginId = container.metadata().id();
+        Logger logger = LoggerFactory.getLogger(pluginId);
+        Class<?> resourceAnchor = plugin.getClass();
 
-        AtomicReference<RapunzelContext> created = new AtomicReference<>();
-        Rapunzel.Lease lease = Rapunzel.bootstrapOrAcquire(plugin, () -> {
-            logger.info("Bootstrapping RapunzelLib {}", RapunzelLibVersion.current());
-
-            try {
-                Files.createDirectories(dataDirectory);
-            } catch (Exception e) {
-                logger.debug("Failed to create Sponge data directory {}", dataDirectory, e);
-            }
-
-            ResourceProvider resources = path -> Optional.ofNullable(openResource(resourceAnchor, path));
-
-            Scheduler scheduler = new SpongeScheduler(server, container);       
-
-            DefaultRapunzelContext ctx =
-                BootstrapServices.createContext(PlatformId.SPONGE, logger, dataDirectory, resources, scheduler);
-            created.set(ctx);
-
-            ctx.register(Server.class, server);
-
-            ConfigService configService = BootstrapServices.registerYamlConfig(ctx, resources, logger);
-            BootstrapServices.registerYamlMessages(ctx, configService, logger, dataDirectory);
-
-            SpongePlayers players = new SpongePlayers();
-            ctx.register(Players.class, players);
-            ctx.register(SpongePlayers.class, players);
-
-            SpongeWorlds worlds = new SpongeWorlds();
-            ctx.register(Worlds.class, worlds);
-            ctx.register(SpongeWorlds.class, worlds);
-
-            SpongeBlocks blocks = new SpongeBlocks();
-            ctx.register(Blocks.class, blocks);
-            ctx.register(SpongeBlocks.class, blocks);
-
-            InMemoryMessenger inMemoryMessenger = new InMemoryMessenger(pluginId, "velocity");
-            ctx.register(Messenger.class, inMemoryMessenger);
-            ctx.register(InMemoryMessenger.class, inMemoryMessenger);
-
-            try {
-                var transportConfig = configService.load(dataDirectory.resolve("config.yml"), "config.yml");
-                var result =
-                    MessengerTransportBootstrap.bootstrap(transportConfig, PlatformId.SPONGE, logger, ctx.services());
-                ctx.registerCloseable(result.closeable());
-            } catch (Exception e) {
-                logger.warn("Failed to initialize network transport; using in-memory.", e);
-                ctx.services().register(Messenger.class, inMemoryMessenger);
-            }
-
-            return ctx;
-        });
-
-        if (created.get() == null) {
-            logger.debug("RapunzelLib already bootstrapped; acquiring lease for {}", pluginId);
+        try {
+            Files.createDirectories(dataDirectory);
+        } catch (Exception e) {
+            logger.debug("Failed to create Sponge data directory {}", dataDirectory, e);
         }
-        return lease.context();
+
+        ResourceProvider resources = path -> Optional.ofNullable(openResource(resourceAnchor, path));
+        Scheduler scheduler = new SpongeScheduler(server, container);
+        PlatformRuntime runtime = BootstrapServices.serverRuntime(
+            PlatformId.SPONGE,
+            EngineFamily.SPONGE_SERVER,
+            container,
+            RuntimeProfiles.SERVER_STANDARD
+        );
+
+        return SharedBackendBootstrap.createContext(
+                plugin,
+                pluginId,
+                pluginId,
+                runtime,
+                logger,
+                dataDirectory,
+                resources,
+                scheduler,
+                ctx -> {
+                    ctx.register(Server.class, server);
+
+                    SpongePersistentAttachmentsStore attachmentStore = new SpongePersistentAttachmentsStore(
+                        logger,
+                        ctx.configs(),
+                        dataDirectory.resolve("attachments.yml")
+                    );
+                    SpongeAttachmentService attachmentService = new SpongeAttachmentService(attachmentStore);
+                    ctx.register(SpongePersistentAttachmentsStore.class, attachmentStore);
+                    ctx.register(SpongeAttachmentService.class, attachmentService);
+                    ctx.registerCloseable(attachmentStore);
+
+                    PlatformFeatures.install(ctx);
+                },
+                new BackendTransportBootstrap.Hooks(
+                    NetworkQueueTransportDecorator.pluginHooks(() -> new InMemoryMessenger(pluginId, "velocity"))
+                ),
+                Messenger.class,
+                null,
+                (ctx, hookScheduler, hookLogger, transport, pluginMessenger, effectiveMessenger) -> {
+                    if (transport.pluginMessenger() == null) {
+                        return;
+                    }
+                    NetworkInfoClient networkInfo = BackendNetworkInfoBootstrap.registerClient(
+                        ctx,
+                        ctx.services().get(NetworkRuntimeGateway.class),
+                        hookScheduler,
+                        hookLogger
+                    );
+
+                    BackendNetworkInfoBootstrap.registerRepeatingTask(ctx, hookScheduler, Duration.ofSeconds(1), Duration.ofSeconds(5), () -> {
+                        networkInfo.networkServerName()
+                                .thenAccept(name -> hookLogger.debug("Resolved network server name: {}", name))
+                                .exceptionally(ignored -> null);
+                        return true;
+                    });
+                },
+                false
+        );
     }
 
     private static InputStream openResource(Class<?> anchor, String path) {

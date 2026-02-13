@@ -1,36 +1,38 @@
 package de.t14d3.rapunzellib.network.info;
 
-import com.google.gson.reflect.TypeToken;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.rpc.RpcClient;
+import de.t14d3.rapunzellib.network.runtime.DefaultNetworkRuntimeGateway;
+import de.t14d3.rapunzellib.network.runtime.NetworkRuntimeGateway;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.slf4j.Logger;
 
-import java.lang.reflect.Type;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 public final class NetworkInfoClient implements NetworkInfoService, AutoCloseable {
-    private static final Type SERVERS_LIST_TYPE = new TypeToken<List<String>>() {
-    }.getType();
-
-    private static final Type PLAYERS_LIST_TYPE = new TypeToken<List<NetworkPlayerInfo>>() {
-    }.getType();
-
     private final RpcClient rpc;
     private final Object networkServerNameLock = new Object();
     private volatile String cachedNetworkServerName;
     private volatile CompletableFuture<String> inFlightNetworkServerName;
 
     public NetworkInfoClient(Messenger messenger, Scheduler scheduler, Logger logger) {
-        this(messenger, scheduler, logger, Duration.ofSeconds(3));
+        this(DefaultNetworkRuntimeGateway.compatibility(messenger), scheduler, logger, Duration.ofSeconds(3));
     }
 
     public NetworkInfoClient(Messenger messenger, Scheduler scheduler, Logger logger, Duration requestTimeout) {
+        this(DefaultNetworkRuntimeGateway.compatibility(messenger), scheduler, logger, requestTimeout);
+    }
+
+    public NetworkInfoClient(NetworkRuntimeGateway gateway, Scheduler scheduler, Logger logger) {
+        this(gateway, scheduler, logger, Duration.ofSeconds(3));
+    }
+
+    public NetworkInfoClient(NetworkRuntimeGateway gateway, Scheduler scheduler, Logger logger, Duration requestTimeout) {
         Objects.requireNonNull(requestTimeout, "requestTimeout");
-        this.rpc = new RpcClient(messenger, scheduler, logger, requestTimeout);
+        this.rpc = new RpcClient(Objects.requireNonNull(gateway, "gateway"), scheduler, logger, requestTimeout);
     }
 
     @Override
@@ -51,7 +53,7 @@ public final class NetworkInfoClient implements NetworkInfoService, AutoCloseabl
                 return inFlight;
             }
 
-            CompletableFuture<String> started = rpc.callProxy(NetworkInfoRpc.SERVICE, NetworkInfoRpc.WHO_AM_I, null, String.class)
+            CompletableFuture<String> started = rpc.callProxy(NetworkInfoRpc.WHO_AM_I_METHOD, null)
                 .thenApply(name -> {
                     if (name == null || name.isBlank()) {
                         throw new IllegalStateException("Proxy returned an empty server name");
@@ -75,12 +77,12 @@ public final class NetworkInfoClient implements NetworkInfoService, AutoCloseabl
 
     @Override
     public CompletableFuture<List<String>> servers() {
-        return rpc.callProxy(NetworkInfoRpc.SERVICE, NetworkInfoRpc.LIST_SERVERS, null, SERVERS_LIST_TYPE);
+        return rpc.callProxy(NetworkInfoRpc.LIST_SERVERS_METHOD, null);
     }
 
     @Override
     public CompletableFuture<List<NetworkPlayerInfo>> players() {
-        return rpc.callProxy(NetworkInfoRpc.SERVICE, NetworkInfoRpc.LIST_PLAYERS, null, PLAYERS_LIST_TYPE);
+        return rpc.callProxy(NetworkInfoRpc.LIST_PLAYERS_METHOD, null);
     }
 
     @Override

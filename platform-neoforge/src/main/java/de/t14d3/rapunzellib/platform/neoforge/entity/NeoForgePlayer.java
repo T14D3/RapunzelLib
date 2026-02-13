@@ -1,23 +1,16 @@
 package de.t14d3.rapunzellib.platform.neoforge.entity;
 
 import de.t14d3.rapunzellib.PlatformId;
-import de.t14d3.rapunzellib.Rapunzel;
-import de.t14d3.rapunzellib.objects.RLocation;
-import de.t14d3.rapunzellib.objects.RNativeHandle;
-import de.t14d3.rapunzellib.objects.RPlayer;
-import de.t14d3.rapunzellib.objects.RWorld;
-import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.platform.shared.entity.SharedServerPlayerBase;
 import net.kyori.adventure.audience.Audience;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
 
-final class NeoForgePlayer extends RNativeHandle<ServerPlayer> implements RPlayer {
-    NeoForgePlayer(ServerPlayer handle) {
-        super(PlatformId.NEOFORGE, Objects.requireNonNull(handle, "handle"));
+final class NeoForgePlayer extends SharedServerPlayerBase {
+    NeoForgePlayer(ServerPlayer handle, NeoForgeWorlds worlds) {
+        super(PlatformId.NEOFORGE, Objects.requireNonNull(handle, "handle"), de.t14d3.rapunzellib.attachments.RAttachmentContainer.lazyMutable(), Objects.requireNonNull(worlds, "worlds"));
     }
 
     void updateHandle(ServerPlayer newHandle) {
@@ -30,44 +23,7 @@ final class NeoForgePlayer extends RNativeHandle<ServerPlayer> implements RPlaye
     }
 
     @Override
-    public @NotNull UUID uuid() {
-        return handle().getUUID();
-    }
-
-    @Override
-    public @NotNull String name() {
-        return handle().getGameProfile().name();
-    }
-
-    @Override
     public boolean hasPermission(@NotNull String permission) {
         return NeoForgePermissions.hasPermission(handle(), permission);
-    }
-
-    @Override
-    public @NotNull Optional<RWorld> world() {
-        ServerPlayer player = handle();
-        return Rapunzel.context().worlds()
-            .wrap(player.level())
-            .or(() -> Optional.of(new NeoForgeWorld(player.level())));
-    }
-
-    @Override
-    public @NotNull Optional<RLocation> location() {
-        ServerPlayer player = handle();
-        String key = player.level().dimension().location().toString();
-        RWorldRef worldRef = new RWorldRef(key, key);
-        return Optional.of(new RLocation(worldRef, player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot()));
-    }
-
-    @Override
-    public boolean canTeleport() {
-        return true;
-    }
-
-    @Override
-    public void teleport(@NotNull RLocation location) {
-        Objects.requireNonNull(location, "location");
-        handle().teleportTo(location.x(), location.y(), location.z());
     }
 }

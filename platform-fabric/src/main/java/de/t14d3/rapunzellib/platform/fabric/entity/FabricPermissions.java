@@ -1,6 +1,8 @@
 package de.t14d3.rapunzellib.platform.fabric.entity;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
 
 import java.lang.reflect.Method;
 import java.util.UUID;
@@ -34,7 +36,7 @@ final class FabricPermissions {
         }
 
         // Reasonable default: treat level 4 as "op".
-        return player.hasPermissions(4);
+        return player.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.OWNERS));
     }
 }
 

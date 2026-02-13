@@ -14,46 +14,56 @@ public interface RPlayer extends RAudience {
 
     boolean hasPermission(@NotNull String permission);
 
-    /**
-     * Returns the player's current world (server platforms only).
-     */
-    default @NotNull Optional<RWorld> world() {
+    default boolean isServerPlayer() {
+        return this instanceof RServerPlayer;
+    }
+
+    default boolean isProxyPlayer() {
+        return this instanceof RProxyPlayer;
+    }
+
+    default @NotNull Optional<RServerPlayer> asServerPlayer() {
+        if (this instanceof RServerPlayer player) return Optional.of(player);
         return Optional.empty();
     }
 
-    /**
-     * Returns the player's current location (server platforms only).
-     */
-    default @NotNull Optional<RLocation> location() {
+    default @NotNull Optional<RProxyPlayer> asProxyPlayer() {
+        if (this instanceof RProxyPlayer player) return Optional.of(player);
         return Optional.empty();
     }
 
-    default @NotNull RWorld worldOrThrow() {
-        return world().orElseThrow(() -> new UnsupportedOperationException("world is not supported for " + getClass().getName()));
+    default boolean isEntity() {
+        return this instanceof REntity;
     }
 
-    default @NotNull RLocation locationOrThrow() {
-        return location().orElseThrow(() -> new UnsupportedOperationException("location is not supported for " + getClass().getName()));
-    }
-
-    default boolean canTeleport() {
-        return false;
-    }
-
-    /**
-     * Teleports the player (server platforms only).
-     *
-     * @throws UnsupportedOperationException if teleporting is not supported by this platform/player implementation
-     */
-    default void teleport(@NotNull RLocation location) {
-        throw new UnsupportedOperationException("teleport is not supported for " + getClass().getName());
-    }
-
-    /**
-     * Returns the current proxy server name (proxy platforms only).
-     */
-    default @NotNull Optional<String> currentServerName() {
+    default @NotNull Optional<REntity> asEntity() {
+        if (this instanceof REntity entity) return Optional.of(entity);
         return Optional.empty();
+    }
+
+    default boolean isLivingEntity() {
+        return this instanceof RLivingEntity;
+    }
+
+    default @NotNull Optional<RLivingEntity> asLivingEntity() {
+        if (this instanceof RLivingEntity livingEntity) return Optional.of(livingEntity);
+        return Optional.empty();
+    }
+
+    default @NotNull RServerPlayer requireServerPlayer() {
+        return asServerPlayer().orElseThrow(() -> new IllegalStateException("Player does not expose server semantics: " + getClass().getName()));
+    }
+
+    default @NotNull RProxyPlayer requireProxyPlayer() {
+        return asProxyPlayer().orElseThrow(() -> new IllegalStateException("Player does not expose proxy semantics: " + getClass().getName()));
+    }
+
+    default @NotNull REntity requireEntity() {
+        return asEntity().orElseThrow(() -> new IllegalStateException("Player does not expose entity semantics: " + getClass().getName()));
+    }
+
+    default @NotNull RLivingEntity requireLivingEntity() {
+        return asLivingEntity().orElseThrow(() -> new IllegalStateException("Player does not expose living-entity semantics: " + getClass().getName()));
     }
 
     static @NotNull Collection<RPlayer> online() {
@@ -68,4 +78,3 @@ public interface RPlayer extends RAudience {
         return Rapunzel.players().wrap(nativePlayer);
     }
 }
-

@@ -1,102 +1,41 @@
 package de.t14d3.rapunzellib.platform.paper.objects;
 
 import de.t14d3.rapunzellib.PlatformId;
-import de.t14d3.rapunzellib.Rapunzel;
-import de.t14d3.rapunzellib.network.info.NetworkInfoService;
-import de.t14d3.rapunzellib.objects.RNativeHandle;
-import de.t14d3.rapunzellib.objects.RLocation;
-import de.t14d3.rapunzellib.objects.RPlayer;
-import de.t14d3.rapunzellib.objects.RWorld;
-import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.RServerPlayer;
+import de.t14d3.rapunzellib.platform.shared.entity.SharedServerPlayerBase;
+import de.t14d3.rapunzellib.platform.paper.PaperHandleBridge;
 import net.kyori.adventure.audience.Audience;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.NamespacedKey;
+import net.minecraft.server.level.ServerPlayer;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
 
-final class PaperPlayer extends RNativeHandle<Player> implements RPlayer {
-    PaperPlayer(Player handle) {
-        super(PlatformId.PAPER, Objects.requireNonNull(handle, "handle"));
+final class PaperPlayer extends SharedServerPlayerBase implements RServerPlayer {
+    PaperPlayer(ServerPlayer handle, PaperWorlds worlds) {
+        super(
+            PlatformId.PAPER,
+            Objects.requireNonNull(handle, "handle"),
+            PaperPersistentAttachments.forPlayer(handle.getUUID()),
+            Objects.requireNonNull(worlds, "worlds")
+        );
     }
 
-    void updateHandle(Player newHandle) {
+    void updateHandle(ServerPlayer newHandle) {
         updateNativeHandle(Objects.requireNonNull(newHandle, "newHandle"));
+    }
+
+    private @NotNull Player bukkit() {
+        return PaperHandleBridge.toBukkit(handle());
     }
 
     @Override
     public @NotNull Audience audience() {
-        return handle();
-    }
-
-    @Override
-    public @NotNull UUID uuid() {
-        return handle().getUniqueId();
-    }
-
-    @Override
-    public @NotNull String name() {
-        return handle().getName();
+        return bukkit();
     }
 
     @Override
     public boolean hasPermission(@NotNull String permission) {
-        return handle().hasPermission(permission);
-    }
-
-    @Override
-    public @NotNull Optional<RWorld> world() {
-        Player player = handle();
-        return Rapunzel.context().worlds()
-            .wrap(player.getWorld())
-            .or(() -> Optional.of(new PaperWorld(player.getWorld())));
-    }
-
-    @Override
-    public @NotNull Optional<RLocation> location() {
-        Location loc = handle().getLocation();
-        String key = loc.getWorld() != null ? loc.getWorld().getKey().toString() : null;
-        String name = (loc.getWorld() != null) ? loc.getWorld().getName() : null;
-        return Optional.of(new RLocation(new RWorldRef(name, key), loc.getX(), loc.getY(), loc.getZ(), loc.getYaw(), loc.getPitch()));
-    }
-
-    @Override
-    public boolean canTeleport() {
-        return true;
-    }
-
-    @Override
-    public void teleport(@NotNull RLocation location) {
-        Objects.requireNonNull(location, "location");
-        RWorldRef worldRef = location.world();
-        org.bukkit.World world = null;
-        if (worldRef != null) {
-            if (worldRef.name() != null) {
-                world = Bukkit.getWorld(worldRef.name());
-            }
-            if (world == null && worldRef.key() != null) {
-                NamespacedKey key = NamespacedKey.fromString(worldRef.key());
-                if (key != null) {
-                    world = Bukkit.getWorld(key);
-                }
-            }
-        }
-
-        if (world == null) {
-            world = handle().getWorld();
-        }
-
-        Location target = new Location(world, location.x(), location.y(), location.z(), location.yaw(), location.pitch());
-        handle().teleport(target);
-    }
-
-    @Override
-    public @NotNull Optional<String> currentServerName() {
-        return Optional.of(Rapunzel.context().services().get(NetworkInfoService.class).networkServerName().join());
+        return bukkit().hasPermission(permission);
     }
 }
-

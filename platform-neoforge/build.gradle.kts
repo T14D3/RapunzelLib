@@ -1,64 +1,27 @@
-import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.api.publish.PublishingExtension
+import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.api.tasks.bundling.Jar
 
 plugins {
-    `java-library`
+    alias(libs.plugins.platform.neoforge.module.conventions)
     alias(libs.plugins.shadow)
-    alias(libs.plugins.neoforge.moddev)
 }
 
-val versions: VersionCatalog = extensions
-    .getByType<VersionCatalogsExtension>()
-    .named("libs")
+val companionModJar by tasks.registering(Jar::class) {
+    archiveBaseName.set("platform-neoforge")
+    archiveClassifier.set("companion")
+    dependsOn(tasks.named("compileJava"))
 
-neoForge {
-    version = versions.findVersion("neoforge").get().requiredVersion
-
-    mods {
-        create("rapunzellib_platform_neoforge") {
-            sourceSet(sourceSets.main.get())
-        }
+    from(layout.buildDirectory.dir("classes/java/main")) {
+        include("de/t14d3/rapunzellib/platform/neoforge/NeoForgePlatformMod.class")
     }
-
-    addModdingDependenciesTo(sourceSets.main.get())
-}
-
-val shade: Configuration by configurations.creating {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    extendsFrom(
-        configurations.getByName("api"),
-        configurations.getByName("implementation"),
-    )
-}
-
-dependencies {
-    api(project(":api"))
-    implementation(project(":common"))
-    implementation(project(":network"))
-    implementation(project(":database-spool"))
-
-    implementation(libs.adventure.platform.neoforge)
-    implementation(libs.slf4j.api)
-
-    compileOnly(libs.annotations)
-    testImplementation(libs.junit.jupiter)
-}
-
-tasks {
-    processResources {
-        val props = mapOf("version" to project.version)
-        inputs.properties(props)
-        filteringCharset = "UTF-8"
-        filesMatching("META-INF/neoforge.mods.toml") {
-            expand(props)
-        }
+    from(layout.projectDirectory.dir("src/companion/resources")) {
+        expand("version" to project.version.toString())
     }
+}
 
-    withType<ShadowJar>().configureEach {
-        configurations.set(listOf(shade))
-        archiveClassifier.set("shaded")
-        isZip64 = true
-        relocate("org.yaml.snakeyaml", "de.t14d3.rapunzellib.libs.snakeyaml")
-        relocate("com.google.gson", "de.t14d3.rapunzellib.libs.gson")
+extensions.configure(PublishingExtension::class.java) {
+    publications.withType(MavenPublication::class.java).configureEach {
+        artifact(companionModJar)
     }
 }

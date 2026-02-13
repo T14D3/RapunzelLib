@@ -6,6 +6,17 @@
  */
 
 pluginManagement {
+    includeBuild("gradle-plugin") {
+        name = "gradle-plugin-build"
+    }
+
+    plugins {
+        id("com.gradleup.shadow") version providers.gradleProperty("shadowVersion")
+        id("fabric-loom") version providers.gradleProperty("fabricLoomVersion")
+        id("net.neoforged.moddev") version providers.gradleProperty("neoforgeModdevVersion")
+        id("org.spongepowered.gradle.vanilla") version providers.gradleProperty("vanillaGradleVersion")
+    }
+
     repositories {
         gradlePluginPortal()
         mavenCentral()
@@ -17,7 +28,7 @@ pluginManagement {
 }
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.9.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version providers.gradleProperty("foojayResolverVersion")
 }
 
 rootProject.name = "RapunzelLib"
@@ -27,23 +38,43 @@ include(
     "bom",
     "common",
     "commands",
+    "commands-shared",
     "commands-paper",
     "commands-fabric",
     "commands-neoforge",
     "commands-sponge",
     "events",
+    "events-shared",
     "events-paper",
     "events-fabric",
     "events-neoforge",
     "events-sponge",
+    "gui",
+    "gui-shared",
+    "gui-fabric",
+    "gui-neoforge",
+    "gui-paper",
+    "gui-sponge",
+    "inventory",
+    "inventory-shared",
+    "inventory-paper",
+    "inventory-fabric",
+    "inventory-neoforge",
+    "inventory-sponge",
     "network",
     "database-spool",
+    "nbt",
+    "nbt-shared",
+    "nbt-paper",
+    "nbt-fabric",
+    "nbt-neoforge",
+    "nbt-sponge",
+    "platform-shared",
     "platform-paper",
     "platform-fabric",
     "platform-velocity",
     "platform-neoforge",
     "platform-sponge",
-    "tool-server-runner",
     "gradle-plugin",
 )
 
@@ -52,7 +83,7 @@ include(
 // When multiple NeoForge subprojects do that in the same import, it can clash on the root "settings" extension.
 // Limit the IntelliJ-specific integration to the platform module during sync.
 val originalIdeaSyncActive: String? = System.getProperty("idea.sync.active")
-val disableIdeaSyncForProjects = setOf(":commands-neoforge", ":events-neoforge")
+val disableIdeaSyncForProjects = setOf(":commands-neoforge", ":events-neoforge", ":nbt-neoforge", ":gui-neoforge", ":inventory-neoforge")
 val ideaSyncKey = "idea.sync.active"
 
 fun restoreIdeaSyncProperty() {

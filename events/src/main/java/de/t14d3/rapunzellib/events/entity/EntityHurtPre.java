@@ -1,39 +1,53 @@
 package de.t14d3.rapunzellib.events.entity;
 
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.BaseCancellablePreEvent;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.REntity;
+import de.t14d3.rapunzellib.objects.RLivingEntity;
 import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.snapshot.REntitySnapshot;
 
 import java.util.Objects;
 
 public final class EntityHurtPre extends BaseCancellablePreEvent {
-    private final RWorldRef world;
-    private final RBlockPos pos;
-    private final String entityTypeKey;
+    private final REntity entity;
+    private final REntitySnapshot snapshot;
     private final String damageTypeKey;
 
-    public EntityHurtPre(RWorldRef world, RBlockPos pos, String entityTypeKey, String damageTypeKey) {
-        this(world, pos, entityTypeKey, damageTypeKey, false);
+    public EntityHurtPre(REntity entity, String damageTypeKey) {
+        this(entity, damageTypeKey, false);
     }
 
-    public EntityHurtPre(RWorldRef world, RBlockPos pos, String entityTypeKey, String damageTypeKey, boolean isCancelled) {
-        this.world = Objects.requireNonNull(world, "world");
-        this.pos = Objects.requireNonNull(pos, "pos");
-        this.entityTypeKey = Objects.requireNonNull(entityTypeKey, "entityTypeKey");
+    public EntityHurtPre(REntity entity, String damageTypeKey, boolean isCancelled) {
+        this.entity = Objects.requireNonNull(entity, "entity");
+        this.snapshot = entity.snapshot();
         this.damageTypeKey = Objects.requireNonNull(damageTypeKey, "damageTypeKey");
-        this.cancelled = isCancelled;
+        setCancelled(isCancelled);
+    }
+
+    public REntity entity() {
+        return entity;
+    }
+
+    public java.util.Optional<RLivingEntity> livingEntity() {
+        return entity.asLivingEntity();
+    }
+
+    public REntitySnapshot snapshot() {
+        return snapshot;
     }
 
     public RWorldRef world() {
-        return world;
+        return snapshot.world();
     }
 
     public RBlockPos pos() {
-        return pos;
+        return snapshot.pos();
     }
 
-    public String entityTypeKey() {
-        return entityTypeKey;
+    public RKey entityTypeKey() {
+        return snapshot.entityTypeKey();
     }
 
     public String damageTypeKey() {

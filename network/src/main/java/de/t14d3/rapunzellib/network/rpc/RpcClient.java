@@ -3,8 +3,11 @@ package de.t14d3.rapunzellib.network.rpc;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import de.t14d3.rapunzellib.network.Messenger;
-import de.t14d3.rapunzellib.network.NetworkEventBus;
 import de.t14d3.rapunzellib.network.json.JsonCodecs;
+import de.t14d3.rapunzellib.network.runtime.DefaultNetworkRuntimeGateway;
+import de.t14d3.rapunzellib.network.runtime.NetworkPath;
+import de.t14d3.rapunzellib.network.runtime.NetworkRuntimeGateway;
+import de.t14d3.rapunzellib.network.runtime.RpcMethod;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.slf4j.Logger;
@@ -23,13 +26,12 @@ import java.util.concurrent.TimeoutException;
  * Underlying transport is determined by the {@link Messenger} instance.
  */
 public final class RpcClient implements AutoCloseable {
-    private final Messenger messenger;
+    private final NetworkRuntimeGateway gateway;
     private final Scheduler scheduler;
     private final Logger logger;
     private final Duration defaultTimeout;
     private final Gson gson;
-    private final NetworkEventBus bus;
-    private final NetworkEventBus.Subscription responseSubscription;
+    private final NetworkRuntimeGateway.Subscription responseSubscription;
 
     private final Map<String, PendingRequest<?>> pending = new ConcurrentHashMap<>();
     private volatile boolean closed;
@@ -42,7 +44,7 @@ public final class RpcClient implements AutoCloseable {
      * @param logger the logger to use for RPC
      */
     public RpcClient(Messenger messenger, Scheduler scheduler, Logger logger) {
-        this(messenger, scheduler, logger, Duration.ofSeconds(3), JsonCodecs.gson());
+        this(DefaultNetworkRuntimeGateway.compatibility(messenger), scheduler, logger, Duration.ofSeconds(3), JsonCodecs.gson());
     }
     /**
      * Creates a new RPC client with the given messenger, scheduler, and logger.
@@ -53,7 +55,7 @@ public final class RpcClient implements AutoCloseable {
      * @param defaultTimeout the default timeout for RPC requests
      */
     public RpcClient(Messenger messenger, Scheduler scheduler, Logger logger, Duration defaultTimeout) {
-        this(messenger, scheduler, logger, defaultTimeout, JsonCodecs.gson());
+        this(DefaultNetworkRuntimeGateway.compatibility(messenger), scheduler, logger, defaultTimeout, JsonCodecs.gson());
     }
     /**
      * Creates a new RPC client with the given messenger, scheduler, and logger.
@@ -65,18 +67,34 @@ public final class RpcClient implements AutoCloseable {
      * @param gson the GSON instance to use for RPC requests
      */
     public RpcClient(Messenger messenger, Scheduler scheduler, Logger logger, Duration defaultTimeout, Gson gson) {
-        this.messenger = Objects.requireNonNull(messenger, "messenger");
+        this(DefaultNetworkRuntimeGateway.compatibility(messenger, gson), scheduler, logger, defaultTimeout, gson);
+    }
+
+    public RpcClient(NetworkRuntimeGateway gateway, Scheduler scheduler, Logger logger) {
+        this(gateway, scheduler, logger, Duration.ofSeconds(3), JsonCodecs.gson());
+    }
+
+    public RpcClient(NetworkRuntimeGateway gateway, Scheduler scheduler, Logger logger, Duration defaultTimeout) {
+        this(gateway, scheduler, logger, defaultTimeout, JsonCodecs.gson());
+    }
+
+    public RpcClient(NetworkRuntimeGateway gateway, Scheduler scheduler, Logger logger, Duration defaultTimeout, Gson gson) {
+        this.gateway = Objects.requireNonNull(gateway, "gateway");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.defaultTimeout = Objects.requireNonNull(defaultTimeout, "defaultTimeout");
         this.gson = Objects.requireNonNull(gson, "gson");
 
-        this.bus = new NetworkEventBus(messenger, gson);
-        this.responseSubscription = bus.register(
-            RpcChannels.RESPONSE,
-            RpcResponse.class,
-                this::handleResponse
-        );
+        this.responseSubscription = gateway.subscribe(RpcChannels.RESPONSE_TOPIC, this::handleResponse);
+    }
+
+    public <Req, Res> CompletableFuture<Res> callProxy(RpcMethod<Req, Res> method, Req payload) {
+        return callProxy(method, payload, null);
+    }
+
+    public <Req, Res> CompletableFuture<Res> callProxy(RpcMethod<Req, Res> method, Req payload, Duration timeout) {
+        Objects.requireNonNull(method, "method");
+        return call(Target.PROXY, null, method.service(), method.method(), payload, method.responseType(), timeout);
     }
 
     public <T> CompletableFuture<T> callProxy(String service, String method, Object payload, Class<T> resultType) {
@@ -93,6 +111,15 @@ public final class RpcClient implements AutoCloseable {
 
     public <T> CompletableFuture<T> callServer(String serverName, String service, String method, Object payload, Class<T> resultType) {
         return callServer(serverName, service, method, payload, resultType, null);
+    }
+
+    public <Req, Res> CompletableFuture<Res> callServer(String serverName, RpcMethod<Req, Res> method, Req payload) {
+        return callServer(serverName, method, payload, null);
+    }
+
+    public <Req, Res> CompletableFuture<Res> callServer(String serverName, RpcMethod<Req, Res> method, Req payload, Duration timeout) {
+        Objects.requireNonNull(method, "method");
+        return call(Target.SERVER, serverName, method.service(), method.method(), payload, method.responseType(), timeout);
     }
 
     public <T> CompletableFuture<T> callServer(String serverName, String service, String method, Object payload, Type resultType) {
@@ -128,9 +155,11 @@ public final class RpcClient implements AutoCloseable {
             return CompletableFuture.failedFuture(new IllegalStateException("RpcClient is closed"));
         }
 
-        if (!messenger.isConnected()) {
+        if (!gateway.isConnected()) {
             return CompletableFuture.failedFuture(new IllegalStateException(
-                "Network messenger is not connected (" + messenger.getClass().getSimpleName() + ")"
+                "Network messenger is not connected ("
+                    + gateway.runtime().canonicalMessenger().getClass().getSimpleName()
+                    + ")"
             ));
         }
 
@@ -167,9 +196,9 @@ public final class RpcClient implements AutoCloseable {
 
         try {
             if (target == Target.PROXY) {
-                bus.sendToProxy(RpcChannels.REQUEST, request);
+                gateway.publish(RpcChannels.REQUEST_TOPIC, NetworkPath.proxy(), request);
             } else {
-                bus.sendToServer(RpcChannels.REQUEST, targetServerName, request);
+                gateway.publish(RpcChannels.REQUEST_TOPIC, NetworkPath.server(targetServerName), request);
             }
         } catch (Exception e) {
             PendingRequest<?> removed = pending.remove(requestId);

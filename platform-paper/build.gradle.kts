@@ -1,25 +1,32 @@
+import org.gradle.api.tasks.bundling.Jar
+
 plugins {
-    `java-library`
+    alias(libs.plugins.backend.platform.module.conventions)
+    alias(libs.plugins.paper.userdev.module.conventions)
     alias(libs.plugins.shadow)
-    alias(libs.plugins.userdev)
 }
 
 dependencies {
-    api(project(":api"))
-    implementation(project(":common"))
-    implementation(project(":network"))
-    implementation(project(":database-spool"))
-
-    paperweight.paperDevBundle(libs.versions.paper.api)
-    compileOnly(libs.annotations)
-
-    testImplementation(libs.junit.jupiter)
+    api(project(":platform-shared"))
+    implementation(project(":nbt"))
 }
 
-tasks {
-    withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>().configureEach {
-        archiveClassifier.set("shaded")
-        relocate("org.yaml.snakeyaml", "de.t14d3.rapunzellib.libs.snakeyaml")
-        relocate("com.google.gson", "de.t14d3.rapunzellib.libs.gson")
+val companionPluginJar by tasks.registering(Jar::class) {
+    archiveBaseName.set("platform-paper")
+    archiveClassifier.set("plugin")
+    dependsOn(tasks.named("compileJava"))
+
+    from(layout.buildDirectory.dir("classes/java/main")) {
+        include("de/t14d3/rapunzellib/platform/paper/PaperPlatformPlugin.class")
+    }
+    from(layout.projectDirectory.dir("src/companion/resources")) {
+        expand("version" to project.version.toString())
+    }
+}
+
+tasks.processResources {
+    from(companionPluginJar) {
+        into("META-INF/rapunzellib")
+        rename { "platform-paper-plugin.jar" }
     }
 }

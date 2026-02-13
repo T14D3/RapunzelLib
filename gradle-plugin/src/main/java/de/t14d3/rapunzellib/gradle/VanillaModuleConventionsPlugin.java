@@ -1,0 +1,14 @@
+package de.t14d3.rapunzellib.gradle;
+
+import org.gradle.api.Plugin;
+import org.gradle.api.Project;
+
+public final class VanillaModuleConventionsPlugin implements Plugin<Project> {
+    @Override
+    public void apply(Project target) {
+        ConventionPluginSupport.applyBaseJavaModule(target);
+        target.getPluginManager().apply("org.spongepowered.gradle.vanilla");
+        ConventionPluginSupport.addFamilyAndSharedDependencies(target);
+        ConventionPluginSupport.configureVanillaMinecraft(target);
+    }
+}

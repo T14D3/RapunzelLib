@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.events.fabric;
 
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
@@ -14,10 +15,9 @@ import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockPost;
 import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
+import de.t14d3.rapunzellib.events.shared.SharedEntityInteractionHooks;
+import de.t14d3.rapunzellib.events.shared.SharedLifecycleEventHooks;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
-import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
-import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
-import de.t14d3.rapunzellib.events.world.WorldLoadPost;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorld;
@@ -43,15 +43,24 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.BlockHitResult;
+import org.jetbrains.annotations.NotNull;
 
 final class FabricGameEventsBridge implements GameEventBridge {
     private final GameEventBus bus;
+
+    static @NotNull GameEventBridge install(@NotNull GameEventBus bus) {
+        FabricGameEventsBridge bridge = new FabricGameEventsBridge(bus);
+        bridge.register();
+        return bridge;
+    }
 
     FabricGameEventsBridge(GameEventBus bus) {
         this.bus = bus;
     }
 
     void register() {
+        SharedLifecycleEventHooks.initializeMixins(bus);
+
         PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
             if (!(player instanceof ServerPlayer serverPlayer)) return true;
             if (!(world instanceof ServerLevel serverLevel)) return true;
@@ -67,23 +76,13 @@ final class FabricGameEventsBridge implements GameEventBridge {
         UseEntityCallback.EVENT.register(this::onUseEntity);
         AttackEntityCallback.EVENT.register(this::onAttackEntity);
 
-        ServerWorldEvents.LOAD.register((server, world) -> {
-            if (!bus.hasPostListeners(WorldLoadPost.class)) return;
-            String id = world.dimension().location().toString();
-            bus.dispatchPost(new WorldLoadPost(new RWorldRef(id, id)));
-        });
-
-        ServerChunkEvents.CHUNK_UNLOAD.register((world, chunk) -> {
-            if (!bus.hasPostListeners(ChunkUnloadPost.class)) return;
-            String id = world.dimension().location().toString();
-            bus.dispatchPost(new ChunkUnloadPost(new RWorldRef(id, id), chunk.getPos().x, chunk.getPos().z));
-        });
-
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            if (!bus.hasPostListeners(PlayerQuitPost.class)) return;
-            ServerPlayer player = handler.getPlayer();
-            bus.dispatchPost(new PlayerQuitPost(player.getUUID(), player.getName().getString()));
-        });
+        ServerWorldEvents.LOAD.register((server, world) -> SharedLifecycleEventHooks.dispatchWorldLoadPost(bus, world));
+        ServerChunkEvents.CHUNK_UNLOAD.register(
+            (world, chunk) -> SharedLifecycleEventHooks.dispatchChunkUnloadPost(bus, world, chunk.getPos().x, chunk.getPos().z)
+        );
+        ServerPlayConnectionEvents.DISCONNECT.register(
+            (handler, server) -> SharedLifecycleEventHooks.dispatchPlayerQuitPost(bus, handler.getPlayer())
+        );
     }
 
     @Override
@@ -113,7 +112,7 @@ final class FabricGameEventsBridge implements GameEventBridge {
 
         if (cancelled) {
             if (needsPost) bus.dispatchPost(new BlockBreakPost(rPlayer, block, true));
-            if (needsAsync) bus.dispatchAsync(new BlockBreakSnapshot(rPlayer.uuid(), block.world().ref(), block.pos(), block.typeKey(), true));
+            if (needsAsync) bus.dispatchAsync(BlockBreakSnapshot.capture(rPlayer.uuid(), block, true));
             return false;
         }
         return true;
@@ -133,7 +132,7 @@ final class FabricGameEventsBridge implements GameEventBridge {
             bus.dispatchPost(new BlockBreakPost(rPlayer, block, false));
         }
         if (needsAsync) {
-            bus.dispatchAsync(new BlockBreakSnapshot(rPlayer.uuid(), block.world().ref(), block.pos(), block.typeKey(), false));
+            bus.dispatchAsync(BlockBreakSnapshot.capture(rPlayer.uuid(), block, false));
         }
     }
 
@@ -188,7 +187,7 @@ final class FabricGameEventsBridge implements GameEventBridge {
                 Direction face = hit.getDirection();
                 BlockPos placePos = clickedPos.relative(face);
 
-                String placeKey = BuiltInRegistries.BLOCK.getKey(blockItem.getBlock()).toString();
+                RKey placeKey = RKey.of(BuiltInRegistries.BLOCK.getKey(blockItem.getBlock()).toString());
                 RWorldRef worldRef = clickedBlock.world().ref();
                 RBlockPos rPlacePos = new RBlockPos(placePos.getX(), placePos.getY(), placePos.getZ());
 
@@ -217,12 +216,12 @@ final class FabricGameEventsBridge implements GameEventBridge {
 
         if (cancelled) {
             if (needsUsePost) bus.dispatchPost(new UseBlockPost(rPlayer, clickedBlock, true));
-            if (needsUseAsync) bus.dispatchAsync(new UseBlockSnapshot(rPlayer.uuid(), clickedBlock.world().ref(), clickedBlock.pos(), clickedBlock.typeKey(), true));
+            if (needsUseAsync) bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), clickedBlock, true));
             return InteractionResult.FAIL;
         }
 
         if (needsUsePost) bus.dispatchPost(new UseBlockPost(rPlayer, clickedBlock, false));
-        if (needsUseAsync) bus.dispatchAsync(new UseBlockSnapshot(rPlayer.uuid(), clickedBlock.world().ref(), clickedBlock.pos(), clickedBlock.typeKey(), false));
+        if (needsUseAsync) bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), clickedBlock, false));
 
         return InteractionResult.PASS;
     }
@@ -254,16 +253,11 @@ final class FabricGameEventsBridge implements GameEventBridge {
         if (!(world instanceof ServerLevel serverLevel)) return InteractionResult.PASS;
         if (!bus.hasPreListeners(InteractEntityPre.class)) return InteractionResult.PASS;
 
-        RPlayer rPlayer = Rapunzel.players().require(serverPlayer);
-        String worldId = serverLevel.dimension().location().toString();
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
-        BlockPos pos = entity.blockPosition();
-        RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
-        String typeKey = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
-
-        InteractEntityPre pre = new InteractEntityPre(rPlayer, worldRef, rPos, typeKey);
-        bus.dispatchPre(pre);
-        return pre.isDenied() ? InteractionResult.FAIL : InteractionResult.PASS;
+        if (SharedEntityInteractionHooks.dispatchInteractPre(bus, serverPlayer, entity, false)) {
+            SharedEntityInteractionHooks.dispatchInteractPost(bus, serverPlayer, entity, true);
+            return InteractionResult.FAIL;
+        }
+        return InteractionResult.PASS;
     }
 
     private InteractionResult onAttackEntity(Player player, Level world, InteractionHand hand, net.minecraft.world.entity.Entity entity, net.minecraft.world.phys.EntityHitResult hit) {
@@ -272,15 +266,10 @@ final class FabricGameEventsBridge implements GameEventBridge {
         if (!(world instanceof ServerLevel serverLevel)) return InteractionResult.PASS;
         if (!bus.hasPreListeners(AttackEntityPre.class)) return InteractionResult.PASS;
 
-        RPlayer rPlayer = Rapunzel.players().require(serverPlayer);
-        String worldId = serverLevel.dimension().location().toString();
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
-        BlockPos pos = entity.blockPosition();
-        RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
-        String typeKey = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()).toString();
-
-        AttackEntityPre pre = new AttackEntityPre(rPlayer, worldRef, rPos, typeKey);
-        bus.dispatchPre(pre);
-        return pre.isDenied() ? InteractionResult.FAIL : InteractionResult.PASS;
+        if (SharedEntityInteractionHooks.dispatchAttackPre(bus, serverPlayer, entity, false)) {
+            SharedEntityInteractionHooks.dispatchAttackPost(bus, serverPlayer, entity, true);
+            return InteractionResult.FAIL;
+        }
+        return InteractionResult.PASS;
     }
 }

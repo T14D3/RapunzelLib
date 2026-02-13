@@ -22,7 +22,7 @@ public final class BucketEmptyPre extends BaseCancellablePreEvent {
         this.world = Objects.requireNonNull(world, "world");
         this.pos = Objects.requireNonNull(pos, "pos");
         this.bucketTypeKey = Objects.requireNonNull(bucketTypeKey, "bucketTypeKey");
-        this.cancelled = isCancelled;
+        setCancelled(isCancelled);
     }
 
     public RPlayer player() {

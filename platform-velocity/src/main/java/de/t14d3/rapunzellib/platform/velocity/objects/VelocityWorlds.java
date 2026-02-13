@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.platform.velocity.objects;
 
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.Worlds;
 import org.jetbrains.annotations.NotNull;
@@ -7,6 +8,9 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Collection;
 import java.util.Optional;
 
+/**
+ * Velocity is a proxy runtime, so it deliberately exposes no server-world wrappers.
+ */
 public final class VelocityWorlds implements Worlds {
     @Override
     public @NotNull Collection<RWorld> all() {
@@ -19,8 +23,12 @@ public final class VelocityWorlds implements Worlds {
     }
 
     @Override
+    public @NotNull Optional<RWorld> get(@NotNull RKey key) {
+        return Optional.empty();
+    }
+
+    @Override
     public @NotNull Optional<RWorld> wrap(@NotNull Object nativeWorld) {
         return Optional.empty();
     }
 }
-

@@ -10,7 +10,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -201,7 +201,7 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
      * Payload carrying the JSON-encoded NetworkEnvelope over the proxy bridge.
      */
     public record BridgePayload(String json) implements CustomPacketPayload {
-        public static final Type<BridgePayload> TYPE = new Type<>(ResourceLocation.parse(NetworkConstants.TRANSPORT_CHANNEL));
+        public static final Type<BridgePayload> TYPE = new Type<>(Identifier.parse(NetworkConstants.TRANSPORT_CHANNEL));
         public static final StreamCodec<RegistryFriendlyByteBuf, BridgePayload> CODEC = StreamCodec.of(
             BridgePayload::write,
             BridgePayload::read

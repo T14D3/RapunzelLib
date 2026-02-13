@@ -31,7 +31,7 @@ final class DbQueuedMessengerTest {
             scheduler,
             LoggerFactory.getLogger("db-queue-test"),
             "owner",
-            Set.of("ch"),
+            new LegacyAllowlistNetworkOutboxPolicy(Set.of("ch")),
             Duration.ofSeconds(1),
             100,
             Duration.ofSeconds(10),
@@ -66,7 +66,7 @@ final class DbQueuedMessengerTest {
             scheduler,
             LoggerFactory.getLogger("db-queue-test"),
             "owner",
-            Set.of("ch"),
+            new LegacyAllowlistNetworkOutboxPolicy(Set.of("ch")),
             Duration.ofSeconds(1),
             1,
             Duration.ofSeconds(10),
@@ -106,7 +106,7 @@ final class DbQueuedMessengerTest {
             scheduler,
             LoggerFactory.getLogger("db-queue-test"),
             "owner",
-            Set.of("ch"),
+            new LegacyAllowlistNetworkOutboxPolicy(Set.of("ch")),
             Duration.ofSeconds(1),
             100,
             Duration.ofMillis(1),
@@ -137,7 +137,7 @@ final class DbQueuedMessengerTest {
             scheduler,
             LoggerFactory.getLogger("db-queue-test"),
             "owner",
-            Set.of("ch"),
+            new LegacyAllowlistNetworkOutboxPolicy(Set.of("ch")),
             Duration.ofSeconds(1),
             100,
             Duration.ofSeconds(10),
@@ -149,7 +149,7 @@ final class DbQueuedMessengerTest {
         scheduler.flush.run();
         assertEquals(0, store.size());
         assertEquals(1, listener.dropped.size());
-        assertEquals(DbQueuedMessenger.DropReason.NOT_ALLOWLISTED, listener.dropped.getFirst().reason);
+        assertEquals(DbQueuedMessenger.DropReason.POLICY_REJECTED, listener.dropped.getFirst().reason);
     }
 
     private static final class TestScheduler implements Scheduler {

@@ -4,6 +4,8 @@ import de.t14d3.rapunzellib.database.SpoolDatabase;
 import de.t14d3.rapunzellib.network.MessageListener;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkEnvelope;
+import de.t14d3.rapunzellib.network.outbox.NetworkOutboxPolicy;
+import de.t14d3.rapunzellib.network.outbox.NetworkSendRequest;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.jetbrains.annotations.NotNull;
@@ -12,7 +14,6 @@ import org.slf4j.Logger;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -48,7 +49,7 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     }
 
     public enum DropReason {
-        NOT_ALLOWLISTED,
+        POLICY_REJECTED,
         INVALID_TARGET,
         MISSING_TARGET_SERVER
     }
@@ -246,7 +247,7 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     private final Logger logger;
     private final Listener listener;
     private final String ownerId;
-    private final Set<String> channelAllowlist;
+    private final NetworkOutboxPolicy outboxPolicy;
     private final int maxBatchSize;
     private final long maxAgeMillis;
     private final Supplier<List<String>> allServersSupplier;
@@ -254,6 +255,32 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
 
     private final AtomicBoolean flushing = new AtomicBoolean();
     private final ScheduledTask flushTask;
+
+    public DbQueuedMessenger(
+        SpoolDatabase database,
+        Messenger delegate,
+        Scheduler scheduler,
+        Logger logger,
+        String ownerId,
+        NetworkOutboxPolicy outboxPolicy,
+        Duration flushPeriod,
+        int maxBatchSize,
+        Duration maxAge
+    ) {
+        this(
+            database,
+            delegate,
+            scheduler,
+            logger,
+            ownerId,
+            outboxPolicy,
+            flushPeriod,
+            maxBatchSize,
+            maxAge,
+            null,
+            null
+        );
+    }
 
     public DbQueuedMessenger(
         SpoolDatabase database,
@@ -272,11 +299,40 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             scheduler,
             logger,
             ownerId,
-            channelAllowlist,
+            new LegacyAllowlistNetworkOutboxPolicy(channelAllowlist),
             flushPeriod,
             maxBatchSize,
             maxAge,
             null,
+            null
+        );
+    }
+
+    public DbQueuedMessenger(
+        SpoolDatabase database,
+        Messenger delegate,
+        Scheduler scheduler,
+        Logger logger,
+        String ownerId,
+        NetworkOutboxPolicy outboxPolicy,
+        Duration flushPeriod,
+        int maxBatchSize,
+        Duration maxAge,
+        Supplier<List<String>> allServersSupplier,
+        Predicate<String> canSendToServerOverride
+    ) {
+        this(
+            database,
+            delegate,
+            scheduler,
+            logger,
+            ownerId,
+            outboxPolicy,
+            flushPeriod,
+            maxBatchSize,
+            maxAge,
+            allServersSupplier,
+            canSendToServerOverride,
             null
         );
     }
@@ -300,13 +356,43 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             scheduler,
             logger,
             ownerId,
-            channelAllowlist,
+            new LegacyAllowlistNetworkOutboxPolicy(channelAllowlist),
             flushPeriod,
             maxBatchSize,
             maxAge,
             allServersSupplier,
             canSendToServerOverride,
             null
+        );
+    }
+
+    public DbQueuedMessenger(
+        SpoolDatabase database,
+        Messenger delegate,
+        Scheduler scheduler,
+        Logger logger,
+        String ownerId,
+        NetworkOutboxPolicy outboxPolicy,
+        Duration flushPeriod,
+        int maxBatchSize,
+        Duration maxAge,
+        Supplier<List<String>> allServersSupplier,
+        Predicate<String> canSendToServerOverride,
+        Listener listener
+    ) {
+        this(
+            new DatabaseOutboxStore(Objects.requireNonNull(database, "database")),
+            delegate,
+            scheduler,
+            logger,
+            ownerId,
+            outboxPolicy,
+            flushPeriod,
+            maxBatchSize,
+            maxAge,
+            allServersSupplier,
+            canSendToServerOverride,
+            listener
         );
     }
 
@@ -330,7 +416,7 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             scheduler,
             logger,
             ownerId,
-            channelAllowlist,
+            new LegacyAllowlistNetworkOutboxPolicy(channelAllowlist),
             flushPeriod,
             maxBatchSize,
             maxAge,
@@ -346,7 +432,7 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         Scheduler scheduler,
         Logger logger,
         String ownerId,
-        Set<String> channelAllowlist,
+        NetworkOutboxPolicy outboxPolicy,
         Duration flushPeriod,
         int maxBatchSize,
         Duration maxAge,
@@ -367,7 +453,7 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         }
         this.ownerId = normalizedOwner;
 
-        this.channelAllowlist = normalizeAllowlist(channelAllowlist);
+        this.outboxPolicy = outboxPolicy != null ? outboxPolicy : NetworkOutboxPolicy.directOnly();
         this.maxBatchSize = Math.max(0, maxBatchSize);
         this.maxAgeMillis = (maxAge == null) ? 0L : Math.max(0L, maxAge.toMillis());
 
@@ -383,7 +469,8 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
 
     @Override
     public void sendToAll(@NotNull String channel, @NotNull String data) {
-        if (shouldQueue(channel)) {
+        NetworkSendRequest request = request(NetworkEnvelope.Target.ALL, null, channel, data);
+        if (shouldStore(request)) {
             List<String> servers = allServers();
             if (!servers.isEmpty()) {
                 for (String serverName : servers) {
@@ -398,8 +485,8 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             delegate.sendToAll(channel, data);
             return;
         }
-        if (shouldQueue(channel)) {
-            enqueue(NetworkEnvelope.Target.ALL, null, channel, data);
+        if (shouldStore(request)) {
+            enqueue(request);
             return;
         }
         delegate.sendToAll(channel, data);
@@ -407,12 +494,13 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
 
     @Override
     public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
+        NetworkSendRequest request = request(NetworkEnvelope.Target.SERVER, serverName, channel, data);
         if (canSendToServer(serverName)) {
             delegate.sendToServer(channel, serverName, data);
             return;
         }
-        if (shouldQueue(channel)) {
-            enqueue(NetworkEnvelope.Target.SERVER, serverName, channel, data);
+        if (shouldStore(request)) {
+            enqueue(request);
             return;
         }
         delegate.sendToServer(channel, serverName, data);
@@ -420,12 +508,13 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
 
     @Override
     public void sendToProxy(@NotNull String channel, @NotNull String data) {
+        NetworkSendRequest request = request(NetworkEnvelope.Target.PROXY, null, channel, data);
         if (canSendToProxy()) {
             delegate.sendToProxy(channel, data);
             return;
         }
-        if (shouldQueue(channel)) {
-            enqueue(NetworkEnvelope.Target.PROXY, null, channel, data);
+        if (shouldStore(request)) {
+            enqueue(request);
             return;
         }
         delegate.sendToProxy(channel, data);
@@ -497,10 +586,8 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         return delegate.isConnected();
     }
 
-    private boolean shouldQueue(String channel) {
-        if (channel == null) return false;
-        if (channelAllowlist.isEmpty()) return false;
-        return channelAllowlist.contains(channel.trim());
+    private boolean shouldStore(NetworkSendRequest request) {
+        return outboxPolicy.shouldStore(request);
     }
 
     private List<String> allServers() {
@@ -516,23 +603,22 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    private void enqueue(NetworkEnvelope.Target target, String targetServer, String channel, String data) {
-        if (target == null) return;
-        if (channel == null || channel.isBlank()) return;
-        final String payload = (data == null) ? "" : data;
-        final String normalizedChannel = channel.trim();
+    private void enqueue(NetworkSendRequest request) {
+        if (request == null) return;
+        if (request.channel().isBlank()) return;
+        final String payload = (request.data() == null) ? "" : request.data();
+        final String normalizedChannel = request.channel().trim();
 
         final long now = System.currentTimeMillis();
-        final String normalizedTargetServer = (targetServer == null) ? null : targetServer.trim();
+        final String normalizedTargetServer = (request.targetServer() == null) ? null : request.targetServer().trim();
         final String targetServerValue =
             (normalizedTargetServer == null || normalizedTargetServer.isBlank()) ? null : normalizedTargetServer;
 
-        long id = store.enqueue(ownerId, target, targetServerValue, normalizedChannel, payload, now);
-        listener.onEnqueued(id, target, targetServerValue, normalizedChannel);
+        long id = store.enqueue(ownerId, request.target(), targetServerValue, normalizedChannel, payload, now);
+        listener.onEnqueued(id, request.target(), targetServerValue, normalizedChannel);
     }
 
     private void flush() {
-        if (channelAllowlist.isEmpty()) return;
         if (maxBatchSize <= 0) return;
         if (!flushing.compareAndSet(false, true)) return;
 
@@ -562,19 +648,20 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
                 continue;
             }
 
-            String channel = msg.channel();
-            if (!shouldQueue(channel)) {
-                deleteIds.add(msg.id());
-                listener.onDropped(msg.id(), DropReason.NOT_ALLOWLISTED, parseTargetOrNull(msg.target()), msg.targetServer(), channel);
-                continue;
-            }
-
             NetworkEnvelope.Target target;
             try {
                 target = parseTarget(msg.target());
             } catch (Exception e) {
                 deleteIds.add(msg.id());
-                listener.onDropped(msg.id(), DropReason.INVALID_TARGET, null, msg.targetServer(), channel);
+                listener.onDropped(msg.id(), DropReason.INVALID_TARGET, null, msg.targetServer(), msg.channel());
+                continue;
+            }
+
+            String channel = msg.channel();
+            NetworkSendRequest request = request(target, msg.targetServer(), channel, msg.data());
+            if (request == null || !shouldStore(request)) {
+                deleteIds.add(msg.id());
+                listener.onDropped(msg.id(), DropReason.POLICY_REJECTED, target, msg.targetServer(), channel);
                 continue;
             }
 
@@ -640,14 +727,10 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    private static Set<String> normalizeAllowlist(Set<String> allowlist) {
-        if (allowlist == null || allowlist.isEmpty()) return Set.of();
-        HashSet<String> out = new HashSet<>();
-        for (String ch : allowlist) {
-            if (ch == null) continue;
-            String trimmed = ch.trim();
-            if (!trimmed.isBlank()) out.add(trimmed);
+    private NetworkSendRequest request(NetworkEnvelope.Target target, String targetServer, String channel, String data) {
+        if (target == null || channel == null) {
+            return null;
         }
-        return Set.copyOf(out);
+        return new NetworkSendRequest(target, targetServer, channel, data);
     }
 }

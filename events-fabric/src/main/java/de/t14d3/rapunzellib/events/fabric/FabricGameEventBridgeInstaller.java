@@ -2,21 +2,18 @@ package de.t14d3.rapunzellib.events.fabric;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.context.RapunzelContext;
+import de.t14d3.rapunzellib.events.AbstractGameEventBridgeInstaller;
 import de.t14d3.rapunzellib.events.GameEventBridge;
-import de.t14d3.rapunzellib.events.GameEventBridgeInstaller;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import org.jetbrains.annotations.NotNull;
 
-public final class FabricGameEventBridgeInstaller implements GameEventBridgeInstaller {
-    @Override
-    public @NotNull PlatformId platformId() {
-        return PlatformId.FABRIC;
+public final class FabricGameEventBridgeInstaller extends AbstractGameEventBridgeInstaller {
+    public FabricGameEventBridgeInstaller() {
+        super(PlatformId.FABRIC, FabricGameEventSupport.MANIFEST);
     }
 
     @Override
-    public @NotNull GameEventBridge install(@NotNull RapunzelContext context, @NotNull GameEventBus bus, Object owner) {
-        FabricGameEventsBridge bridge = new FabricGameEventsBridge(bus);
-        bridge.register();
-        return bridge;
+    protected @NotNull GameEventBridge installBridge(@NotNull RapunzelContext context, @NotNull GameEventBus bus) {
+        return FabricGameEventsBridge.install(bus);
     }
 }

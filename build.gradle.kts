@@ -1,62 +1,24 @@
-import org.gradle.api.tasks.testing.logging.TestExceptionFormat
-import org.gradle.api.tasks.testing.logging.TestLogEvent
-import org.gradle.api.DefaultTask
-import org.gradle.api.GradleException
-import org.gradle.api.artifacts.VersionCatalogsExtension
-import org.gradle.api.plugins.BasePluginExtension
-import org.gradle.api.publish.PublishingExtension
-import org.gradle.api.publish.maven.MavenPublication
-import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.Optional
-import org.gradle.api.tasks.TaskAction
-import org.gradle.api.tasks.bundling.AbstractArchiveTask
+import org.gradle.api.tasks.bundling.Zip
 
 plugins {
     base
+    alias(libs.plugins.root.subproject.conventions)
+    alias(libs.plugins.root.publishing.conventions)
+    alias(libs.plugins.userdev) apply false
+    alias(libs.plugins.vanilla.gradle) apply false
 }
 
-val buildVersion = System.getenv("VERSION")?.takeIf { it.isNotBlank() } ?: "0.1.9-SNAPSHOT"
+val buildVersion = System.getenv("VERSION")?.takeIf { it.isNotBlank() } ?: "0.3.0-SNAPSHOT"
 
-abstract class CheckReposiliteConfig : DefaultTask() {
-    @get:Input @get:Optional abstract val reposiliteBaseUrl: Property<String>
-    @get:Input @get:Optional abstract val reposiliteUsername: Property<String>
-    @get:Input @get:Optional abstract val reposilitePassword: Property<String>
-
-    @TaskAction
-    fun run() {
-        val missingKeys = mutableListOf<String>()
-
-        fun require(name: String, value: String?) {
-            if (value.isNullOrBlank()) missingKeys += name
-        }
-
-        require("reposiliteUsername/REPOSILITE_USERNAME", reposiliteUsername.orNull)
-        require("reposilitePassword/REPOSILITE_PASSWORD", reposilitePassword.orNull)
-
-        reposiliteBaseUrl.orNull?.let { baseUrl ->
-            val url = baseUrl.trim()
-            if (url.isNotBlank() && !url.startsWith("http://") && !url.startsWith("https://")) {
-                missingKeys += "reposiliteBaseUrl/REPOSILITE_BASE_URL must start with http:// or https://"
-            }
-        }
-
-        if (missingKeys.isNotEmpty()) {
-            throw GradleException(
-                "Missing Reposilite publishing configuration:\n" +
-                    missingKeys.joinToString(separator = "\n") { "- $it" } +
-                    "\n\nConfigure these as Gradle properties (recommended: ~/.gradle/gradle.properties) or environment variables."
-            )
-        }
-    }
-}
 val reposiliteBaseUrl =
     (findProperty("reposiliteBaseUrl") as String?)
         ?: System.getenv("REPOSILITE_BASE_URL")
         ?: "https://maven.t14d3.de"
-val reposiliteUsername: String? = (findProperty("reposiliteUsername") as String?) ?: System.getenv("REPOSILITE_USERNAME")
-val reposilitePassword: String? = (findProperty("reposilitePassword") as String?) ?: System.getenv("REPOSILITE_PASSWORD")
+
+val parityInCheck =
+    providers.gradleProperty("rapunzellib.parityInCheck")
+        .map { it.equals("true", ignoreCase = true) }
+        .orElse(false)
 
 allprojects {
     group = "de.t14d3.rapunzellib"
@@ -72,116 +34,40 @@ allprojects {
         maven("https://repo.spongepowered.org/repository/maven-public/")
         maven("https://jitpack.io")
     }
+
+    tasks.withType<Zip>().configureEach {
+        if (name == "shadowJar") {
+            isZip64 = true
+        }
+    }
 }
 
-val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
-val junitPlatformLauncher = libs.findLibrary("junit-platform-launcher").get()
+val checkParity = tasks.register("checkParity") {
+    group = "verification"
+    description = "Runs opt-in parity verification tasks that are excluded from the default build lifecycle."
 
-val checkReposiliteConfig = tasks.register<CheckReposiliteConfig>("checkReposiliteConfig") {
-    group = "publishing"
-    description = "Validates required configuration for publishing to Reposilite."
-
-    reposiliteBaseUrl.set(providers.gradleProperty("reposiliteBaseUrl").orElse(providers.environmentVariable("REPOSILITE_BASE_URL")))
-    reposiliteUsername.set(providers.gradleProperty("reposiliteUsername").orElse(providers.environmentVariable("REPOSILITE_USERNAME")))
-    reposilitePassword.set(providers.gradleProperty("reposilitePassword").orElse(providers.environmentVariable("REPOSILITE_PASSWORD")))
+    dependsOn(
+        ":api:rapunzellibVerifyRegistryCatalogParity",
+    )
 }
 
-subprojects {
-    val rootLibs = rootProject.layout.buildDirectory.dir("libs")
+tasks.named("check") {
+    if (parityInCheck.get()) {
+        dependsOn(checkParity)
+    }
+}
 
-    plugins.withId("base") {
-        extensions.configure<BasePluginExtension> {
-            archivesName.set("${rootProject.name.lowercase()}-${project.name}")
-        }
+gradle.projectsEvaluated {
+    checkParity.configure {
+        dependsOn(allprojects.mapNotNull { it.tasks.findByName("rapunzellibVerifySharedParity") })
+        dependsOn(allprojects.mapNotNull { it.tasks.findByName("rapunzellibVerifyInstallerWiring") })
     }
 
-    tasks.withType<AbstractArchiveTask>().configureEach {
-        if (archiveExtension.get() == "jar") {
-            destinationDirectory.set(rootLibs)
-        }
+    val gradlePluginTests = project(":gradle-plugin").tasks.matching { it.name == "test" }
+    project(":api").tasks.matching { it.name == "compileJava" }.configureEach {
+        mustRunAfter(gradlePluginTests)
     }
-
-    plugins.withId("java") {
-        dependencies {
-            add("testRuntimeOnly", junitPlatformLauncher)
-        }
-
-        extensions.configure<JavaPluginExtension> {
-            toolchain.languageVersion.set(JavaLanguageVersion.of(21))
-            withSourcesJar()
-            withJavadocJar()
-        }
-
-        tasks.withType<org.gradle.jvm.tasks.Jar>().configureEach {
-            manifest.attributes(
-                mapOf(
-                    "Implementation-Title" to rootProject.name,
-                    "Implementation-Version" to project.version.toString()
-                )
-            )
-        }
-
-        tasks.withType<JavaCompile>().configureEach {
-            options.encoding = "UTF-8"
-            options.release.set(21)
-        }
-
-        tasks.withType<Test>().configureEach {
-            useJUnitPlatform()
-            testLogging {
-                events = setOf(TestLogEvent.FAILED)
-                exceptionFormat = TestExceptionFormat.FULL
-            }
-        }
-    }
-
-    plugins.withId("java-library") {
-        apply(plugin = "maven-publish")
-    }
-
-    plugins.withId("maven-publish") {
-        extensions.configure<PublishingExtension> {
-            publications {
-                if (!plugins.hasPlugin("java-gradle-plugin") && plugins.hasPlugin("java") && findByName("mavenJava") == null) {
-                    create<MavenPublication>("mavenJava") {
-                        from(components["java"])
-
-                        // Publish shaded jars (when available) as classifier artifacts.
-                        tasks.findByName("shadowJar")?.let { artifact(it) }
-
-                        // Fabric's remapped shaded jar.
-                        tasks.findByName("remapShadowJar")?.let { artifact(it) }
-                    }
-                }
-
-            }
-
-            repositories {
-                maven {
-                    name = "reposilite"
-
-                    val repo = if (version.toString().endsWith("SNAPSHOT")) "snapshots" else "releases"
-
-                    url = uri("${reposiliteBaseUrl.trimEnd('/')}/$repo")
-
-                    credentials {
-                        username = reposiliteUsername
-                        password = reposilitePassword
-                    }
-                }
-            }
-        }
-
-        tasks.withType<PublishToMavenRepository>().configureEach {
-            if (name.contains("ToReposiliteRepository")) {
-                dependsOn(rootProject.tasks.named("checkReposiliteConfig"))
-            }
-        }
-    }
-
-    plugins.withId("com.gradleup.shadow") {
-        tasks.named("assemble").configure {
-            dependsOn(tasks.named("shadowJar"))
-        }
+    project(":api").tasks.matching { it.name == "test" }.configureEach {
+        mustRunAfter(gradlePluginTests)
     }
 }

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "rapunzellib_platform_fabric",
+  "version": "${version}",
+  "name": "RapunzelLib (Fabric Platform)",
+  "description": "Fabric startup companion mod for RapunzelLib.",
+  "authors": [
+    "t14d3"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "de.t14d3.rapunzellib.platform.fabric.FabricPlatformMod"
+    ]
+  },
+  "depends": {
+    "fabric-lifecycle-events-v1": "*",
+    "fabric-networking-api-v1": "*",
+    "fabricloader": ">=0.16.0"
+  }
+}

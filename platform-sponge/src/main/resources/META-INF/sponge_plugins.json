@@ -1,0 +1,24 @@
+{
+  "loader": {
+    "name": "java_plain",
+    "version": "1.0"
+  },
+  "license": "LGPL-2.1",
+  "global": {
+    "version": "${version}",
+    "contributors": [
+      {
+        "name": "t14d3",
+        "description": "Author"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "id": "rapunzellib_platform_sponge",
+      "name": "RapunzelLib (Sponge Platform)",
+      "entrypoint": "de.t14d3.rapunzellib.platform.sponge.SpongePlatformPlugin",
+      "description": "Canonical Sponge host wrapper for RapunzelLib platform bootstrap."
+    }
+  ]
+}

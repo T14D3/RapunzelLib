@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.events.sponge;
 
 import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.block.BlockBreakPost;
@@ -9,9 +10,16 @@ import de.t14d3.rapunzellib.events.block.BlockBreakSnapshot;
 import de.t14d3.rapunzellib.events.block.BlockPlacePost;
 import de.t14d3.rapunzellib.events.block.BlockPlacePre;
 import de.t14d3.rapunzellib.events.block.BlockPlaceSnapshot;
+import de.t14d3.rapunzellib.events.entity.AttackEntityPost;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPre;
+import de.t14d3.rapunzellib.events.entity.EntityEventPayloads;
+import de.t14d3.rapunzellib.events.entity.EntityHurtPost;
 import de.t14d3.rapunzellib.events.entity.EntityHurtPre;
+import de.t14d3.rapunzellib.events.entity.EntityHurtSnapshot;
+import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
+import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
+import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockPost;
 import de.t14d3.rapunzellib.events.interact.UseBlockPre;
@@ -118,7 +126,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
             for (BlockTransaction tx : event.transactions(Operations.PLACE.get()).toList()) {
                 BlockSnapshot placed = tx.finalReplacement();
                 RBlockPos pos = toPos(placed.position());
-                String typeKey = Rapunzel.blocks().requireData(placed.state()).typeKey();
+                RKey typeKey = Rapunzel.blocks().requireData(placed.state()).typeKey();
 
                 BlockPlacePre pre = new BlockPlacePre(rPlayer, worldRef, pos, typeKey, event.isCancelled());
                 bus.dispatchPre(pre);
@@ -149,7 +157,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
                 RBlock block = Rapunzel.blocks().at(rWorld, toPos(tx.original().position()));
                 if (needsBreakPost) bus.dispatchPost(new BlockBreakPost(rPlayer, block, true));
                 if (needsBreakAsync) {
-                    bus.dispatchAsync(new BlockBreakSnapshot(rPlayer.uuid(), block.world().ref(), block.pos(), block.typeKey(), true));
+                    bus.dispatchAsync(BlockBreakSnapshot.capture(rPlayer.uuid(), block, true));
                 }
             }
         }
@@ -158,7 +166,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
             for (BlockTransaction tx : event.transactions(Operations.PLACE.get()).toList()) {
                 BlockSnapshot placed = tx.finalReplacement();
                 RBlockPos pos = toPos(placed.position());
-                String typeKey = Rapunzel.blocks().requireData(placed.state()).typeKey();
+                RKey typeKey = Rapunzel.blocks().requireData(placed.state()).typeKey();
 
                 if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, worldRef, pos, typeKey, true));
                 if (needsPlaceAsync) bus.dispatchAsync(new BlockPlaceSnapshot(rPlayer.uuid(), worldRef, pos, typeKey, true));
@@ -185,15 +193,16 @@ final class SpongeGameEventsBridge implements GameEventBridge {
                 RBlock block = Rapunzel.blocks().at(rWorld, pos);
                 if (needsBreakPost) bus.dispatchPost(new BlockBreakPost(rPlayer, block, false));
                 if (needsBreakAsync) {
-                    bus.dispatchAsync(new BlockBreakSnapshot(rPlayer.uuid(), block.world().ref(), block.pos(), block.typeKey(), false));
+                    bus.dispatchAsync(BlockBreakSnapshot.capture(rPlayer.uuid(), block, false));
                 }
             } else if (receipt.operation().equals(Operations.PLACE.get())) {
                 if (!needsPlacePost && !needsPlaceAsync) continue;
                 BlockSnapshot placed = receipt.finalBlock();
                 RBlockPos pos = toPos(placed.position());
-                String typeKey = Rapunzel.blocks().requireData(placed.state()).typeKey();
+                RKey typeKey = Rapunzel.blocks().requireData(placed.state()).typeKey();
+                RBlock block = Rapunzel.blocks().at(rWorld, pos);
                 if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, worldRef, pos, typeKey, false));
-                if (needsPlaceAsync) bus.dispatchAsync(new BlockPlaceSnapshot(rPlayer.uuid(), worldRef, pos, typeKey, false));
+                if (needsPlaceAsync) bus.dispatchAsync(BlockPlaceSnapshot.capture(rPlayer.uuid(), block, false));
             }
         }
     }
@@ -246,7 +255,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
         if (needsPost) bus.dispatchPost(new UseBlockPost(rPlayer, block, cancelled));
         if (needsAsync) {
-            bus.dispatchAsync(new UseBlockSnapshot(rPlayer.uuid(), block.world().ref(), block.pos(), block.typeKey(), cancelled));
+            bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), block, cancelled));
         }
     }
 
@@ -258,16 +267,23 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         RPlayer rPlayer = Rapunzel.players().require(player);
         Entity entity = event.entity();
 
-        ServerLocation loc = entity.serverLocation();
-        RWorldRef worldRef = Rapunzel.worlds().require(loc.world()).ref();
-        RBlockPos pos = toPos(entity.blockPosition());
-        String typeKey = entity.type().key(RegistryTypes.ENTITY_TYPE).asString();
-
-        InteractEntityPre pre = new InteractEntityPre(rPlayer, worldRef, pos, typeKey, event.isCancelled());
+        InteractEntityPre pre = new InteractEntityPre(rPlayer, Rapunzel.entities().require(entity), event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
         }
+    }
+
+    @Listener(order = Order.LAST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onInteractEntityPost(InteractEntityEvent.Secondary event, @First ServerPlayer player) {
+        if (!bus.hasPostListeners(InteractEntityPost.class)) return;
+
+        bus.dispatchPost(EntityEventPayloads.interactPost(
+            Rapunzel.players().require(player),
+            Rapunzel.entities().require(event.entity()),
+            event.isCancelled()
+        ));
     }
 
     @Listener(order = Order.FIRST)
@@ -278,16 +294,23 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         RPlayer rPlayer = Rapunzel.players().require(player);
         Entity entity = event.entity();
 
-        ServerLocation loc = entity.serverLocation();
-        RWorldRef worldRef = Rapunzel.worlds().require(loc.world()).ref();
-        RBlockPos pos = toPos(entity.blockPosition());
-        String typeKey = entity.type().key(RegistryTypes.ENTITY_TYPE).asString();
-
-        AttackEntityPre pre = new AttackEntityPre(rPlayer, worldRef, pos, typeKey, event.isCancelled());
+        AttackEntityPre pre = new AttackEntityPre(rPlayer, Rapunzel.entities().require(entity), event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
         }
+    }
+
+    @Listener(order = Order.LAST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onAttackEntityPost(AttackEntityEvent event, @First ServerPlayer player) {
+        if (!bus.hasPostListeners(AttackEntityPost.class)) return;
+
+        bus.dispatchPost(EntityEventPayloads.attackPost(
+            Rapunzel.players().require(player),
+            Rapunzel.entities().require(event.entity()),
+            event.isCancelled()
+        ));
     }
 
     @Listener(order = Order.FIRST)
@@ -296,19 +319,31 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         if (!bus.hasPreListeners(EntityHurtPre.class)) return;
 
         Entity entity = event.entity();
-        ServerLocation loc = entity.serverLocation();
-        RWorldRef worldRef = Rapunzel.worlds().require(loc.world()).ref();
-        RBlockPos pos = toPos(entity.blockPosition());
-        String entityTypeKey = entity.type().key(RegistryTypes.ENTITY_TYPE).asString();
-        String damageTypeKey = event.context()
-            .get(EventContextKeys.DAMAGE_TYPE)
-            .map(dt -> dt.key(RegistryTypes.DAMAGE_TYPE).asString())
-            .orElse("unknown");
+        String damageTypeKey = damageTypeKey(event);
 
-        EntityHurtPre pre = new EntityHurtPre(worldRef, pos, entityTypeKey, damageTypeKey, event.isCancelled());
+        EntityHurtPre pre = new EntityHurtPre(Rapunzel.entities().require(entity), damageTypeKey, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
+        }
+    }
+
+    @Listener(order = Order.LAST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onDamageEntityPost(DamageEntityEvent event) {
+        boolean needsPost = bus.hasPostListeners(EntityHurtPost.class);
+        boolean needsAsync = bus.hasAsyncListeners(EntityHurtSnapshot.class);
+        if (!needsPost && !needsAsync) return;
+
+        String damageTypeKey = damageTypeKey(event);
+        var entity = Rapunzel.entities().require(event.entity());
+        boolean cancelled = event.isCancelled();
+
+        if (needsPost) {
+            bus.dispatchPost(EntityEventPayloads.hurtPost(entity, damageTypeKey, cancelled));
+        }
+        if (needsAsync) {
+            bus.dispatchAsync(EntityEventPayloads.hurtSnapshot(entity, damageTypeKey, cancelled));
         }
     }
 
@@ -317,22 +352,50 @@ final class SpongeGameEventsBridge implements GameEventBridge {
     public void onSpawnEntity(SpawnEntityEvent.Pre event) {
         if (!bus.hasPreListeners(EntitySpawnPre.class)) return;
 
-        String reason = event.context()
-            .get(EventContextKeys.SPAWN_TYPE)
-            .map(st -> st.key(RegistryTypes.SPAWN_TYPE).asString())
-            .orElse("unknown");
+        String reason = spawnReason(event);
 
         for (Entity entity : event.entities()) {
             ServerLocation loc = entity.serverLocation();
             RWorldRef worldRef = Rapunzel.worlds().require(loc.world()).ref();
             RBlockPos pos = toPos(entity.blockPosition());
-            String entityTypeKey = entity.type().key(RegistryTypes.ENTITY_TYPE).asString();
+            RKey entityTypeKey = RKey.of(entity.type().key(RegistryTypes.ENTITY_TYPE).asString());
 
             EntitySpawnPre pre = new EntitySpawnPre(worldRef, pos, entityTypeKey, reason, event.isCancelled());
             bus.dispatchPre(pre);
             if (pre.isDenied()) {
                 event.setCancelled(true);
                 return;
+            }
+        }
+    }
+
+    @Listener(order = Order.LAST)
+    @IsCancelled(value = Tristate.TRUE)
+    public void onSpawnEntityCancelled(SpawnEntityEvent.Pre event) {
+        if (!bus.hasAsyncListeners(EntitySpawnSnapshot.class)) return;
+
+        String reason = spawnReason(event);
+        for (Entity entity : event.entities()) {
+            bus.dispatchAsync(EntityEventPayloads.spawnSnapshot(Rapunzel.entities().require(entity), reason, true));
+        }
+    }
+
+    @Listener(order = Order.LAST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onSpawnEntityPost(SpawnEntityEvent event) {
+        boolean needsPost = bus.hasPostListeners(EntitySpawnPost.class);
+        boolean needsAsync = bus.hasAsyncListeners(EntitySpawnSnapshot.class);
+        if (!needsPost && !needsAsync) return;
+
+        String reason = spawnReason(event);
+        boolean cancelled = event.isCancelled();
+        for (Entity entity : event.entities()) {
+            var rEntity = Rapunzel.entities().require(entity);
+            if (needsPost && !cancelled) {
+                bus.dispatchPost(EntityEventPayloads.spawnPost(rEntity, reason, false));
+            }
+            if (needsAsync) {
+                bus.dispatchAsync(EntityEventPayloads.spawnSnapshot(rEntity, reason, cancelled));
             }
         }
     }
@@ -403,7 +466,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         RWorldRef worldRef = Rapunzel.worlds().require(world).ref();
         Vector3i pos = explosive.blockPosition();
 
-        String typeKey = explosive.type().key(RegistryTypes.ENTITY_TYPE).asString();
+        RKey typeKey = RKey.of(explosive.type().key(RegistryTypes.ENTITY_TYPE).asString());
         String cause = event.context()
             .get(EventContextKeys.SPAWN_TYPE)
             .map(st -> st.key(RegistryTypes.SPAWN_TYPE).asString())
@@ -428,6 +491,20 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
     private static RBlockPos toPos(Vector3i pos) {
         return new RBlockPos(pos.x(), pos.y(), pos.z());
+    }
+
+    private static String damageTypeKey(DamageEntityEvent event) {
+        return event.context()
+            .get(EventContextKeys.DAMAGE_TYPE)
+            .map(dt -> dt.key(RegistryTypes.DAMAGE_TYPE).asString())
+            .orElse("unknown");
+    }
+
+    private static String spawnReason(SpawnEntityEvent event) {
+        return event.context()
+            .get(EventContextKeys.SPAWN_TYPE)
+            .map(st -> st.key(RegistryTypes.SPAWN_TYPE).asString())
+            .orElse("unknown");
     }
 
     private static RWorldRef worldRefFromKey(ResourceKey worldKey) {

@@ -1,0 +1,41 @@
+package de.t14d3.rapunzellib.inventory;
+
+import de.t14d3.rapunzellib.PlatformId;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+final class DefaultInventories implements Inventories {
+    private final PlatformId platformId;
+    private final List<InventoryWrapperFactory<?>> wrapperFactories;
+
+    DefaultInventories(@NotNull PlatformId platformId, @NotNull List<? extends InventoryWrapperFactory<?>> wrapperFactories) {
+        this.platformId = Objects.requireNonNull(platformId, "platformId");
+        this.wrapperFactories = List.copyOf(Objects.requireNonNull(wrapperFactories, "wrapperFactories"));
+    }
+
+    @Override
+    public @NotNull PlatformId platformId() {
+        return platformId;
+    }
+
+    @Override
+    public @NotNull Optional<RInventory> wrap(@Nullable Object nativeInventory) {
+        if (nativeInventory == null) {
+            return Optional.empty();
+        }
+        if (nativeInventory instanceof RInventory inventory) {
+            return Optional.of(inventory);
+        }
+
+        for (InventoryWrapperFactory<?> wrapperFactory : wrapperFactories) {
+            if (wrapperFactory.supports(nativeInventory)) {
+                return Optional.of(wrapperFactory.wrapNative(nativeInventory));
+            }
+        }
+        return Optional.empty();
+    }
+}

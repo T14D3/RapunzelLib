@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib.config;
 
+import de.t14d3.rapunzellib.objects.RKey;
+
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.objects.RBlockPos;
@@ -31,6 +33,95 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * YAML configuration implementation using SnakeYAML with type coercion and default merging.
+ *
+ * <p>This class provides a comprehensive configuration management solution supporting
+ * nested section-based access, automatic type coercion for common Minecraft types,
+ * default value merging from classpath resources, and comment preservation during
+ * save operations.
+ *
+ * <p><strong>Thread-Safety Guarantees:</strong>
+ * <p>This implementation provides <strong>read-after-write consistency</strong> for
+ * single-threaded access patterns, but is <strong>not thread-safe</strong> for concurrent
+ * modifications. External synchronization is required when:
+ * <ul>
+ *   <li>Multiple threads call mutating operations ({@link #set}, {@link #reload}, {@link #save})</li>
+ *   <li>One thread reads while another modifies the configuration</li>
+ * </ul>
+ * <p>Best practice: Load configuration during initialization, then treat as effectively
+ * immutable, or use external synchronization (e.g., {@code ReadWriteLock}).
+ *
+ * <p><strong>Default Value Merging from Resources:</strong>
+ * <p>When a default resource path is provided, the implementation performs a
+ * <em>non-destructive merge</em> on each reload:
+ * <ul>
+ *   <li>Missing keys from the default resource are added to the file configuration</li>
+ *   <li>Existing user values are never overwritten</li>
+ *   <li>Comments from defaults are merged for keys that don't have user-defined comments</li>
+ *   <li>If the file doesn't exist, the entire default resource is copied</li>
+ * </ul>
+ * <p>This enables plugin updates to add new configuration options without losing user customizations.
+ *
+ * <p><strong>Section-Based Configuration:</strong>
+ * <p>Configuration keys use dot-notation for nested access:
+ * <pre>{@code
+ * config.get("database.host");      // Returns nested value
+ * config.set("database.port", 3306); // Sets nested value, creating sections as needed
+ * config.keys(true);                // Returns all keys including nested (e.g., "a.b.c")
+ * }</pre>
+ * <p>Supports up to arbitrary nesting depth with automatic section creation during writes.
+ *
+ * <p><strong>SnakeYaml Integration:</strong>
+ * <p>Uses SnakeYAML's SafeConstructor for secure parsing (no arbitrary object instantiation).
+ * Configuration options:
+ * <ul>
+ *   <li>Block-style output for readability</li>
+ *   <li>2-space indentation</li>
+ *   <li>Pretty flow formatting</li>
+ *   <li>No line splitting for long values</li>
+ * </ul>
+ *
+ * <p><strong>Type Coercion:</strong>
+ * <p>Automatic conversion for common types including:
+ * <ul>
+ *   <li>Primitives and wrappers (int, long, double, boolean)</li>
+ *   <li>UUID from string representations</li>
+ *   <li>Duration from ISO-8601 or simple suffixes (10s, 5m, 2h, 1d)</li>
+ *   <li>{@link RBlockPos}, {@link RLocation}, {@link RWorldRef} from maps or strings</li>
+ *   <li>Enums by name (case-insensitive, hyphens converted to underscores)</li>
+ *   <li>Java Records from configuration sections</li>
+ * </ul>
+ *
+ * <p>Usage example:
+ * <pre>{@code
+ * SnakeYamlConfig config = new SnakeYamlConfig(
+ *     Path.of("config.yml"),
+ *     resourceProvider,
+ *     logger,
+ *     "default-config.yml"
+ * );
+ *
+ * // Access with defaults
+ * String host = config.getString("database.host", "localhost");
+ * int port = config.getInt("database.port", 3306);
+ *
+ * // Type coercion to custom types
+ * RLocation spawn = config.get("spawn.location", RLocation.class, defaultSpawn);
+ *
+ * // Save with comments
+ * config.setComment("database", "Database connection settings");
+ * config.save();
+ * }</pre>
+ *
+ * @implNote Comment parsing and insertion preserves formatting but may not handle all
+ *           edge cases of complex YAML structures. Records are coerced using their
+ *           canonical constructor with component name matching.
+ * @since 1.0
+ * @see YamlConfig
+ * @see ConfigService
+ * @see <a href="https://bitbucket.org/snakeyaml/snakeyaml">SnakeYAML Library</a>
+ */
 public final class SnakeYamlConfig implements YamlConfig {
     private static final int INDENT = 2;
 
@@ -378,10 +469,10 @@ public final class SnakeYamlConfig implements YamlConfig {
                 out.put("z", z);
                 return out;
             }
-            case RWorldRef(String name, String key) -> {
+            case RWorldRef(String name, RKey key) -> {
                 LinkedHashMap<String, Object> out = new LinkedHashMap<>();
                 if (name != null && !name.isBlank()) out.put("name", name);
-                if (key != null && !key.isBlank()) out.put("key", key);
+                if (key != null) out.put("key", key.asString());
                 return out;
             }
             case RLocation(RWorldRef world, double x, double y, double z, float yaw, float pitch) -> {

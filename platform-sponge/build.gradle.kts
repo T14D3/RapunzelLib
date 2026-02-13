@@ -1,25 +1,18 @@
 plugins {
-    `java-library`
+    alias(libs.plugins.backend.platform.module.conventions)
+    alias(libs.plugins.sponge.module.conventions)
     alias(libs.plugins.shadow)
 }
 
 dependencies {
-    api(project(":api"))
-    implementation(project(":common"))
-    implementation(project(":network"))
-    implementation(project(":database-spool"))
     implementation(libs.fastutil)
-
-    compileOnly(libs.sponge.api)
-    compileOnly(libs.annotations)
-
-    testImplementation(libs.junit.jupiter)
+    implementation(project(":nbt"))
 }
 
-tasks {
-    withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>().configureEach {
-        archiveClassifier.set("shaded")
-        relocate("org.yaml.snakeyaml", "de.t14d3.rapunzellib.libs.snakeyaml")
-        relocate("com.google.gson", "de.t14d3.rapunzellib.libs.gson")
+tasks.processResources {
+    val props = mapOf("version" to project.version)
+    inputs.properties(props)
+    filesMatching("META-INF/sponge_plugins.json") {
+        expand(props)
     }
 }

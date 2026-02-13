@@ -2,14 +2,13 @@ package de.t14d3.rapunzellib.commands.sponge;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.commands.AudienceCommandSourceAdapterCore;
 import de.t14d3.rapunzellib.commands.RCommandSource;
-import de.t14d3.rapunzellib.commands.RCommandSources;
-import de.t14d3.rapunzellib.objects.RPlayer;
 import net.kyori.adventure.audience.Audience;
 import org.spongepowered.api.command.CommandCause;
 import org.spongepowered.api.entity.living.player.server.ServerPlayer;
+import org.spongepowered.api.service.permission.Subject;
 
-import java.util.Optional;
 import java.util.Objects;
 
 public final class SpongeCommandSourceAdapter {
@@ -28,21 +27,27 @@ public final class SpongeCommandSourceAdapter {
                 "Command source does not implement Adventure Audience: " + source.getClass().getName()
             );
         }
-
-        Optional<RPlayer> player = (source instanceof ServerPlayer spongePlayer)
-            ? Rapunzel.players().wrap(spongePlayer)
-            : Optional.empty();
-
-        return RCommandSources.of(PlatformId.SPONGE, audience, player);
+        return AudienceCommandSourceAdapterCore.wrap(
+            PlatformId.SPONGE,
+            source,
+            s -> audience,
+            (s, permission) -> s instanceof Subject subject && subject.hasPermission(permission),
+            s -> (s instanceof ServerPlayer spongePlayer)
+                ? Rapunzel.players().wrap(spongePlayer)
+                : java.util.Optional.empty()
+        );
     }
 
     public static RCommandSource wrap(CommandCause cause) {
         Objects.requireNonNull(cause, "cause");
 
-        Audience audience = cause.audience();
-        Optional<RPlayer> player = cause.first(ServerPlayer.class)
-            .flatMap(p -> Rapunzel.players().wrap(p));
-
-        return RCommandSources.of(PlatformId.SPONGE, audience, player);
+        return AudienceCommandSourceAdapterCore.wrap(
+            PlatformId.SPONGE,
+            cause,
+            CommandCause::audience,
+            CommandCause::hasPermission,
+            c -> c.first(ServerPlayer.class)
+                .flatMap(player -> Rapunzel.players().wrap(player))
+        );
     }
 }

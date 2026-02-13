@@ -22,7 +22,7 @@ public final class ExplosionPre extends BaseCancellablePreEvent {
         this.origin = Objects.requireNonNull(origin, "origin");
         this.sourceTypeKey = Objects.requireNonNull(sourceTypeKey, "sourceTypeKey");
         this.affectedBlocks = Objects.requireNonNull(affectedBlocks, "affectedBlocks");
-        this.cancelled = isCancelled;
+        setCancelled(isCancelled);
     }
 
     public RWorldRef world() {

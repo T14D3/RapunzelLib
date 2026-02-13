@@ -1,9 +1,9 @@
 package de.t14d3.rapunzellib.common.context;
 
-import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.context.ServiceRegistry;
+import de.t14d3.rapunzellib.runtime.PlatformRuntime;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Objects;
 
 public final class DefaultRapunzelContext implements RapunzelContext {
-    private final PlatformId platformId;
+    private final PlatformRuntime runtime;
     private final Logger logger;
     private final Path dataDirectory;
     private final ResourceProvider resources;
@@ -26,13 +26,13 @@ public final class DefaultRapunzelContext implements RapunzelContext {
     private final IdentityHashMap<AutoCloseable, Boolean> closeableSet = new IdentityHashMap<>();
 
     public DefaultRapunzelContext(
-        PlatformId platformId,
+        PlatformRuntime runtime,
         Logger logger,
         Path dataDirectory,
         ResourceProvider resources,
         Scheduler scheduler
     ) {
-        this.platformId = Objects.requireNonNull(platformId, "platformId");
+        this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dataDirectory = Objects.requireNonNull(dataDirectory, "dataDirectory");
         this.resources = Objects.requireNonNull(resources, "resources");
@@ -40,8 +40,8 @@ public final class DefaultRapunzelContext implements RapunzelContext {
     }
 
     @Override
-    public @NotNull PlatformId platformId() {
-        return platformId;
+    public @NotNull PlatformRuntime runtime() {
+        return runtime;
     }
 
     @Override
@@ -102,4 +102,3 @@ public final class DefaultRapunzelContext implements RapunzelContext {
         if (first != null) throw first;
     }
 }
-

@@ -1,5 +1,7 @@
 package de.t14d3.rapunzellib.network.redis;
 
+import de.t14d3.rapunzellib.network.NetworkDefaults;
+
 @SuppressWarnings("SameParameterValue")
 public final class RedisPubSubConfig {
     private final String host;
@@ -115,17 +117,17 @@ public final class RedisPubSubConfig {
 
     @SuppressWarnings("UnusedReturnValue")
     public static final class Builder {
-        private String host = "127.0.0.1";
-        private int port = 6379;
+        private String host = NetworkDefaults.DEFAULT_RPC_HOST;
+        private int port = NetworkDefaults.DEFAULT_REDIS_PORT;
         private boolean ssl;
         private String username;
         private String password;
         private String transportChannel = "rapunzellib:bridge";
         private String serverName;
-        private String proxyServerName = "velocity";
-        private int connectTimeoutMillis = 5_000;
-        private int socketTimeoutMillis = 5_000;
-        private long reconnectDelayMillis = 2_000;
+        private String proxyServerName = NetworkDefaults.DEFAULT_PROXY_SERVER_NAME;
+        private int connectTimeoutMillis = NetworkDefaults.DEFAULT_REDIS_CONNECT_TIMEOUT_MILLIS;
+        private int socketTimeoutMillis = NetworkDefaults.DEFAULT_REDIS_SOCKET_TIMEOUT_MILLIS;
+        private long reconnectDelayMillis = NetworkDefaults.DEFAULT_REDIS_RECONNECT_DELAY_MILLIS;
         private String clientName;
 
         private Builder() {
@@ -248,4 +250,3 @@ public final class RedisPubSubConfig {
         return trimmed.isEmpty() ? null : trimmed;
     }
 }
-

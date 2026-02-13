@@ -1,16 +1,22 @@
 package de.t14d3.rapunzellib.platform.sponge.objects;
 
+import de.t14d3.rapunzellib.objects.RKey;
+import de.t14d3.rapunzellib.common.objects.BlockCacheKey;
+import de.t14d3.rapunzellib.common.objects.KeyedLruCache;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.block.Blocks;
 import de.t14d3.rapunzellib.objects.block.RBlock;
 import de.t14d3.rapunzellib.objects.block.RBlockData;
-import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import de.t14d3.rapunzellib.platform.sponge.attachments.SpongeAttachmentService;
+import de.t14d3.rapunzellib.registry.RBlockType;
+import de.t14d3.rapunzellib.registry.RRegistryHandles;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.BlockState;
 import org.spongepowered.api.block.BlockType;
+import org.spongepowered.api.registry.RegistryTypes;
 import org.spongepowered.api.world.LocatableBlock;
 import org.spongepowered.api.world.server.ServerLocation;
 import org.spongepowered.api.world.server.ServerWorld;
@@ -20,31 +26,28 @@ import java.util.Objects;
 import java.util.Optional;
 
 public final class SpongeBlocks implements Blocks {
-    // LRU cache for block wrappers using primitive longs (zero allocation lookups)
     private static final int CACHE_SIZE = 10_000;
-    private final Long2ObjectLinkedOpenHashMap<SpongeBlock> blockCache = new Long2ObjectLinkedOpenHashMap<>(16, 0.75f);
 
-    private static long cacheKey(String worldKey, int x, int y, int z) {
-        long worldHash = (long) worldKey.hashCode() << 32;
-        int packedPos = ((x & 0x3FF) << 20) | ((y & 0x3FF) << 10) | (z & 0x3FF);
-        return worldHash | (packedPos & 0xFFFFFFFFL);
+    private final KeyedLruCache<BlockCacheKey, SpongeBlock> blockCache = new KeyedLruCache<>(CACHE_SIZE);
+    private final SpongeAttachmentService attachmentService;
+    private final SpongeWorlds worlds;
+
+    public SpongeBlocks(@NotNull SpongeAttachmentService attachmentService, @NotNull SpongeWorlds worlds) {
+        this.attachmentService = attachmentService;
+        this.worlds = worlds;
     }
 
     @Override
     public @NotNull Optional<RBlock> wrap(@NotNull Object nativeBlock) {
         switch (nativeBlock) {
             case ServerLocation loc -> {
-                return Optional.of(wrapInternal(loc.world(), loc.blockPosition()));
+                return wrap(loc).map(RBlock.class::cast);
             }
             case LocatableBlock locatable -> {
-                if (!(locatable.world() instanceof ServerWorld world)) return Optional.empty();
-                return Optional.of(wrapInternal(world, locatable.blockPosition()));
+                return wrap(locatable).map(RBlock.class::cast);
             }
             case BlockSnapshot snapshot -> {
-                if (!Sponge.isServerAvailable()) return Optional.empty();
-                Vector3i pos = snapshot.position();
-                return Sponge.server().worldManager().world(snapshot.world())
-                        .map(world -> wrapInternal(world, pos));
+                return wrap(snapshot).map(RBlock.class::cast);
             }
             default -> {
             }
@@ -52,22 +55,28 @@ public final class SpongeBlocks implements Blocks {
         return Optional.empty();
     }
 
+    public @NotNull Optional<SpongeBlock> wrap(@NotNull ServerLocation location) {
+        return Optional.of(wrapInternal(location.world(), location.blockPosition()));
+    }
+
+    public @NotNull Optional<SpongeBlock> wrap(@NotNull LocatableBlock locatable) {
+        if (!(locatable.world() instanceof ServerWorld world)) return Optional.empty();
+        return Optional.of(wrapInternal(world, locatable.blockPosition()));
+    }
+
+    public @NotNull Optional<SpongeBlock> wrap(@NotNull BlockSnapshot snapshot) {
+        if (!Sponge.isServerAvailable()) return Optional.empty();
+        Vector3i pos = snapshot.position();
+        return Sponge.server().worldManager().world(snapshot.world()).map(world -> wrapInternal(world, pos));
+    }
+
+    public @NotNull SpongeBlock wrapNative(@NotNull ServerWorld world, @NotNull Vector3i pos) {
+        return wrapInternal(world, pos);
+    }
+
     private SpongeBlock wrapInternal(ServerWorld world, Vector3i pos) {
-        long key = cacheKey(world.key().asString(), pos.x(), pos.y(), pos.z());
-        synchronized (blockCache) {
-            SpongeBlock cached = blockCache.getAndMoveToLast(key);
-            if (cached != null) {
-                return cached;
-            }
-            
-            if (blockCache.size() >= CACHE_SIZE) {
-                blockCache.removeFirst();
-            }
-            
-            SpongeBlock newBlock = new SpongeBlock(world, pos);
-            blockCache.put(key, newBlock);
-            return newBlock;
-        }
+        BlockCacheKey key = BlockCacheKey.of(world.key().asString(), pos.x(), pos.y(), pos.z());
+        return blockCache.getOrCreate(key, ignored -> new SpongeBlock(world, pos, attachmentService, worlds));
     }
 
     @Override
@@ -87,32 +96,44 @@ public final class SpongeBlocks implements Blocks {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(pos, "pos");
         ServerWorld spongeWorld = world.handle(ServerWorld.class);
-
-        long key = cacheKey(spongeWorld.key().asString(), pos.x(), pos.y(), pos.z());
-        synchronized (blockCache) {
-            SpongeBlock cached = blockCache.getAndMoveToLast(key);
-            if (cached != null) {
-                return cached;
-            }
-            
-            if (blockCache.size() >= CACHE_SIZE) {
-                blockCache.removeFirst();
-            }
-            
-            SpongeBlock newBlock = new SpongeBlock(spongeWorld, new Vector3i(pos.x(), pos.y(), pos.z()));
-            blockCache.put(key, newBlock);
-            return newBlock;
-        }
+        return wrapInternal(spongeWorld, new Vector3i(pos.x(), pos.y(), pos.z()));
     }
 
     @Override
     public @NotNull Optional<RBlockData> parseData(@NotNull String value) {
-        String trimmed = value.trim();
+        String trimmed = value == null ? "" : value.trim();
         if (trimmed.isEmpty()) return Optional.empty();
 
+        RKey typeKey = parseTypeKey(trimmed).orElse(null);
+        if (typeKey == null) return Optional.empty();
+
+        BlockType blockType = RRegistryHandles.find(RBlockType.ref(typeKey), BlockType.class)
+            .or(() -> findNativeBlockType(typeKey))
+            .orElse(null);
+        if (blockType == null) return Optional.empty();
+
+        if (trimmed.indexOf('[') < 0) {
+            return Optional.of(new SpongeBlockData(blockType.defaultState()));
+        }
+
         try {
-            BlockState state = BlockState.fromString(trimmed);
-            return Optional.of(new SpongeBlockData(state));
+            return Optional.of(new SpongeBlockData(BlockState.fromString(trimmed)));
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private static @NotNull Optional<RKey> parseTypeKey(@NotNull String value) {
+        int bracketIndex = value.indexOf('[');
+        String id = (bracketIndex >= 0 ? value.substring(0, bracketIndex) : value).trim();
+        if (id.isEmpty()) return Optional.empty();
+        return id.contains(":") ? RKey.tryParse(id) : Optional.of(RKey.of("minecraft", id));
+    }
+
+    private static @NotNull Optional<BlockType> findNativeBlockType(@NotNull RKey typeKey) {
+        try {
+            return Sponge.server().registry(RegistryTypes.BLOCK_TYPE)
+                .findValue(org.spongepowered.api.ResourceKey.resolve(typeKey.asString()));
         } catch (Exception ignored) {
             return Optional.empty();
         }

@@ -1,26 +1,13 @@
 package de.t14d3.rapunzellib.platform.paper.objects;
 
 import de.t14d3.rapunzellib.PlatformId;
-import de.t14d3.rapunzellib.objects.RNativeHandle;
-import de.t14d3.rapunzellib.objects.block.RBlockData;
-import org.bukkit.block.data.BlockData;
-import org.jetbrains.annotations.NotNull;
+import de.t14d3.rapunzellib.platform.shared.entity.SharedBlockDataBase;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Objects;
 
-final class PaperBlockData extends RNativeHandle<BlockData> implements RBlockData {
-    PaperBlockData(BlockData data) {
+final class PaperBlockData extends SharedBlockDataBase {
+    PaperBlockData(BlockState data) {
         super(PlatformId.PAPER, Objects.requireNonNull(data, "data"));
     }
-
-    @Override
-    public @NotNull String typeKey() {
-        return handle().getMaterial().getKey().toString();
-    }
-
-    @Override
-    public @NotNull String asString() {
-        return handle().getAsString(true);
-    }
 }
-

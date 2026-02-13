@@ -1,10 +1,9 @@
 plugins {
-    `java-library`
+    alias(libs.plugins.feature.platform.module.conventions)
+    alias(libs.plugins.sponge.module.conventions)
 }
 
 dependencies {
-    api(project(":commands"))
-    compileOnly(libs.sponge.api)
-    compileOnly(libs.annotations)
-    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.brigadier)
+    testImplementation(libs.sponge.api)
 }

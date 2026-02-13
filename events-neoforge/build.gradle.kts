@@ -1,36 +1,9 @@
 plugins {
-    `java-library`
-    alias(libs.plugins.neoforge.moddev)
-}
-
-val versions: VersionCatalog = extensions
-    .getByType<VersionCatalogsExtension>()
-    .named("libs")
-
-neoForge {
-    version = versions.findVersion("neoforge").get().requiredVersion
-    mods {
-        create("rapunzellib_events_neoforge") {
-            sourceSet(sourceSets.main.get())
-        }
-    }
-    addModdingDependenciesTo(sourceSets.main.get())
+    alias(libs.plugins.feature.platform.module.conventions)
+    alias(libs.plugins.neoforge.module.conventions)
 }
 
 dependencies {
-    api(project(":events"))
-    compileOnly(libs.annotations)
-    testImplementation(libs.junit.jupiter)
+    implementation(project(":events-shared"))
+    implementation(libs.mixin)
 }
-
-tasks {
-    processResources {
-        val props = mapOf("version" to project.version)
-        inputs.properties(props)
-        filteringCharset = "UTF-8"
-        filesMatching("META-INF/neoforge.mods.toml") {
-            expand(props)
-        }
-    }
-}
-

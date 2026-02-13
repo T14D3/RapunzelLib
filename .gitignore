@@ -1,9 +1,17 @@
 # Ignore Gradle project-specific cache directory
 .gradle
+**/.kotlin/
 
 # Ignore Gradle build output directory
 build
+**/logs/
+**/run/
+**/src/generated/
 /.idea/
 /.kotlin/
 /run/
 /.profileconfig.json
+bin
+.settings/
+.project
+.classpath

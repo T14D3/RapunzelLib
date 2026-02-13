@@ -1,10 +1,23 @@
 package de.t14d3.rapunzellib;
 
+import de.t14d3.rapunzellib.bootstrap.BootstrapHandle;
+import de.t14d3.rapunzellib.bootstrap.BootstrapOwnerRole;
+import de.t14d3.rapunzellib.bootstrap.PlatformBootstrapHost;
+import de.t14d3.rapunzellib.config.ConfigService;
+import de.t14d3.rapunzellib.config.YamlConfig;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.context.ServiceRegistry;
+import de.t14d3.rapunzellib.message.MessageFormatService;
+import de.t14d3.rapunzellib.message.Placeholders;
+import de.t14d3.rapunzellib.runtime.EngineFamily;
+import de.t14d3.rapunzellib.runtime.LifecycleOwner;
+import de.t14d3.rapunzellib.runtime.PlatformRuntime;
+import de.t14d3.rapunzellib.runtime.RuntimeCapability;
+import de.t14d3.rapunzellib.runtime.RuntimeRole;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,74 +26,128 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 final class RapunzelLeaseTest {
     @Test
-    void closesOnlyWhenLastOwnerReleases(@TempDir Path dir) {
-        Rapunzel.shutdownAll();
+    void laterBootstrapCallsBecomeBorrowersAndOwnerShutdownCloses(@TempDir Path dir) {
+        resetBootstrap();
 
         Object ownerA = new Object();
         Object ownerB = new Object();
-        TestContext ctx = new TestContext(dir);
+        TestContext ctx = new TestContext(dir.resolve("owner"));
+        TestContext ignored = new TestContext(dir.resolve("ignored"));
 
-        Rapunzel.Lease leaseA = Rapunzel.bootstrap(ownerA, ctx);
-        assertSame(ctx, leaseA.context());
+        BootstrapHandle ownerHandle = Rapunzel.bootstrap(ownerA, ctx);
+        BootstrapHandle borrowerHandle = Rapunzel.bootstrap(ownerB, ignored);
+
+        assertSame(ctx, ownerHandle.context());
+        assertEquals(BootstrapOwnerRole.OWNER, ownerHandle.role());
         assertEquals(1, Rapunzel.ownerCount());
+        assertEquals(1, Rapunzel.borrowerCount());
         assertTrue(Rapunzel.isBootstrapped());
         assertFalse(ctx.isClosed());
 
-        Rapunzel.Lease leaseB = Rapunzel.acquire(ownerB);
-        assertSame(ctx, leaseB.context());
-        assertEquals(2, Rapunzel.ownerCount());
-        assertTrue(Rapunzel.isBootstrapped());
-
-        Rapunzel.shutdown(ownerA);
+        assertSame(ctx, borrowerHandle.context());
+        assertEquals(BootstrapOwnerRole.BORROWER, borrowerHandle.role());
         assertEquals(1, Rapunzel.ownerCount());
-        assertTrue(Rapunzel.isBootstrapped());
-        assertFalse(ctx.isClosed());
+        assertEquals(1, Rapunzel.borrowerCount());
+        assertFalse(ignored.isClosed());
 
         Rapunzel.shutdown(ownerB);
-        assertEquals(0, Rapunzel.ownerCount());
+        assertEquals(1, Rapunzel.ownerCount());
+        assertEquals(0, Rapunzel.borrowerCount());
+        assertTrue(Rapunzel.isBootstrapped());
+        assertFalse(ctx.isClosed());
+
+        Rapunzel.shutdown(ownerA);
         assertFalse(Rapunzel.isBootstrapped());
         assertTrue(ctx.isClosed());
     }
 
     @Test
-    void disallowsReplacingContext(@TempDir Path dir) {
-        Rapunzel.shutdownAll();
+    void hostPreferredBootstrapClaimsOwnership(@TempDir Path dir) {
+        resetBootstrap();
 
-        Object owner = new Object();
-        TestContext ctx1 = new TestContext(dir.resolve("a"));
-        TestContext ctx2 = new TestContext(dir.resolve("b"));
+        Object borrower = new Object();
+        TestContext ctx = new TestContext(dir);
+        TestPlatformHost host = new TestPlatformHost(true);
+        Rapunzel.registerPlatformBootstrapHost(host);
 
-        Rapunzel.bootstrap(owner, ctx1);
-        IllegalStateException e = assertThrows(IllegalStateException.class, () -> Rapunzel.bootstrap(new Object(), ctx2));
-        assertTrue(e.getMessage().contains("already bootstrapped"));
+        BootstrapHandle handle = Rapunzel.bootstrap(borrower, () -> ctx);
+
+        assertEquals(BootstrapOwnerRole.BORROWER, handle.role());
+        assertSame(ctx, handle.context());
+        assertEquals(1, Rapunzel.ownerCount());
+        assertEquals(1, Rapunzel.borrowerCount());
+        assertSame(host.ownerToken(), Rapunzel.bootstrapState().ownerToken().orElseThrow());
+
+        Rapunzel.shutdown(borrower);
+        assertTrue(Rapunzel.isBootstrapped());
+        assertFalse(ctx.isClosed());
+
+        Rapunzel.shutdown(host.ownerToken());
+        assertFalse(Rapunzel.isBootstrapped());
+        assertTrue(ctx.isClosed());
     }
 
     @Test
-    void bootstrapIsIdempotentPerOwner(@TempDir Path dir) {
-        Rapunzel.shutdownAll();
+    void canonicalHostCallerKeepsOwnerHandle(@TempDir Path dir) {
+        resetBootstrap();
+
+        TestContext ctx = new TestContext(dir);
+        TestPlatformHost host = new TestPlatformHost(true);
+        Rapunzel.registerPlatformBootstrapHost(host);
+
+        BootstrapHandle handle = Rapunzel.bootstrap(host.ownerToken(), () -> ctx);
+
+        assertEquals(BootstrapOwnerRole.OWNER, handle.role());
+        assertSame(host.ownerToken(), handle.participant());
+        assertEquals(1, Rapunzel.ownerCount());
+        assertEquals(0, Rapunzel.borrowerCount());
+    }
+
+    @Test
+    void fallsBackToEmbeddedOwnerWhenHostCannotClaim(@TempDir Path dir) {
+        resetBootstrap();
+
+        Object owner = new Object();
+        TestContext ctx = new TestContext(dir);
+        Rapunzel.registerPlatformBootstrapHost(new TestPlatformHost(false));
+
+        BootstrapHandle handle = Rapunzel.bootstrap(owner, () -> ctx);
+
+        assertEquals(BootstrapOwnerRole.OWNER, handle.role());
+        assertSame(owner, Rapunzel.bootstrapState().ownerToken().orElseThrow());
+        assertSame(ctx, handle.context());
+    }
+
+    @Test
+    void bootstrapIsIdempotentPerCaller(@TempDir Path dir) {
+        resetBootstrap();
 
         Object owner = new Object();
         TestContext ctx = new TestContext(dir);
 
-        Rapunzel.Lease first = Rapunzel.bootstrap(owner, ctx);
-        Rapunzel.Lease second = Rapunzel.bootstrap(owner, ctx);
+        BootstrapHandle first = Rapunzel.bootstrap(owner, ctx);
+        BootstrapHandle second = Rapunzel.bootstrap(owner, ctx);
         assertSame(first, second);
         assertEquals(1, Rapunzel.ownerCount());
+        assertEquals(0, Rapunzel.borrowerCount());
     }
 
     @Test
     void bootstrapOrAcquireSkipsFactoryWhenAlreadyBootstrapped(@TempDir Path dir) {
-        Rapunzel.shutdownAll();
+        resetBootstrap();
 
         Object ownerA = new Object();
         Object ownerB = new Object();
@@ -88,34 +155,113 @@ final class RapunzelLeaseTest {
 
         Rapunzel.bootstrap(ownerA, ctx);
 
-        Rapunzel.Lease leaseB = Rapunzel.bootstrapOrAcquire(ownerB, () -> {
+        BootstrapHandle leaseB = Rapunzel.bootstrapOrAcquire(ownerB, () -> {
             fail("contextFactory should not be invoked when already bootstrapped");
             return new TestContext(dir.resolve("unused"));
         });
 
         assertSame(ctx, leaseB.context());
-        assertEquals(2, Rapunzel.ownerCount());
+        assertEquals(BootstrapOwnerRole.BORROWER, leaseB.role());
+        assertEquals(1, Rapunzel.ownerCount());
+        assertEquals(1, Rapunzel.borrowerCount());
+    }
+
+    @Test
+    void staticConvenienceHelpersDelegateToContext(@TempDir Path dir) {
+        resetBootstrap();
+
+        Object owner = new Object();
+        TestContext ctx = new TestContext(dir);
+        Rapunzel.bootstrap(owner, ctx);
+
+        assertSame(ctx.services(), Rapunzel.services());
+        assertSame(ctx.scheduler(), Rapunzel.scheduler());
+        assertSame(ctx.configs(), Rapunzel.configs());
+        assertSame(ctx.messages(), Rapunzel.messages());
+        assertSame(ctx.logger(), Rapunzel.logger());
+        assertSame(ctx.dataDirectory(), Rapunzel.dataDirectory());
+        assertSame(ctx.runtime(), Rapunzel.runtime());
+        assertSame(ctx.platformId(), Rapunzel.platformId());
+
+        ExampleService service = Rapunzel.service(ExampleService.class);
+        assertSame(ctx.exampleService(), service);
+        assertSame(service, Rapunzel.findService(ExampleService.class).orElseThrow());
+        assertTrue(Rapunzel.findService(MissingService.class).isEmpty());
+    }
+
+    private static void resetBootstrap() {
+        Rapunzel.shutdownAll();
+        Rapunzel.clearRegisteredPlatformBootstrapHost();
+    }
+
+    private static final class TestPlatformHost implements PlatformBootstrapHost {
+        private final Object ownerToken = new Object();
+        private final boolean available;
+
+        private TestPlatformHost(boolean available) {
+            this.available = available;
+        }
+
+        @Override
+        public @NotNull Object ownerToken() {
+            return ownerToken;
+        }
+
+        @Override
+        public @NotNull String displayName() {
+            return "test-host";
+        }
+
+        @Override
+        public @NotNull Optional<? extends RapunzelContext> tryCreateContext(
+            @NotNull Object bootstrapCaller,
+            @NotNull Supplier<? extends RapunzelContext> contextFactory
+        ) {
+            Objects.requireNonNull(bootstrapCaller, "bootstrapCaller");
+            Objects.requireNonNull(contextFactory, "contextFactory");
+            if (!available) {
+                return Optional.empty();
+            }
+            return Optional.of(contextFactory.get());
+        }
     }
 
     private static final class TestContext implements RapunzelContext {
         private static final Logger LOGGER = LoggerFactory.getLogger(TestContext.class);
+        private static final ConfigService CONFIGS = new TestConfigService();
+        private static final MessageFormatService MESSAGES = new TestMessageFormatService();
 
         private final Path dataDir;
+        private final PlatformRuntime runtime = new PlatformRuntime(
+            PlatformId.PAPER,
+            RuntimeRole.SERVER,
+            EngineFamily.MOJANG_SERVER,
+            EnumSet.of(RuntimeCapability.WORLDS, RuntimeCapability.BLOCKS),
+            new LifecycleOwner(this)
+        );
         private final AtomicBoolean closed = new AtomicBoolean();
         private final ServiceRegistry services = new MapServiceRegistry();
         private final Scheduler scheduler = new InlineScheduler();
+        private final ExampleService exampleService = new ExampleServiceImpl();
 
         private TestContext(Path dataDir) {
             this.dataDir = Objects.requireNonNull(dataDir, "dataDir");
+            services.register(ConfigService.class, CONFIGS);
+            services.register(MessageFormatService.class, MESSAGES);
+            services.register(ExampleService.class, exampleService);
         }
 
         boolean isClosed() {
             return closed.get();
         }
 
+        ExampleService exampleService() {
+            return exampleService;
+        }
+
         @Override
-        public @NotNull PlatformId platformId() {
-            return PlatformId.PAPER;
+        public @NotNull PlatformRuntime runtime() {
+            return runtime;
         }
 
         @Override
@@ -215,6 +361,63 @@ final class RapunzelLeaseTest {
         @Override
         public boolean isCancelled() {
             return false;
+        }
+    }
+
+    private interface ExampleService {
+        String value();
+    }
+
+    private interface MissingService {
+    }
+
+    private static final class ExampleServiceImpl implements ExampleService {
+        @Override
+        public String value() {
+            return "example";
+        }
+    }
+
+    private static final class TestConfigService implements ConfigService {
+        @Override
+        public @NotNull YamlConfig load(@NotNull Path file) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public @NotNull YamlConfig load(@NotNull Path file, @NotNull String defaultResourcePath) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    private static final class TestMessageFormatService implements MessageFormatService {
+        @Override
+        public void reload() {
+        }
+
+        @Override
+        public boolean contains(@NotNull String key) {
+            return false;
+        }
+
+        @Override
+        public @NotNull Set<String> keys() {
+            return Set.of();
+        }
+
+        @Override
+        public @NotNull String raw(@NotNull String key) {
+            return key;
+        }
+
+        @Override
+        public @NotNull Component component(@NotNull String key) {
+            return Component.text(key);
+        }
+
+        @Override
+        public @NotNull Component component(@NotNull String key, @NotNull Placeholders placeholders) {
+            return Component.text(key);
         }
     }
 }

@@ -2,26 +2,26 @@ package de.t14d3.rapunzellib.platform.velocity.network;
 
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
-import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.info.NetworkInfoService;
 import de.t14d3.rapunzellib.network.info.NetworkPlayerInfo;
+import de.t14d3.rapunzellib.network.runtime.NetworkRuntime;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 public final class VelocityNetworkInfoService implements NetworkInfoService {
-    private final Messenger messenger;
+    private final NetworkRuntime runtime;
     private final ProxyServer proxy;
 
-    public VelocityNetworkInfoService(Messenger messenger, ProxyServer proxy) {
-        this.messenger = Objects.requireNonNull(messenger, "messenger");
+    public VelocityNetworkInfoService(NetworkRuntime runtime, ProxyServer proxy) {
+        this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.proxy = Objects.requireNonNull(proxy, "proxy");
     }
 
     @Override
     public CompletableFuture<String> networkServerName() {
-        return CompletableFuture.completedFuture(messenger.getServerName());
+        return CompletableFuture.completedFuture(runtime.localName());
     }
 
     @Override
@@ -45,4 +45,3 @@ public final class VelocityNetworkInfoService implements NetworkInfoService {
         return new NetworkPlayerInfo(player.getUniqueId(), player.getUsername(), serverName);
     }
 }
-

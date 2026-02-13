@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.message.MessageKey;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -34,6 +35,7 @@ public interface YamlConfig {
     /**
      * Returns the value at {@code path} coerced to {@code type} (if possible), or {@code def} if missing/uncoercible.
      */
+    @Contract("_, _, !null -> !null")
     default <T> @Nullable T get(@NotNull String path, @NotNull Class<T> type, @Nullable T def) {
         Object value = get(path);
         if (value == null) return def;

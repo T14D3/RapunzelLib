@@ -1,6 +1,8 @@
 package de.t14d3.rapunzellib.events;
 
 import net.kyori.adventure.text.Component;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -29,7 +31,7 @@ public interface CancellablePreEvent extends GamePreEvent {
 
     void deny();
 
-    void deny(Component reason);
+    void deny(@Nullable Component reason);
 
-    Optional<Component> denyReason();
+    @NotNull Optional<Component> denyReason();
 }

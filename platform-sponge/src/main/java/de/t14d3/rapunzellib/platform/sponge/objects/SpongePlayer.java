@@ -1,29 +1,27 @@
 package de.t14d3.rapunzellib.platform.sponge.objects;
 
 import de.t14d3.rapunzellib.PlatformId;
-import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RNativeHandle;
-import de.t14d3.rapunzellib.objects.RPlayer;
+import de.t14d3.rapunzellib.objects.RServerPlayer;
 import de.t14d3.rapunzellib.objects.RWorld;
-import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.platform.sponge.attachments.SpongeAttachmentService;
 import net.kyori.adventure.audience.Audience;
 import org.jetbrains.annotations.NotNull;
-import org.spongepowered.api.ResourceKey;
-import org.spongepowered.api.Sponge;
+import org.spongepowered.api.data.Keys;
 import org.spongepowered.api.entity.living.player.server.ServerPlayer;
-import org.spongepowered.api.world.Location;
-import org.spongepowered.api.world.server.ServerLocation;
 import org.spongepowered.api.world.server.ServerWorld;
-import org.spongepowered.math.vector.Vector3d;
 
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RPlayer {
-    SpongePlayer(ServerPlayer handle) {
-        super(PlatformId.SPONGE, Objects.requireNonNull(handle, "handle"));
+final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RServerPlayer {
+    private final SpongeWorlds worlds;
+
+    SpongePlayer(ServerPlayer handle, @NotNull SpongeAttachmentService attachmentService, @NotNull SpongeWorlds worlds) {
+        super(PlatformId.SPONGE, Objects.requireNonNull(handle, "handle"), Objects.requireNonNull(attachmentService, "attachmentService").forPlayer(handle));
+        this.worlds = Objects.requireNonNull(worlds, "worlds");
     }
 
     void updateHandle(ServerPlayer newHandle) {
@@ -47,35 +45,42 @@ final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RPlayer 
 
     @Override
     public boolean hasPermission(@NotNull String permission) {
-        if (permission == null || permission.isBlank()) return true;
-        return handle().hasPermission(permission);
+        return permission == null || permission.isBlank() || handle().hasPermission(permission);
     }
 
     @Override
     public @NotNull Optional<RWorld> world() {
-        ServerWorld world = handle().world();
-        return Rapunzel.context().worlds()
-            .wrap(world)
-            .or(() -> Optional.of(new SpongeWorld(world)));
+        return Optional.of(worlds.requireNative(handle().world()));
     }
 
     @Override
     public @NotNull Optional<RLocation> location() {
-        ServerPlayer player = handle();
-        Location<?, ?> location = player.location();
-        if (!(location instanceof ServerLocation loc)) {
-            return Optional.empty();
-        }
+        return Optional.of(SpongeEntitySemantics.location(handle()));
+    }
 
-        ServerWorld world = loc.world();
-        String key = world.key().asString();
-        String name = world.properties().name();
+    @Override
+    public double health() {
+        return handle().health().get();
+    }
 
-        Vector3d rot = player.rotation();
-        float pitch = (float) rot.x();
-        float yaw = (float) rot.y();
+    @Override
+    public double maxHealth() {
+        return handle().maxHealth().get();
+    }
 
-        return Optional.of(new RLocation(new RWorldRef(name, key), loc.x(), loc.y(), loc.z(), yaw, pitch));
+    @Override
+    public int remainingAir() {
+        return handle().requireValue(Keys.REMAINING_AIR).get();
+    }
+
+    @Override
+    public int maxAir() {
+        return handle().requireValue(Keys.MAX_AIR).get();
+    }
+
+    @Override
+    public boolean isAlive() {
+        return !handle().isRemoved() && handle().health().get() > 0.0d;
     }
 
     @Override
@@ -84,42 +89,27 @@ final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RPlayer 
     }
 
     @Override
-    public void teleport(@NotNull RLocation location) {
-        Objects.requireNonNull(location, "location");
-        if (!Sponge.isServerAvailable()) return;
-
-        ServerPlayer player = handle();
-        ServerWorld targetWorld = resolveWorld(location.world(), player.world());
-        ServerLocation target = targetWorld.location(location.x(), location.y(), location.z());
-
-        player.setLocation(target);
-
-        Vector3d rot = new Vector3d(location.pitch(), location.yaw(), 0.0);
-        player.setRotation(rot);
+    public boolean teleport(@NotNull RLocation location) {
+        return SpongeEntitySemantics.teleport(handle(), location);
     }
 
-    private static ServerWorld resolveWorld(RWorldRef worldRef, ServerWorld fallback) {
-        if (worldRef == null) return fallback;
-        var manager = Sponge.server().worldManager();
+    @Override
+    public boolean canDamage() {
+        return true;
+    }
 
-        String keyString = worldRef.key();
-        if (keyString != null && !keyString.isBlank()) {
-            try {
-                ResourceKey key = ResourceKey.resolve(keyString.trim());
-                Optional<ServerWorld> byKey = manager.world(key);
-                if (byKey.isPresent()) return byKey.get();
-            } catch (Exception ignored) {
-            }
-        }
+    @Override
+    public boolean damage(double amount) {
+        return SpongeEntitySemantics.damage(handle(), amount);
+    }
 
-        String name = worldRef.name();
-        if (name != null && !name.isBlank()) {
-            String target = name.trim();
-            for (ServerWorld world : manager.worlds()) {
-                if (world.properties().name().equalsIgnoreCase(target)) return world;
-            }
-        }
+    @Override
+    public boolean canHeal() {
+        return true;
+    }
 
-        return fallback;
+    @Override
+    public boolean heal(double amount) {
+        return SpongeEntitySemantics.heal(handle(), amount);
     }
 }

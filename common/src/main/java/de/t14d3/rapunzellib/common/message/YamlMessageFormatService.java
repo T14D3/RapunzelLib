@@ -19,7 +19,85 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-public final class YamlMessageFormatService implements MessageFormatService {   
+/**
+ * Message formatting service with YAML-backed templates, caching, and MiniMessage support.
+ *
+ * <p>This service loads message templates from YAML configuration files, compiles them using
+ * MiniMessage for rich text formatting, and provides efficient placeholder replacement with
+ * multi-layer caching for high-performance message rendering in multi-threaded environments.
+ *
+ * <p><strong>Template Compilation and Caching:</strong>
+ * <p>Templates undergo a two-phase compilation process:
+ * <ul>
+ *   <li><strong>Parse Phase:</strong> MiniMessage templates are deserialized to {@link Component} objects</li>
+ *   <li><strong>Extract Phase:</strong> Placeholder names (e.g., {@code <player>}, {@code <amount>}) are
+ *       extracted from the parsed component tree and stored for efficient replacement</li>
+ * </ul>
+ * <p>Compiled templates are cached in an immutable {@link State} object that is atomically
+ * replaced on reload, ensuring consistent reads during template updates.
+ *
+ * <p><strong>Placeholder Resolution:</strong>
+ * <p>Placeholders are resolved in priority order:
+ * <ol>
+ *   <li>Component placeholders ({@code Component} objects passed directly)</li>
+ *   <li>String placeholders (automatically wrapped in {@code Component.text()})</li>
+ *   <li>Special {@code <prefix>} placeholder resolved from the configured prefix template</li>
+ * </ol>
+ * <p>Unresolved placeholders are left as-is in the output.
+ *
+ * <p><strong>Thread-Safe Rendering with Volatile Fields:</strong>
+ * <p>This service uses a {@code volatile} {@link State} field for lock-free reads:
+ * <ul>
+ *   <li>All template reads access the volatile state reference for visibility across threads</li>
+ *   <li>Individual {@link Template} instances use volatile fields for empty-render caches</li>
+ *   <li>String-based placeholder combinations use synchronized LRU caches per template</li>
+ *   <li>Prefix rendering uses atomic state capture to ensure consistency</li>
+ * </ul>
+ *
+ * <p><strong>MiniMessage Integration:</strong>
+ * <p>MiniMessage provides rich text formatting using tags like:
+ * <ul>
+ *   <li>Color codes: {@code <red>}, {@code <#RRGGBB>}</li>
+ *   <li>Decorations: {@code <bold>}, {@code <italic>}, {@code <underlined>}</li>
+ *   <li>Click/hover events: {@code <click:run_command:/help>}, {@code <hover:show_text:Info>}</li>
+ *   <li>Gradients and more advanced formatting</li>
+ * </ul>
+ *
+ * <p>Usage example:
+ * <pre>{@code
+ * YamlMessageFormatService service = new YamlMessageFormatService(
+ *     configService, logger, Path.of("messages.yml"), "default-messages.yml"
+ * );
+ *
+ * // Render with placeholders
+ * Component msg = service.component("player.welcome",
+ *     Placeholders.of("player", playerName, "server", serverName));
+ *
+ * // Check if key exists
+ * if (service.contains("player.bye")) {
+ *     Component bye = service.component("player.bye");
+ * }
+ * }</pre>
+ *
+ * <p>YAML configuration format:
+ * <pre>
+ * {@code
+ * prefix: "<gray>[<blue>MyPlugin</blue>]</gray> "
+ * player:
+ *   welcome: "<prefix><green>Welcome <player> to <server>!</green>"
+ *   bye: "<prefix><yellow>Goodbye <player>!</yellow>"
+ * }
+ * </pre>
+ *
+ * @implNote The service maintains three levels of caching: (1) empty render cache per template,
+ *           (2) empty-with-prefix cache, and (3) LRU string-based placeholder cache.
+ *           Cache size is bounded to prevent memory leaks in long-running servers.
+ * @since 1.0
+ * @see MessageFormatService
+ * @see Placeholders
+ * @see MiniMessage
+ */
+public final class YamlMessageFormatService implements MessageFormatService {
     private static final String PREFIX_KEY = "prefix";
     private static final int STRING_RENDER_CACHE_MAX_ENTRIES = 64;
 

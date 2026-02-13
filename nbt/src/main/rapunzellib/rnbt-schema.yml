@@ -1,0 +1,22 @@
+name: r_item
+entries:
+  - key: components
+    type: compound
+    children:
+      - key: custom_name
+        type: component
+      - key: lore
+        type: list
+        elementType: component
+      - key: damage
+        type: int
+      - key: unbreakable
+        type: boolean
+      - key: custom_model_data
+        type: int
+      - key: repair_cost
+        type: int
+      - key: enchantment_glint_override
+        type: boolean
+  - key: custom_data
+    type: compound

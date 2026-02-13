@@ -1,48 +1,25 @@
 package de.t14d3.rapunzellib.platform.fabric.entity;
 
-import de.t14d3.rapunzellib.objects.Players;
-import de.t14d3.rapunzellib.objects.RPlayer;
+import de.t14d3.rapunzellib.platform.shared.entity.SharedPlayersCore;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+public final class FabricPlayers extends SharedPlayersCore<FabricPlayer> {
+    private final FabricWorlds worlds;
 
-public final class FabricPlayers implements Players {
-    private final MinecraftServer server;
-    private final ConcurrentHashMap<UUID, FabricPlayer> cache = new ConcurrentHashMap<>();
-
-    public FabricPlayers(MinecraftServer server) {
-        this.server = server;
+    public FabricPlayers(MinecraftServer server, @NotNull FabricWorlds worlds) {
+        super(server);
+        this.worlds = worlds;
     }
 
     @Override
-    public @NotNull Collection<RPlayer> online() {
-        return server.getPlayerList().getPlayers().stream().map(this::wrapInternal).map(RPlayer.class::cast).toList();
+    protected @NotNull FabricPlayer createWrapper(@NotNull ServerPlayer player) {
+        return new FabricPlayer(player, worlds);
     }
 
     @Override
-    public @NotNull Optional<RPlayer> get(@NotNull UUID uuid) {
-        ServerPlayer player = server.getPlayerList().getPlayer(uuid);
-        if (player == null) return Optional.empty();
-        return Optional.of(wrapInternal(player));
-    }
-
-    @Override
-    public @NotNull Optional<RPlayer> wrap(@NotNull Object nativePlayer) {
-        if (!(nativePlayer instanceof ServerPlayer player)) return Optional.empty();
-        return Optional.of(wrapInternal(player));
-    }
-
-    private FabricPlayer wrapInternal(ServerPlayer player) {
-        return cache.compute(player.getUUID(), (uuid, existing) -> {
-            if (existing == null) return new FabricPlayer(player);
-            existing.updateHandle(player);
-            return existing;
-        });
+    protected void updateWrapper(@NotNull FabricPlayer existingPlayer, @NotNull ServerPlayer player) {
+        existingPlayer.updateHandle(player);
     }
 }
-
