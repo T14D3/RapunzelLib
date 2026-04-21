@@ -1,12 +1,16 @@
 package de.t14d3.rapunzellib.gradle;
 
 import org.gradle.api.Project;
+import org.gradle.api.Task;
+import org.gradle.api.artifacts.repositories.PasswordCredentials;
 import org.gradle.api.artifacts.VersionCatalog;
 import org.gradle.api.artifacts.VersionCatalogsExtension;
 import org.gradle.api.plugins.ExtensionAware;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.publish.PublishingExtension;
 import org.gradle.api.publish.maven.MavenPublication;
+import org.gradle.api.publish.maven.tasks.PublishToMavenRepository;
+import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.compile.JavaCompile;
 import org.gradle.api.tasks.testing.Test;
 import org.gradle.jvm.toolchain.JavaLanguageVersion;
@@ -15,8 +19,12 @@ import org.spongepowered.gradle.vanilla.repository.MinecraftPlatform;
 
 import java.lang.reflect.Method;
 
+import de.t14d3.rapunzellib.gradle.tasks.CheckReposiliteConfigTask;
+
 final class ConventionPluginSupport {
     private static final int JAVA_VERSION = 21;
+    private static final String REPOSILITE_REPOSITORY_NAME = "reposilite";
+    private static final String DEFAULT_REPOSILITE_BASE_URL = "https://maven.t14d3.de";
 
     private ConventionPluginSupport() {
     }
@@ -31,6 +39,8 @@ final class ConventionPluginSupport {
         JavaPluginExtension java = project.getExtensions().findByType(JavaPluginExtension.class);
         if (java != null) {
             java.getToolchain().getLanguageVersion().set(JavaLanguageVersion.of(JAVA_VERSION));
+            java.withSourcesJar();
+            java.withJavadocJar();
         }
         project.getTasks().withType(JavaCompile.class).configureEach(task -> task.getOptions().getRelease().set(JAVA_VERSION));
         project.getTasks().withType(Test.class).configureEach(Test::useJUnitPlatform);
@@ -56,6 +66,54 @@ final class ConventionPluginSupport {
 
         MavenPublication publication = publishing.getPublications().create("mavenJava", MavenPublication.class);
         publication.from(project.getComponents().getByName("java"));
+        attachArtifactIfPresent(project, publication, "shadowJar");
+        attachArtifactIfPresent(project, publication, "remapShadowJar");
+    }
+
+    static TaskProvider<CheckReposiliteConfigTask> registerReposiliteConfigCheck(Project rootProject) {
+        return rootProject.getTasks().register("checkReposiliteConfig", CheckReposiliteConfigTask.class, task -> {
+            task.setGroup("publishing");
+            task.setDescription("Validates the Reposilite configuration required for remote publishing.");
+            task.getReposiliteBaseUrl().set(rootProject.getProviders().gradleProperty("reposiliteBaseUrl")
+                .orElse(rootProject.getProviders().environmentVariable("REPOSILITE_BASE_URL"))
+                .orElse(DEFAULT_REPOSILITE_BASE_URL));
+            task.getReposiliteUsername().set(rootProject.getProviders().gradleProperty("reposiliteUsername")
+                .orElse(rootProject.getProviders().environmentVariable("REPOSILITE_USERNAME")));
+            task.getReposilitePassword().set(rootProject.getProviders().gradleProperty("reposilitePassword")
+                .orElse(rootProject.getProviders().environmentVariable("REPOSILITE_PASSWORD")));
+        });
+    }
+
+    static TaskProvider<Task> registerPublishToReposilite(Project rootProject) {
+        return rootProject.getTasks().register("publishToReposilite", task -> {
+            task.setGroup("publishing");
+            task.setDescription("Publishes all Reposilite-targeted Maven publications from publishable subprojects.");
+        });
+    }
+
+    static void configureReposilitePublishing(Project project, TaskProvider<CheckReposiliteConfigTask> checkReposiliteConfig) {
+        PublishingExtension publishing = project.getExtensions().findByType(PublishingExtension.class);
+        if (publishing == null) {
+            return;
+        }
+
+        if (publishing.getRepositories().findByName(REPOSILITE_REPOSITORY_NAME) == null) {
+            publishing.getRepositories().maven(repository -> {
+                repository.setName(REPOSILITE_REPOSITORY_NAME);
+                repository.setUrl(project.uri(reposiliteRepositoryUrl(project)));
+                repository.credentials(PasswordCredentials.class, credentials -> {
+                    credentials.setUsername(optionalProperty(project, "reposiliteUsername", "REPOSILITE_USERNAME"));
+                    credentials.setPassword(optionalProperty(project, "reposilitePassword", "REPOSILITE_PASSWORD"));
+                });
+            });
+        }
+
+        project.getTasks().withType(PublishToMavenRepository.class).configureEach(task -> {
+            if (!isReposilitePublishTask(task)) {
+                return;
+            }
+            task.dependsOn(checkReposiliteConfig);
+        });
     }
 
     static void addLibraryDependency(Project project, String configuration, String alias) {
@@ -129,6 +187,13 @@ final class ConventionPluginSupport {
         return project.getExtensions().getByType(VersionCatalogsExtension.class).named("libs");
     }
 
+    private static void attachArtifactIfPresent(Project project, MavenPublication publication, String taskName) {
+        Task task = project.getTasks().findByName(taskName);
+        if (task != null) {
+            publication.artifact(task);
+        }
+    }
+
     private static Object library(Project project, String alias) {
         return libs(project).findLibrary(alias).orElseThrow().get();
     }
@@ -142,6 +207,43 @@ final class ConventionPluginSupport {
             return true;
         }
         return "platform-shared".equals(projectName) || projectName.endsWith("-shared");
+    }
+
+    static boolean publishesToReposilite(Project project) {
+        String projectName = project.getName();
+        if ("bom".equals(projectName) || "gradle-plugin".equals(projectName)) {
+            return true;
+        }
+        return !isInternalPublishModule(projectName);
+    }
+
+    private static boolean isReposilitePublishTask(PublishToMavenRepository task) {
+        if (task.getName().contains("ToReposiliteRepository")) {
+            return true;
+        }
+        return task.getRepository() != null && REPOSILITE_REPOSITORY_NAME.equals(task.getRepository().getName());
+    }
+
+    private static String reposiliteRepositoryUrl(Project project) {
+        String baseUrl = optionalProperty(project, "reposiliteBaseUrl", "REPOSILITE_BASE_URL");
+        if (baseUrl == null) {
+            baseUrl = DEFAULT_REPOSILITE_BASE_URL;
+        }
+        String repository = project.getVersion().toString().endsWith("SNAPSHOT") ? "snapshots" : "releases";
+        return baseUrl.replaceAll("/+$", "") + "/" + repository;
+    }
+
+    private static String optionalProperty(Project project, String propertyName, String environmentName) {
+        Object propertyValue = project.findProperty(propertyName);
+        if (propertyValue instanceof String stringValue && !stringValue.trim().isEmpty()) {
+            return stringValue.trim();
+        }
+
+        String environmentValue = System.getenv(environmentName);
+        if (environmentValue != null && !environmentValue.trim().isEmpty()) {
+            return environmentValue.trim();
+        }
+        return null;
     }
 
     private static Method firstMethod(Class<?> type, String name, Class<?> parameterType) {
