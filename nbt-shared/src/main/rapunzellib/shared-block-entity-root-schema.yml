@@ -1,0 +1,21 @@
+name: mojang_block_entity_root
+entries:
+  - key: id
+    type: string
+  - key: x
+    type: int
+  - key: y
+    type: int
+  - key: z
+    type: int
+  - key: Items
+    type: list
+    elementType: compound
+  - key: CustomName
+    type: component
+  - key: Lock
+    type: string
+  - key: LootTable
+    type: string
+  - key: LootTableSeed
+    type: long

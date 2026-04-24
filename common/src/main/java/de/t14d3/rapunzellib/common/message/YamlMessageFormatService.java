@@ -89,9 +89,9 @@ import java.util.Set;
  * }
  * </pre>
  *
- * @implNote The service maintains three levels of caching: (1) empty render cache per template,
- *           (2) empty-with-prefix cache, and (3) LRU string-based placeholder cache.
- *           Cache size is bounded to prevent memory leaks in long-running servers.
+ * <p><strong>Implementation note:</strong> The service maintains three levels of caching:
+ * (1) empty render cache per template, (2) empty-with-prefix cache, and (3) LRU string-based
+ * placeholder cache. Cache size is bounded to prevent memory leaks in long-running servers.
  * @since 1.0
  * @see MessageFormatService
  * @see Placeholders

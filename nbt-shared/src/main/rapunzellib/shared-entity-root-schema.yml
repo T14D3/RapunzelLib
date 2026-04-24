@@ -1,0 +1,50 @@
+name: mojang_entity_root
+entries:
+  - key: id
+    type: string
+  - key: Pos
+    type: list
+    elementType: double
+  - key: PosX
+    type: double
+  - key: PosY
+    type: double
+  - key: PosZ
+    type: double
+  - key: Motion
+    type: list
+    elementType: double
+  - key: Rotation
+    type: list
+    elementType: float
+  - key: Attributes
+    type: list
+    elementType: compound
+  - key: Brain
+    type: compound
+  - key: Health
+    type: float
+  - key: variant
+    type: value
+  - key: Variant
+    type: value
+  - key: Air
+    type: short
+  - key: fall_distance
+    type: float
+  - key: PersistenceRequired
+    type: boolean
+  - key: Invulnerable
+    type: boolean
+  - key: PortalCooldown
+    type: int
+  - key: Age
+    type: int
+  - key: RotationYaw
+    type: float
+  - key: RotationPitch
+    type: float
+  - key: WorldUUIDLeast
+    type: long
+  - key: WorldUUIDMost
+    type: long

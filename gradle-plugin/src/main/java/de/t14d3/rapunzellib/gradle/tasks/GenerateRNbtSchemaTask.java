@@ -64,11 +64,15 @@ public abstract class GenerateRNbtSchemaTask extends DefaultTask {
         String source = RNbtSchemaGenerator.renderJavaSource(getPackageName().get(), getClassName().get(), schema);
 
         File outputRoot = getOutputDir().get().getAsFile();
-        getProject().delete(outputRoot);
-        outputRoot.mkdirs();
+        if (!outputRoot.exists() && !outputRoot.mkdirs()) {
+            throw new GradleException("Failed to create RNbt schema output directory " + outputRoot + ".");
+        }
 
         File targetFile = new File(new File(outputRoot, getPackageName().get().replace('.', '/')), getClassName().get() + ".java");
-        targetFile.getParentFile().mkdirs();
+        File targetParent = targetFile.getParentFile();
+        if (!targetParent.exists() && !targetParent.mkdirs()) {
+            throw new GradleException("Failed to create RNbt schema package directory " + targetParent + ".");
+        }
         try {
             java.nio.file.Files.writeString(targetFile.toPath(), source, StandardCharsets.UTF_8);
         } catch (Exception ex) {

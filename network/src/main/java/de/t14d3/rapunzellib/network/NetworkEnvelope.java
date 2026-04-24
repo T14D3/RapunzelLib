@@ -57,9 +57,9 @@ import org.jetbrains.annotations.Nullable;
  * );
  * }</pre>
  *
- * @implNote This class is intentionally mutable to support deserialization frameworks.
- *           Thread safety is the responsibility of the caller; immutable copies should
- *           be made if concurrent access is required.
+ * <p><strong>Implementation note:</strong> This class is intentionally mutable to support
+ * deserialization frameworks. Thread safety is the responsibility of the caller; immutable copies
+ * should be made if concurrent access is required.
  * @since 1.0
  * @see Messenger
  * @see NetworkEventBus
@@ -119,4 +119,3 @@ public class NetworkEnvelope {
         return createdAt;
     }
 }
-

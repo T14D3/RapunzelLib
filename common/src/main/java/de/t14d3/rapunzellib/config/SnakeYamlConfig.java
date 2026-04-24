@@ -114,9 +114,9 @@ import java.util.UUID;
  * config.save();
  * }</pre>
  *
- * @implNote Comment parsing and insertion preserves formatting but may not handle all
- *           edge cases of complex YAML structures. Records are coerced using their
- *           canonical constructor with component name matching.
+ * <p><strong>Implementation note:</strong> Comment parsing and insertion preserves formatting but
+ * may not handle all edge cases of complex YAML structures. Records are coerced using their
+ * canonical constructor with component name matching.
  * @since 1.0
  * @see YamlConfig
  * @see ConfigService

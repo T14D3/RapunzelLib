@@ -1,0 +1,6 @@
+name: mojang_block_state
+entries:
+  - key: Name
+    type: string
+  - key: Properties
+    type: compound

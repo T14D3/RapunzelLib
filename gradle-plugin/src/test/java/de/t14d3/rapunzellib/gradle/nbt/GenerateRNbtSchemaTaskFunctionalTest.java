@@ -90,6 +90,104 @@ class GenerateRNbtSchemaTaskFunctionalTest {
         assertTrue(Files.exists(compiledClass("com/example/UsesGeneratedEntityNbt.class")));
     }
 
+    @Test
+    void multipleSchemaTasksCanShareOneGeneratedSourceDirectory() throws Exception {
+        writeConsumerProject(
+            """
+            import de.t14d3.rapunzellib.gradle.tasks.GenerateRNbtSchemaTask
+
+            plugins {
+                id 'java'
+                id 'de.t14d3.rapunzellib'
+            }
+
+            def generatedDir = layout.projectDirectory.dir('src/generated/java')
+
+            tasks.register('generateEntitySchema', GenerateRNbtSchemaTask) {
+                inputFiles.from(layout.projectDirectory.file('src/main/rapunzellib/entity-schema.yml'))
+                packageName.set('com.example.generated')
+                className.set('EntityNbt')
+                outputDir.set(generatedDir)
+            }
+
+            tasks.register('generateWorldSchema', GenerateRNbtSchemaTask) {
+                inputFiles.from(layout.projectDirectory.file('src/main/rapunzellib/world-schema.yml'))
+                packageName.set('com.example.generated')
+                className.set('WorldNbt')
+                outputDir.set(generatedDir)
+            }
+
+            sourceSets {
+                main {
+                    java.srcDir('src/generated/java')
+                }
+            }
+
+            tasks.named('compileJava') {
+                dependsOn(tasks.named('generateEntitySchema'))
+                dependsOn(tasks.named('generateWorldSchema'))
+            }
+            """
+        );
+        TestSupport.writeFile(
+            tempDir,
+            "src/main/rapunzellib/entity-schema.yml",
+            """
+            name: entity
+            entries:
+              - key: Pos
+                type: list
+                elementType: double
+            """
+        );
+        TestSupport.writeFile(
+            tempDir,
+            "src/main/rapunzellib/world-schema.yml",
+            """
+            name: world
+            entries:
+              - key: WorldUUIDMost
+                type: long
+            """
+        );
+        writeStubRnbtModel();
+        TestSupport.writeFile(
+            tempDir,
+            "src/main/java/com/example/UsesGeneratedSchemas.java",
+            """
+            package com.example;
+
+            import com.example.generated.EntityNbt;
+            import com.example.generated.WorldNbt;
+            import de.t14d3.rapunzellib.nbt.RNbtField;
+            import de.t14d3.rapunzellib.nbt.RNbtPath;
+            import java.util.List;
+
+            public final class UsesGeneratedSchemas {
+                private UsesGeneratedSchemas() {
+                }
+
+                public static RNbtField<List<Double>> positionField() {
+                    return EntityNbt.Fields.POS;
+                }
+
+                public static RNbtPath<Long> worldUuidMostPath() {
+                    return WorldNbt.Paths.WORLD_UUID_MOST;
+                }
+            }
+            """
+        );
+
+        BuildResult result = TestSupport.runGradle(tempDir, "generateEntitySchema", "generateWorldSchema", "compileJava");
+
+        assertEquals(SUCCESS, result.task(":generateEntitySchema").getOutcome());
+        assertEquals(SUCCESS, result.task(":generateWorldSchema").getOutcome());
+        assertEquals(SUCCESS, result.task(":compileJava").getOutcome());
+        assertTrue(Files.exists(tempDir.resolve("src/generated/java/com/example/generated/EntityNbt.java")));
+        assertTrue(Files.exists(tempDir.resolve("src/generated/java/com/example/generated/WorldNbt.java")));
+        assertTrue(Files.exists(compiledClass("com/example/UsesGeneratedSchemas.class")));
+    }
+
     private void writeConsumerProject(String buildFile) {
         TestSupport.writeFile(tempDir, "settings.gradle", "rootProject.name = 'consumer-rnbt-schema'");
         TestSupport.writeFile(tempDir, "build.gradle", buildFile.strip());

@@ -52,8 +52,8 @@ import java.util.List;
  * int partialStart = result.partialStart(); // 5 (after the opening quote)
  * }</pre>
  *
- * @implNote This is a utility class with static methods only. The {@link Tokenization}
- *           record encapsulates both the parsed tokens and any trailing partial input.
+ * <p><strong>Implementation note:</strong> This is a utility class with static methods only. The
+ * {@link Tokenization} record encapsulates both the parsed tokens and any trailing partial input.
  * @since 1.0
  * @see TokenSuggester
  */
