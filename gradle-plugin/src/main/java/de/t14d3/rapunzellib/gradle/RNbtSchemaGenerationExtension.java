@@ -30,6 +30,6 @@ public abstract class RNbtSchemaGenerationExtension {
         getInputFiles().from(project.getLayout().getProjectDirectory().file("src/main/rapunzellib/rnbt-schema.yml"));
         getPackageName().convention("generated.rapunzellib.nbt");
         getClassName().convention("GeneratedRNbtSchema");
-        getOutputDir().convention(project.getLayout().getBuildDirectory().dir("generated/sources/rapunzellib/rnbtSchema/main/java"));
+        getOutputDir().convention(project.getLayout().getProjectDirectory().dir("src/generated/java"));
     }
 }

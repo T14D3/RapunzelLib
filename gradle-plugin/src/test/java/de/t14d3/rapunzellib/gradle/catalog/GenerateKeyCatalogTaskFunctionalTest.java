@@ -296,7 +296,7 @@ class GenerateKeyCatalogTaskFunctionalTest {
     }
 
     private Path generatedSource(String relativePath) {
-        return tempDir.resolve("build/generated/sources/rapunzellib/keyCatalog/main/java/" + relativePath);
+        return tempDir.resolve("src/generated/java/" + relativePath);
     }
 
     private Path compiledClass(String relativePath) {

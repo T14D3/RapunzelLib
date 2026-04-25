@@ -88,8 +88,8 @@ class GenerateRegistryCatalogTaskFunctionalTest {
 
         assertEquals(SUCCESS, result.task(":rapunzellibGenerateRegistryCatalogs").getOutcome());
         assertEquals(SUCCESS, result.task(":compileJava").getOutcome());
-        assertTrue(Files.exists(generatedSource("demo-item-types", "com/example/catalog/GeneratedItemCatalog.java")));
-        assertTrue(Files.exists(generatedSource("demo-block-types", "com/example/catalog/GeneratedBlockCatalog.java")));
+        assertTrue(Files.exists(generatedSource("com/example/catalog/GeneratedItemCatalog.java")));
+        assertTrue(Files.exists(generatedSource("com/example/catalog/GeneratedBlockCatalog.java")));
         assertTrue(Files.exists(compiledClass("com/example/UsesMultipleCatalogs.class")));
     }
 
@@ -399,8 +399,8 @@ class GenerateRegistryCatalogTaskFunctionalTest {
         );
     }
 
-    private Path generatedSource(String catalogName, String relativePath) {
-        return tempDir.resolve("build/generated/sources/rapunzellib/registryCatalog/" + catalogName + "/main/java/" + relativePath);
+    private Path generatedSource(String relativePath) {
+        return tempDir.resolve("src/generated/java/" + relativePath);
     }
 
     private Path compiledClass(String relativePath) {

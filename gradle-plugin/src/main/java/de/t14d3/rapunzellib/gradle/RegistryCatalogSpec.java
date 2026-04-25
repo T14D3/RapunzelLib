@@ -77,7 +77,7 @@ public abstract class RegistryCatalogSpec implements Named {
         getRegistryValueType().convention("");
         getRegistryKeyOwnerType().convention("de.t14d3.rapunzellib.registry.RRegistries");
         getRegistryKeyFieldName().convention("");
-        getOutputDir().convention(project.getLayout().getBuildDirectory().dir("generated/sources/rapunzellib/registryCatalog/" + getName() + "/main/java"));
+        getOutputDir().convention(project.getLayout().getProjectDirectory().dir("src/generated/java"));
 
         getSource().applyDefaultConventions();
         getParitySources().configureEach(NamedRegistryCatalogSourceSpec::applyDefaultConventions);

@@ -24,7 +24,6 @@ public final class TestSupport {
             .withProjectDir(projectDir.toFile())
             .withArguments(allArguments)
             .withPluginClasspath()
-            .withTestKitDir(projectDir.resolve(".test-kit").toFile())
             .build();
     }
 
@@ -49,7 +48,7 @@ public final class TestSupport {
                 Path sourceFile = sourceRoot.resolve(entry.getKey());
                 Files.createDirectories(sourceFile.getParent());
                 Files.writeString(sourceFile, entry.getValue());
-                sourceFiles.add(sourceFile.toString());
+                sourceFiles.add(toGradlePath(sourceFile));
             }
             var compiler = ToolProvider.getSystemJavaCompiler();
             if (compiler == null) {
@@ -57,7 +56,7 @@ public final class TestSupport {
             }
             List<String> args = new ArrayList<>();
             args.add("-d");
-            args.add(classesRoot.toString());
+            args.add(toGradlePath(classesRoot));
             args.addAll(sourceFiles);
             int result = compiler.run(null, null, null, args.toArray(String[]::new));
             if (result != 0) {

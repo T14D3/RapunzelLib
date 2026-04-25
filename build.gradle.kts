@@ -1,7 +1,13 @@
 import org.gradle.api.tasks.bundling.Zip
+import org.gradle.api.plugins.ExtensionAware
+import org.jetbrains.gradle.ext.ProjectSettings
+import org.jetbrains.gradle.ext.TaskTriggersConfig
+import org.jetbrains.gradle.ext.settings
+import org.jetbrains.gradle.ext.taskTriggers
 
 plugins {
     base
+    alias(libs.plugins.idea.ext)
     alias(libs.plugins.root.subproject.conventions)
     alias(libs.plugins.root.publishing.conventions)
     alias(libs.plugins.userdev) apply false
@@ -19,6 +25,11 @@ val parityInCheck =
     providers.gradleProperty("rapunzellib.parityInCheck")
         .map { it.equals("true", ignoreCase = true) }
         .orElse(false)
+
+val syncGeneratedSources = tasks.register("rapunzellibSyncGeneratedSources") {
+    group = "rapunzellib"
+    description = "Generates RapunzelLib checked-in derived sources before IntelliJ Gradle sync."
+}
 
 allprojects {
     group = "de.t14d3.rapunzellib"
@@ -39,6 +50,24 @@ allprojects {
         if (name == "shadowJar") {
             isZip64 = true
         }
+    }
+}
+
+syncGeneratedSources.configure {
+    dependsOn(
+        ":nbt:rapunzellibGenerateRNbtSchema",
+        ":nbt:rapunzellibGenerateKeyCatalog",
+        ":nbt:rapunzellibGenerateRegistryCatalogs",
+        ":nbt:rapunzellibGenerateBlockEntityRootNbtSchema",
+        ":nbt:rapunzellibGenerateBlockStateNbtSchema",
+        ":nbt:rapunzellibGenerateEntityRootNbtSchema",
+        ":api:rapunzellibGenerateRegistryCatalogs",
+    )
+}
+
+idea.project.settings {
+    taskTriggers {
+        afterSync(syncGeneratedSources.get())
     }
 }
 

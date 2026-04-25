@@ -2,6 +2,7 @@
 junit-jupiter = "5.10.3"
 junit-platform = "1.10.3"
 jetbrains-annotations = "26.0.1"
+idea-ext = "1.4.1"
 
 adventure = "4.25.0"
 adventure-platform-fabric = "6.2.0"
@@ -39,6 +40,7 @@ mixin-plugin = "0.8-SNAPSHOT"
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+idea-ext = { id = "org.jetbrains.gradle.plugin.idea-ext", version.ref = "idea-ext" }
 
 userdev = { id = "io.papermc.paperweight.userdev", version.ref = "userdev" }
 vanilla-gradle = { id = "org.spongepowered.gradle.vanilla", version.ref = "vanilla-gradle" }

@@ -86,11 +86,15 @@ public abstract class GenerateKeyCatalogTask extends DefaultTask {
         );
 
         File outputRoot = getOutputDir().get().getAsFile();
-        getProject().delete(outputRoot);
-        outputRoot.mkdirs();
 
         File targetFile = new File(new File(outputRoot, getPackageName().get().replace('.', '/')), getClassName().get() + ".java");
-        targetFile.getParentFile().mkdirs();
+        File targetParent = targetFile.getParentFile();
+        if (targetFile.exists()) {
+            getProject().delete(targetFile);
+        }
+        if (!targetParent.exists() && !targetParent.mkdirs()) {
+            throw new GradleException("Failed to create key catalog output directory " + targetParent + ".");
+        }
         try {
             java.nio.file.Files.writeString(targetFile.toPath(), source, StandardCharsets.UTF_8);
         } catch (Exception ex) {

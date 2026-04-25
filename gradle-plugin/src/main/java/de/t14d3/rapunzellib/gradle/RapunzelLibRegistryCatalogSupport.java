@@ -14,12 +14,16 @@ import org.gradle.api.tasks.TaskProvider;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public final class RapunzelLibRegistryCatalogSupport {
+    static final String WIRED_SOURCE_DIRS_KEY = "rapunzellib.wiredSourceDirs";
     private RapunzelLibRegistryCatalogSupport() {
     }
 
+    @SuppressWarnings("unchecked")
     public static RegistryCatalogTasks registerRegistryCatalogTasks(Project project, RapunzelLibExtension extension) {
         TaskProvider<Task> generateAll = project.getTasks().register("rapunzellibGenerateRegistryCatalogs", task -> {
             task.setGroup("rapunzellib");
@@ -33,6 +37,8 @@ public final class RapunzelLibRegistryCatalogSupport {
 
         Provider<Boolean> includeVerifyParityInCheck =
             RapunzelLibRunnerSupport.booleanGradleProperty(project, "rapunzellib.registryParityInCheck", false);
+
+        project.getExtensions().getExtraProperties().set(WIRED_SOURCE_DIRS_KEY, new HashSet<File>());
 
         extension.getRegistryCatalogs().configureEach(spec -> {
             TaskProvider<GenerateRegistryCatalogTask> generateCatalog = registerRegistryCatalogGenerationTask(project, spec);
@@ -106,6 +112,7 @@ public final class RapunzelLibRegistryCatalogSupport {
         });
     }
 
+    @SuppressWarnings("unchecked")
     private static void wireRegistryCatalogSourceDirectory(
         Project project,
         TaskProvider<GenerateRegistryCatalogTask> generateCatalog
@@ -113,7 +120,12 @@ public final class RapunzelLibRegistryCatalogSupport {
         SourceSetContainer sourceSets = project.getExtensions().getByType(SourceSetContainer.class);
         SourceSet main = sourceSets.getByName(SourceSet.MAIN_SOURCE_SET_NAME);
 
-        main.getJava().srcDir(generateCatalog.flatMap(GenerateRegistryCatalogTask::getOutputDir));
+        File outputDir = generateCatalog.flatMap(GenerateRegistryCatalogTask::getOutputDir).get().getAsFile();
+        Set<File> wiredDirs = (Set<File>) project.getExtensions().getExtraProperties().get(WIRED_SOURCE_DIRS_KEY);
+        if (wiredDirs.add(outputDir)) {
+            main.getJava().srcDir(outputDir);
+        }
+
         project.getTasks().named(main.getCompileJavaTaskName()).configure(task -> task.dependsOn(generateCatalog));
     }
 }

@@ -37,6 +37,6 @@ public abstract class KeyCatalogGenerationExtension {
         getClassName().convention("GeneratedKeys");
         getDomainName().convention(project.getName());
         getRegistryHelpers().convention(java.util.Set.of());
-        getOutputDir().convention(project.getLayout().getBuildDirectory().dir("generated/sources/rapunzellib/keyCatalog/main/java"));
+        getOutputDir().convention(project.getLayout().getProjectDirectory().dir("src/generated/java"));
     }
 }

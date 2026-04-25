@@ -1,7 +1,7 @@
 package de.t14d3.rapunzellib.nbt.shared;
 
 import de.t14d3.rapunzellib.nbt.SerializedBlockEntity;
-import de.t14d3.rapunzellib.nbt.shared.generated.SharedBlockEntityRootNbt;
+import de.t14d3.rapunzellib.nbt.generated.BlockEntityRootNbt;
 import net.kyori.adventure.text.Component;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -39,11 +39,11 @@ final class SharedBlockEntityNbtSerializerCoreTest {
         SerializedBlockEntity serialized = serializer.serialize(chest);
 
         assertEquals("minecraft:chest", serialized.blockEntityTypeId());
-        assertEquals(12, SharedBlockEntityRootNbt.Fields.X.read(serialized.data()).orElseThrow());
-        assertEquals(64, SharedBlockEntityRootNbt.Fields.Y.read(serialized.data()).orElseThrow());
-        assertEquals(-4, SharedBlockEntityRootNbt.Fields.Z.read(serialized.data()).orElseThrow());
-        assertEquals(Component.text("Vault"), SharedBlockEntityRootNbt.Fields.CUSTOM_NAME.read(serialized.data()).orElseThrow());
-        assertFalse(SharedBlockEntityRootNbt.Fields.ITEMS.read(serialized.data()).orElseThrow().isEmpty());
+        assertEquals(12, BlockEntityRootNbt.Fields.X.read(serialized.data()).orElseThrow());
+        assertEquals(64, BlockEntityRootNbt.Fields.Y.read(serialized.data()).orElseThrow());
+        assertEquals(-4, BlockEntityRootNbt.Fields.Z.read(serialized.data()).orElseThrow());
+        assertEquals(Component.text("Vault"), BlockEntityRootNbt.Fields.CUSTOM_NAME.read(serialized.data()).orElseThrow());
+        assertFalse(BlockEntityRootNbt.Fields.ITEMS.read(serialized.data()).orElseThrow().isEmpty());
 
         BlockState targetState = Blocks.CHEST.defaultBlockState();
         BlockEntity deserialized = serializer.deserialize(

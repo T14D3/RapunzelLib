@@ -4,7 +4,7 @@ import de.t14d3.rapunzellib.nbt.NbtSerializer;
 import de.t14d3.rapunzellib.nbt.RNbtCompound;
 import de.t14d3.rapunzellib.nbt.SerializationException;
 import de.t14d3.rapunzellib.nbt.SerializedEntity;
-import de.t14d3.rapunzellib.nbt.shared.generated.SharedEntityRootNbt;
+import de.t14d3.rapunzellib.nbt.generated.EntityRootNbt;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProblemReporter;
@@ -50,8 +50,8 @@ public final class SharedEntityNbtSerializerCore<L extends SharedEntityLocation>
     @Override
     public final @NotNull Entity deserialize(@NotNull SerializedEntity data, @NotNull L location) {
         try {
-            RNbtCompound tree = SharedEntityRootNbt.Fields.POS.write(data.data(), position(location));
-            tree = SharedEntityRootNbt.Fields.ROTATION.write(tree, rotation(location));
+            RNbtCompound tree = EntityRootNbt.Fields.POS.write(data.data(), position(location));
+            tree = EntityRootNbt.Fields.ROTATION.write(tree, rotation(location));
             CompoundTag nbt = SharedNbtIoSupport.fromTree(tree);
 
             ServerLevel level = location.level();
@@ -76,17 +76,17 @@ public final class SharedEntityNbtSerializerCore<L extends SharedEntityLocation>
         }
     }
 
-    protected final @NotNull RNbtCompound stripLocationData(@NotNull RNbtCompound nbt) {
+    private @NotNull RNbtCompound stripLocationData(@NotNull RNbtCompound nbt) {
         return Objects.requireNonNull(nbt, "nbt")
-            .remove(SharedEntityRootNbt.Paths.POS)
-            .remove(SharedEntityRootNbt.Paths.POS_X)
-            .remove(SharedEntityRootNbt.Paths.POS_Y)
-            .remove(SharedEntityRootNbt.Paths.POS_Z)
-            .remove(SharedEntityRootNbt.Paths.ROTATION)
-            .remove(SharedEntityRootNbt.Paths.ROTATION_YAW)
-            .remove(SharedEntityRootNbt.Paths.ROTATION_PITCH)
-            .remove(SharedEntityRootNbt.Paths.WORLD_UUID_LEAST)
-            .remove(SharedEntityRootNbt.Paths.WORLD_UUID_MOST);
+            .remove(EntityRootNbt.Paths.POS)
+            .remove(EntityRootNbt.Paths.POS_X)
+            .remove(EntityRootNbt.Paths.POS_Y)
+            .remove(EntityRootNbt.Paths.POS_Z)
+            .remove(EntityRootNbt.Paths.ROTATION)
+            .remove(EntityRootNbt.Paths.ROTATION_YAW)
+            .remove(EntityRootNbt.Paths.ROTATION_PITCH)
+            .remove(EntityRootNbt.Paths.WORLD_UUID_LEAST)
+            .remove(EntityRootNbt.Paths.WORLD_UUID_MOST);
     }
 
     private static @NotNull List<Double> position(@NotNull SharedEntityLocation location) {

@@ -5,7 +5,7 @@ import de.t14d3.rapunzellib.nbt.BlockEntityNbtSerializer;
 import de.t14d3.rapunzellib.nbt.RNbtCompound;
 import de.t14d3.rapunzellib.nbt.SerializationException;
 import de.t14d3.rapunzellib.nbt.SerializedBlockEntity;
-import de.t14d3.rapunzellib.nbt.shared.generated.SharedBlockEntityRootNbt;
+import de.t14d3.rapunzellib.nbt.generated.BlockEntityRootNbt;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -38,10 +38,10 @@ public final class SharedBlockEntityNbtSerializerCore<L extends SharedBlockEntit
         Objects.requireNonNull(location, "location");
 
         try {
-            RNbtCompound tree = SharedBlockEntityRootNbt.Fields.ID.write(data.data(), data.blockEntityTypeId());
-            tree = SharedBlockEntityRootNbt.Fields.X.write(tree, location.x());
-            tree = SharedBlockEntityRootNbt.Fields.Y.write(tree, location.y());
-            tree = SharedBlockEntityRootNbt.Fields.Z.write(tree, location.z());
+            RNbtCompound tree = BlockEntityRootNbt.Fields.ID.write(data.data(), data.blockEntityTypeId());
+            tree = BlockEntityRootNbt.Fields.X.write(tree, location.x());
+            tree = BlockEntityRootNbt.Fields.Y.write(tree, location.y());
+            tree = BlockEntityRootNbt.Fields.Z.write(tree, location.z());
 
             CompoundTag nbt = SharedNbtIoSupport.fromTree(tree);
             BlockEntity blockEntity = BlockEntity.loadStatic(location.pos(), location.state(), nbt, location.registries());
