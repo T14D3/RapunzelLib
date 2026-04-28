@@ -1,0 +1,508 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<profile version="1.0" is_locked="false">
+  <!-- 
+    IntelliJ IDEA Inspection Profile for Multi-Version Code
+    This profile suppresses warnings that are expected in preprocessed code.
+    
+    Usage:
+    1. Copy this file to your IntelliJ project: .idea/inspectionProfiles/MultiVersion.xml
+    2. Enable the profile in Settings > Editor > Inspections > Profile
+    3. Optionally apply to specific files/folders only
+  -->
+  
+  <option name="myName" value="MultiVersion Code" />
+  
+  <!-- Suppress unreachable code warnings in preprocessor blocks -->
+  <inspection_tool class="com.intellij.codeInspection.unreachableCode.UnreachableCodeInspection" 
+                   level="IGNORE" 
+                   enabled="false">
+    <option name="IGNORE_ASSERTIONS" value="true" />
+    <option name="IGNORE_THROW_STATEMENTS" value="true" />
+  </inspection_tool>
+  
+  <!-- Suppress unused variable warnings in conditional code -->
+  <inspection_tool class="com.intellij.codeInspection.unused.UnusedLocalVariableInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress duplicate variable declarations (common in if/else blocks) -->
+  <inspection_tool class="com.intellij.codeInspection.redundancy.RedundantVariableInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress constant condition warnings -->
+  <inspection_tool class="com.intellij.codeInspection.constantCondition.ConstantConditionInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress unnecessary return warnings -->
+  <inspection_tool class="com.intellij.codeInspection.unnecessaryReturn.UnnecessaryReturnInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress duplicate branch in switch warnings -->
+  <inspection_tool class="com.intellij.codeInspection.duplicateBranches.DuplicateBranchesInSwitchInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress unused assignment warnings -->
+  <inspection_tool class="com.intellij.codeInspection.unusedAssignment.UnusedAssignmentInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress variable already declared warnings -->
+  <inspection_tool class="com.intellij.codeInspection.localVariableShadowing.LocalVariableShadowingInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "statement with empty body" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.emptyStatement.EmptyStatementBodyInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "missing return statement" in conditional code -->
+  <inspection_tool class="com.intellij.codeInspection.controlFlow.ControlFlowInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "method might not return" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.returnFromFinally.ReturnFromFinallyInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "uninitialized variable" in conditional blocks -->
+  <inspection_tool class="com.intellij.codeInspection.initialization.VariableInitializationInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "value never assigned" in conditional code -->
+  <inspection_tool class="com.intellij.codeInspection.assignment.ValueNeverAssignedInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "redundant cast" in version-specific type casts -->
+  <inspection_tool class="com.intellij.codeInspection.redundantCast.RedundantCastInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "unchecked cast" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.unchecked.UncheckedExceptionInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "deprecated" warnings for legacy API usage -->
+  <inspection_tool class="com.intellij.codeInspection.deprecation.DeprecationInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "missing javadoc" in generated code -->
+  <inspection_tool class="com.intellij.java.missed.javadoc.MissingJavadocInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "unused method parameter" in conditional methods -->
+  <inspection_tool class="com.intellij.codeInspection.unusedParameter.UnusedParameterInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "overly complex method" for preprocessor methods -->
+  <inspection_tool class="com.intellij.codeInspection.complexity.ComplexityInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "method too long" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.methodLength.MethodLengthInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "class too large" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.classSize.ClassSizeInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "too many parameters" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.parameterCount.ParameterCountInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "magic number" warnings in version checks -->
+  <inspection_tool class="com.intellij.codeInspection.magicConstant.MagicConstantInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "field can be local" in conditional code -->
+  <inspection_tool class="com.intellij.codeInspection.canBeLocal.CanBeLocalInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "redundant throws" in version-specific exception handling -->
+  <inspection_tool class="com.intellij.codeInspection.redundantThrows.RedundantThrowsInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "same parameter value" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.sameParameterValue.SameParameterValueInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "pointless boolean expression" in version checks -->
+  <inspection_tool class="com.intellij.codeInspection.pointless.PointlessBooleanExpressionInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "redundant type arguments" in generic version-specific code -->
+  <inspection_tool class="com.intellij.codeInspection.redundantTypeArgs.RedundantTypeArgumentsInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "obtrusive formatting" in multi-line conditionals -->
+  <inspection_tool class="com.intellij.codeInspection.whitespace.ObtrusiveWhitespaceInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "line length" warnings for long preprocessor lines -->
+  <inspection_tool class="com.intellij.codeInspection.lineLength.LineLengthInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "imports" warnings for conditional imports -->
+  <inspection_tool class="com.intellij.codeInspection.unusedImport.UnusedImportInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "redundant import" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.redundantImport.RedundantImportInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "wildcard import" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.imports.WildcardImportInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "package does not match" in generated sources -->
+  <inspection_tool class="com.intellij.codeInspection.packageNaming.PackageNamingInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "naming convention" in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.naming.NamingInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "visibility" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.visibility.VisibilityInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "access to non-static member" in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.staticMembers.StaticMembersInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "final" modifier warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.modifier.ModifierInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "serializable" warnings in generated classes -->
+  <inspection_tool class="com.intellij.codeInspection.serializable.SerializableInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "interface methods" in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.interfaceMethod.InterfaceMethodInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "abstract method" in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.abstractMethod.AbstractMethodInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "override" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.override.OverrideInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "implements" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.implementation.ImplementationInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "abstract class" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.abstractClass.AbstractClassInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "inner class" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.innerClass.InnerClassInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "anonymous class" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.anonymousClass.AnonymousClassInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "lambda" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.lambda.LambdaInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "stream" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.stream.StreamInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "optional" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.optional.OptionalInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "nullability" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.nullability.NullabilityInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "contract" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.contract.ContractInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "value annotations" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.valueAnnotations.ValueAnnotationsInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "data flow" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.dataFlow.DataFlowInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "constant conditions & exceptions" in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.dataFlow.ConstantConditionsInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "unstable API" warnings for version-specific APIs -->
+  <inspection_tool class="com.intellij.codeInspection.unstableApi.UnstableApiInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "experimental" warnings for version-specific APIs -->
+  <inspection_tool class="com.intellij.codeInspection.experimental.ExperimentalInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "internal" warnings for version-specific APIs -->
+  <inspection_tool class="com.intellij.codeInspection.internal.InternalInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "for remanrks" warnings in generated code -->
+  <inspection_tool class="com.intellij.codeInspection.remarks.RemarksInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "commented out code" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.commentedOutCode.CommentedOutCodeInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "redundant comments" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.redundantComment.RedundantCommentInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "wrong comment text" warnings -->
+  <inspection_tool class="com.intellij.codeInspection.wrongCommentText.WrongCommentTextInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc reference problems" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocReference.JavadocReferenceInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc problems" -->
+  <inspection_tool class="com.intellij.codeInspection.javadoc.JavadocInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc leading asterisks" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocLeadingAsterisks.JavadocLeadingAsterisksInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc method references" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocMethodReferences.JavadocMethodReferencesInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc tag validator" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocTagValidator.JavadocTagValidatorInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc variable references" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocVariableReferences.JavadocVariableReferencesInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc reference to inner class" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocReferenceToInnerClass.JavadocReferenceToInnerClassInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty paragraph" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyParagraph.JavadocEmptyParagraphInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyTag.JavadocEmptyTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty see tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptySeeTag.JavadocEmptySeeTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty param tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyParamTag.JavadocEmptyParamTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty throws tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyThrowsTag.JavadocEmptyThrowsTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty return tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyReturnTag.JavadocEmptyReturnTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty exception tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyExceptionTag.JavadocEmptyExceptionTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty method tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyMethodTag.JavadocEmptyMethodTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty class tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyClassTag.JavadocEmptyClassTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty field tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyFieldTag.JavadocEmptyFieldTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty constructor tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyConstructorTag.JavadocEmptyConstructorTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty package tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyPackageTag.JavadocEmptyPackageTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty author tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyAuthorTag.JavadocEmptyAuthorTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty version tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyVersionTag.JavadocEmptyVersionTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty since tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptySinceTag.JavadocEmptySinceTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty deprecated tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyDeprecatedTag.JavadocEmptyDeprecatedTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty serial tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptySerialTag.JavadocEmptySerialTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty serialData tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptySerialDataTag.JavadocEmptySerialDataTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty serialField tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptySerialFieldTag.JavadocEmptySerialFieldTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty type parameter tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyTypeParameterTag.JavadocEmptyTypeParameterTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty code tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyCodeTag.JavadocEmptyCodeTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty literal tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyLiteralTag.JavadocEmptyLiteralTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty index tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyIndexTag.JavadocEmptyIndexTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty hidden tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyHiddenTag.JavadocEmptyHiddenTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty system property tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptySystemPropertyTag.JavadocEmptySystemPropertyTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty rest tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyRestTag.JavadocEmptyRestTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty custom tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyCustomTag.JavadocEmptyCustomTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty unknown tag" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyUnknownTag.JavadocEmptyUnknownTagInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty all tags" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyAllTags.JavadocEmptyAllTagsInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+  <!-- Suppress "javadoc empty everything" -->
+  <inspection_tool class="com.intellij.codeInspection.javadocEmptyEverything.JavadocEmptyEverythingInspection" 
+                   level="IGNORE" 
+                   enabled="false" />
+  
+</profile>

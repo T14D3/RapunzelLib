@@ -15,7 +15,11 @@ import de.t14d3.rapunzellib.registry.RRegistryRef;
 import net.kyori.adventure.text.Component;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.util.Unit;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -139,10 +143,17 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
             return resolved;
         }
         RKey typeKey = typeRef.key();
+        // #if VERSION >= 1.21.11
         Identifier location = Identifier.tryParse(typeKey.asString());
         if (location == null) {
             location = Identifier.withDefaultNamespace(typeKey.path());
         }
+        // #else
+        ResourceLocation location = ResourceLocation.tryParse(typeKey.asString());
+        if (location == null) {
+            location = ResourceLocation.withDefaultNamespace(typeKey.path());
+        }
+        // #endif
         return BuiltInRegistries.ITEM.getValue(location);
     }
 

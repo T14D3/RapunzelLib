@@ -47,7 +47,11 @@ public class ExplosionMixin {
 
         // Get explosion center
         BlockPos center = BlockPos.containing(explosion.center());
+        // #if VERSION >= 1.21.11
         String worldId = level.dimension().identifier().toString();
+        // #else
+        String worldId = level.dimension().location().toString();
+        // #endif
         RWorldRef worldRef = new RWorldRef(worldId, worldId);
         RBlockPos origin = new RBlockPos(center.getX(), center.getY(), center.getZ());
 

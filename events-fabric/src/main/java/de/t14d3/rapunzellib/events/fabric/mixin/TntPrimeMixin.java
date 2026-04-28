@@ -23,36 +23,34 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(TntBlock.class)
 public class TntPrimeMixin {
 
- /**
-  * Inject into wasExploded - called when TNT is exploded by another explosion.
-  */
- @Inject(
- method = "wasExploded",
- at = @At("HEAD"),
- cancellable = true
- )
- private void onTntExplodedPre(ServerLevel level, BlockPos pos, net.minecraft.world.level.Explosion explosion, CallbackInfo ci) {
- GameEventBus bus = SharedMixinEventsBridge.bus();
- if (bus == null) return;
+    /**
+     * Inject into wasExploded - called when TNT is exploded by another explosion.
+     */
+    @Inject(
+            method = "wasExploded",
+            at = @At("HEAD"),
+            cancellable = true
+    )
+    private void onTntExplodedPre(ServerLevel level, BlockPos pos, net.minecraft.world.level.Explosion explosion, CallbackInfo ci) {
+        GameEventBus bus = SharedMixinEventsBridge.bus();
+        if (bus == null) return;
 
- if (!bus.hasPreListeners(TntPrimePre.class)) return;
+        if (!bus.hasPreListeners(TntPrimePre.class)) return;
 
- String worldId = level.dimension().identifier().toString();
- RWorldRef worldRef = new RWorldRef(worldId, worldId);
- RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
- String blockTypeKey = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()).toString();
+        // #if VERSION >= 1.21.11
+        String worldId = level.dimension().identifier().toString();
+        // #else
+        String worldId = level.dimension().location().toString();
+        // #endif
+        RWorldRef worldRef = new RWorldRef(worldId, worldId);
+        RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
+        String blockTypeKey = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()).toString();
 
- TntPrimePre pre = new TntPrimePre(worldRef, rPos, blockTypeKey, "EXPLOSION", null);
- bus.dispatchPre(pre);
+        TntPrimePre pre = new TntPrimePre(worldRef, rPos, blockTypeKey, "EXPLOSION", null);
+        bus.dispatchPre(pre);
 
- if (pre.isDenied()) {
- ci.cancel();
- }
- }
-
- /**
-  * Inject into prime - called when TNT is primed (ignited).
-  * Note: prime is static, so we use @At("INVOKE") on call sites instead.
-  * For now, we capture the explosion-based priming via wasExploded.
-  */
+        if (pre.isDenied()) {
+            ci.cancel();
+        }
+    }
 }

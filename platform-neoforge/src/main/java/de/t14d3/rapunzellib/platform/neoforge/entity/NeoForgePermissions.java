@@ -1,9 +1,13 @@
 package de.t14d3.rapunzellib.platform.neoforge.entity;
 
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permission;
 import net.minecraft.server.permissions.PermissionLevel;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.server.permission.PermissionAPI;
 import net.neoforged.neoforge.server.permission.exceptions.UnregisteredPermissionException;
 import net.neoforged.neoforge.server.permission.nodes.PermissionNode;
@@ -23,6 +27,7 @@ final class NeoForgePermissions {
 
         Objects.requireNonNull(player, "player");
 
+        // #if VERSION >= 1.21.11
         Identifier key = Identifier.tryParse(permission);
         if (key == null) {
             // NeoForge permissions are node-based; fall back for non-resource identifiers (e.g. "myplugin.foo").
@@ -41,5 +46,25 @@ final class NeoForgePermissions {
             // If no permission handler has registered this node, fall back to a reasonable default.
             return player.permissions().hasPermission(new Permission.HasCommandLevel(PermissionLevel.OWNERS));
         }
+        // #else
+        ResourceLocation key = ResourceLocation.tryParse(permission);
+        if (key == null) {
+            // NeoForge permissions are node-based; fall back for non-resource identifiers (e.g. "myplugin.foo").
+            return player.getPermissionLevel() >= 4;
+        }
+
+        PermissionNode<Boolean> node = NODES.computeIfAbsent(key.toString(), ignored -> new PermissionNode<>(
+            key,
+            PermissionTypes.BOOLEAN,
+            (p, uuid, dynamics) -> p != null && p.getPermissionLevel() >= 4
+        ));
+
+        try {
+            return PermissionAPI.getPermission(player, node);
+        } catch (UnregisteredPermissionException ignored) {
+            // If no permission handler has registered this node, fall back to a reasonable default.
+            return player.getPermissionLevel() >= 4;
+        }
+        // #endif
     }
 }

@@ -54,7 +54,11 @@ public final class SharedLifecycleEventHooks {
     }
 
     private static @NotNull RWorldRef worldRef(@NotNull ServerLevel level) {
+        // #if VERSION >= 1.21.11
         RKey id = RKey.of(level.dimension().identifier().toString());
+        // #else
+        RKey id = RKey.of(level.dimension().location().toString());
+        // #endif
         return new RWorldRef(null, id);
     }
 }

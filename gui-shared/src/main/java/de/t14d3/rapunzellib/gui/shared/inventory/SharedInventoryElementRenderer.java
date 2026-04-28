@@ -11,7 +11,11 @@ import de.t14d3.rapunzellib.nbt.item.ItemStackAdapter;
 import net.kyori.adventure.text.Component;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemLore;
@@ -58,7 +62,11 @@ public final class SharedInventoryElementRenderer {
 
     private @NotNull Item resolveItem(@Nullable Icon icon) {
         if (icon instanceof Icon.ItemIcon itemIcon) {
+            // #if VERSION >= 1.21.11
             Identifier location = Identifier.tryParse(GuiInventoryPresentation.normalizeItemKey(itemIcon.itemId(), "minecraft:stone"));
+            // #else
+            ResourceLocation location = ResourceLocation.tryParse(GuiInventoryPresentation.normalizeItemKey(itemIcon.itemId(), "minecraft:stone"));
+            // #endif
             if (location != null) {
                 Item item = BuiltInRegistries.ITEM.getValue(location);
                 if (item != null && item != net.minecraft.world.item.Items.AIR) {
@@ -70,7 +78,11 @@ public final class SharedInventoryElementRenderer {
     }
 
     private @NotNull Item resolveItem(@NotNull String itemKey) {
+        // #if VERSION >= 1.21.11
         Identifier location = Identifier.tryParse(GuiInventoryPresentation.normalizeItemKey(itemKey, "minecraft:stone"));
+        // #else
+        ResourceLocation location = ResourceLocation.tryParse(GuiInventoryPresentation.normalizeItemKey(itemKey, "minecraft:stone"));
+        // #endif
         if (location == null) {
             return net.minecraft.world.item.Items.STONE;
         }

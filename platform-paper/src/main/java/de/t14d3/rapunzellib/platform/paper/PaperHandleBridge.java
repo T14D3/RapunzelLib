@@ -2,12 +2,9 @@ package de.t14d3.rapunzellib.platform.paper;
 
 import de.t14d3.rapunzellib.objects.RKey;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -59,18 +56,13 @@ public final class PaperHandleBridge {
 
     public static @NotNull Optional<World> toBukkit(@NotNull ServerLevel level) {
         Objects.requireNonNull(level, "level");
+        // #if VERSION >= 1.21.11
         NamespacedKey key = NamespacedKey.fromString(level.dimension().identifier().toString());
+        // #else
+        // # NamespacedKey key = NamespacedKey.fromString(level.dimension().location().toString());
+        // #endif
         if (key == null) return Optional.empty();
         return Optional.ofNullable(Bukkit.getWorld(key));
-    }
-
-    public static @NotNull Optional<ServerLevel> levelFromKey(@NotNull MinecraftServer server, @NotNull RKey keyValue) {
-        Objects.requireNonNull(server, "server");
-        Objects.requireNonNull(keyValue, "keyValue");
-        Identifier location = Identifier.tryParse(keyValue.asString());
-        if (location == null) return Optional.empty();
-        ResourceKey<Level> key = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, location);
-        return Optional.ofNullable(server.getLevel(key));
     }
 
     public static @NotNull Optional<ServerLevel> levelFromName(@NotNull MinecraftServer server, @NotNull String worldName) {
@@ -94,7 +86,11 @@ public final class PaperHandleBridge {
     }
 
     public static @NotNull RKey worldKey(@NotNull ServerLevel level) {
+        // #if VERSION >= 1.21.11
         return RKey.of(level.dimension().identifier().toString());
+        // #else
+        return RKey.of(level.dimension().location().toString());
+        // #endif
     }
 
     public static @NotNull UUID worldUuid(@NotNull ServerLevel level) {

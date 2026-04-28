@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.gradle;
 
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.artifacts.MinimalExternalModuleDependency;
 import org.gradle.api.artifacts.repositories.PasswordCredentials;
 import org.gradle.api.artifacts.VersionCatalog;
 import org.gradle.api.artifacts.VersionCatalogsExtension;
@@ -21,7 +22,7 @@ import java.lang.reflect.Method;
 
 import de.t14d3.rapunzellib.gradle.tasks.CheckReposiliteConfigTask;
 
-final class ConventionPluginSupport {
+public final class ConventionPluginSupport {
     private static final int JAVA_VERSION = 21;
     private static final String REPOSILITE_REPOSITORY_NAME = "reposilite";
     private static final String DEFAULT_REPOSILITE_BASE_URL = "https://maven.t14d3.de";
@@ -29,13 +30,13 @@ final class ConventionPluginSupport {
     private ConventionPluginSupport() {
     }
 
-    static void applyBaseJavaModule(Project project) {
+    public static void applyBaseJavaModule(Project project) {
         project.getPluginManager().apply("java-library");
         project.getPluginManager().apply("de.t14d3.rapunzellib");
         configureJavaToolchain(project);
     }
 
-    static void configureJavaToolchain(Project project) {
+    public static void configureJavaToolchain(Project project) {
         JavaPluginExtension java = project.getExtensions().findByType(JavaPluginExtension.class);
         if (java != null) {
             java.getToolchain().getLanguageVersion().set(JavaLanguageVersion.of(JAVA_VERSION));
@@ -46,7 +47,7 @@ final class ConventionPluginSupport {
         project.getTasks().withType(Test.class).configureEach(Test::useJUnitPlatform);
     }
 
-    static void configureMavenPublishing(Project project) {
+    public static void configureMavenPublishing(Project project) {
         if (isInternalPublishModule(project.getName())) {
             return;
         }
@@ -70,7 +71,7 @@ final class ConventionPluginSupport {
         attachArtifactIfPresent(project, publication, "remapShadowJar");
     }
 
-    static TaskProvider<CheckReposiliteConfigTask> registerReposiliteConfigCheck(Project rootProject) {
+    public static TaskProvider<CheckReposiliteConfigTask> registerReposiliteConfigCheck(Project rootProject) {
         return rootProject.getTasks().register("checkReposiliteConfig", CheckReposiliteConfigTask.class, task -> {
             task.setGroup("publishing");
             task.setDescription("Validates the Reposilite configuration required for remote publishing.");
@@ -84,14 +85,14 @@ final class ConventionPluginSupport {
         });
     }
 
-    static TaskProvider<Task> registerPublishToReposilite(Project rootProject) {
+    public static TaskProvider<Task> registerPublishToReposilite(Project rootProject) {
         return rootProject.getTasks().register("publishToReposilite", task -> {
             task.setGroup("publishing");
             task.setDescription("Publishes all Reposilite-targeted Maven publications from publishable subprojects.");
         });
     }
 
-    static void configureReposilitePublishing(Project project, TaskProvider<CheckReposiliteConfigTask> checkReposiliteConfig) {
+    public static void configureReposilitePublishing(Project project, TaskProvider<CheckReposiliteConfigTask> checkReposiliteConfig) {
         PublishingExtension publishing = project.getExtensions().findByType(PublishingExtension.class);
         if (publishing == null) {
             return;
@@ -116,11 +117,11 @@ final class ConventionPluginSupport {
         });
     }
 
-    static void addLibraryDependency(Project project, String configuration, String alias) {
+    public static void addLibraryDependency(Project project, String configuration, String alias) {
         project.getDependencies().add(configuration, library(project, alias));
     }
 
-    static void addProjectDependency(Project project, String configuration, String path) {
+    public static void addProjectDependency(Project project, String configuration, String path) {
         if (path.equals(project.getPath())) {
             return;
         }
@@ -129,13 +130,13 @@ final class ConventionPluginSupport {
         }
     }
 
-    static void addFamilyAndSharedDependencies(Project project) {
+    public static void addFamilyAndSharedDependencies(Project project) {
         String family = project.getName().substring(0, project.getName().indexOf('-'));
         addProjectDependency(project, "api", ":" + family);
         addProjectDependency(project, "implementation", ":" + family + "-shared");
     }
 
-    static void configurePaperweightUserdev(Project project) {
+    public static void configurePaperweightUserdev(Project project) {
         Object extension = ((ExtensionAware) project.getDependencies()).getExtensions().findByName("paperweight");
         if (extension == null) {
             return;
@@ -147,7 +148,7 @@ final class ConventionPluginSupport {
         invoke(method, extension, version(project, "paper-api"));
     }
 
-    static void configureFabricLoom(Project project) {
+    public static void configureFabricLoom(Project project) {
         Object loom = project.getExtensions().findByName("loom");
         if (loom == null) {
             return;
@@ -163,7 +164,7 @@ final class ConventionPluginSupport {
         project.getDependencies().add("modImplementation", library(project, "fabric-loader"));
     }
 
-    static void configureNeoForge(Project project) {
+    public static void configureNeoForge(Project project) {
         Object extension = project.getExtensions().findByName("neoForge");
         if (extension == null) {
             return;
@@ -174,7 +175,7 @@ final class ConventionPluginSupport {
         }
     }
 
-    static void configureVanillaMinecraft(Project project) {
+    public static void configureVanillaMinecraft(Project project) {
         MinecraftExtension extension = project.getExtensions().findByType(MinecraftExtension.class);
         if (extension == null) {
             return;
@@ -195,11 +196,63 @@ final class ConventionPluginSupport {
     }
 
     private static Object library(Project project, String alias) {
-        return libs(project).findLibrary(alias).orElseThrow().get();
+        MinimalExternalModuleDependency dependency = libs(project).findLibrary(alias).orElseThrow().get();
+        String overrideVersion = versionOverride(project, alias);
+        if (overrideVersion == null) {
+            return dependency;
+        }
+        return dependency.getModule().getGroup() + ":" + dependency.getModule().getName() + ":" + overrideVersion;
     }
 
     private static String version(Project project, String alias) {
+        String overrideVersion = versionOverride(project, alias);
+        if (overrideVersion != null) {
+            return overrideVersion;
+        }
         return libs(project).findVersion(alias).orElseThrow().getRequiredVersion();
+    }
+
+    private static String versionOverride(Project project, String alias) {
+        String activeTarget = optionalProperty(project, "rapunzellib.minecraftTarget", "RAPUNZELLIB_MINECRAFT_TARGET");
+        if (activeTarget != null) {
+            String targetOverride = optionalProperty(project, "rapunzellib.version." + activeTarget + "." + alias, null);
+            if (targetOverride != null) {
+                return targetOverride;
+            }
+
+            String targetCatalogOverride = versionCatalogOverride(project, alias, activeTarget);
+            if (targetCatalogOverride != null) {
+                return targetCatalogOverride;
+            }
+        }
+
+        String globalOverride = optionalProperty(project, "rapunzellib.version." + alias, null);
+        if (globalOverride != null) {
+            return globalOverride;
+        }
+
+        if ("minecraft".equals(alias) && activeTarget != null) {
+            return activeTarget;
+        }
+        if ("paper-api".equals(alias) && activeTarget != null) {
+            return activeTarget + "-R0.1-SNAPSHOT";
+        }
+
+        return null;
+    }
+
+    private static String versionCatalogOverride(Project project, String alias, String activeTarget) {
+        String targetAlias = alias + "-ver-" + activeTarget;
+        String override = libs(project).findVersion(targetAlias).map(version -> version.getRequiredVersion()).orElse(null);
+        if (override != null) {
+            return override;
+        }
+
+        String sanitizedTargetAlias = alias + "-ver-" + activeTarget.replaceAll("[^A-Za-z0-9]", "_");
+        if (sanitizedTargetAlias.equals(targetAlias)) {
+            return null;
+        }
+        return libs(project).findVersion(sanitizedTargetAlias).map(version -> version.getRequiredVersion()).orElse(null);
     }
 
     private static boolean isInternalPublishModule(String projectName) {
@@ -209,7 +262,7 @@ final class ConventionPluginSupport {
         return "platform-shared".equals(projectName) || projectName.endsWith("-shared");
     }
 
-    static boolean publishesToReposilite(Project project) {
+    public static boolean publishesToReposilite(Project project) {
         String projectName = project.getName();
         if ("bom".equals(projectName) || "gradle-plugin".equals(projectName)) {
             return true;
@@ -239,6 +292,9 @@ final class ConventionPluginSupport {
             return stringValue.trim();
         }
 
+        if (environmentName == null) {
+            return null;
+        }
         String environmentValue = System.getenv(environmentName);
         if (environmentValue != null && !environmentValue.trim().isEmpty()) {
             return environmentValue.trim();

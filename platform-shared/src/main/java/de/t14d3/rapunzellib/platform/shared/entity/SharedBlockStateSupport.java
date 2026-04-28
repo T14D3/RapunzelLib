@@ -5,7 +5,11 @@ import de.t14d3.rapunzellib.registry.RBlockType;
 import de.t14d3.rapunzellib.registry.RRegistryHandles;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.registries.BuiltInRegistries;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
@@ -89,7 +93,11 @@ final class SharedBlockStateSupport {
             return Optional.empty();
         }
 
+        // #if VERSION >= 1.21.11
         Identifier key = id.contains(":") ? Identifier.tryParse(id) : Identifier.withDefaultNamespace(id);
+        // #else
+        ResourceLocation key = id.contains(":") ? ResourceLocation.tryParse(id) : ResourceLocation.withDefaultNamespace(id);
+        // #endif
         if (key == null) {
             return Optional.empty();
         }
@@ -118,10 +126,19 @@ final class SharedBlockStateSupport {
         return Optional.of(new ParsedState(key, assignments));
     }
 
+    // #if VERSION >= 1.21.11
     private record ParsedState(@NotNull Identifier key, @NotNull String[] assignments) {
         private ParsedState {
             Objects.requireNonNull(key, "key");
             Objects.requireNonNull(assignments, "assignments");
         }
     }
+    // #else
+    private record ParsedState(@NotNull ResourceLocation key, @NotNull String[] assignments) {
+        private ParsedState {
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(assignments, "assignments");
+        }
+    }
+    // #endif
 }

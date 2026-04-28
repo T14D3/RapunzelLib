@@ -225,7 +225,11 @@ public final class SharedBlockMixinHooks {
     }
 
     private static @NotNull RKey worldKey(@NotNull ServerLevel level) {
+        // #if VERSION >= 1.21.11
         return RKey.of(level.dimension().identifier().toString());
+        // #else
+        return RKey.of(level.dimension().location().toString());
+        // #endif
     }
 
     private static @NotNull RKey blockKey(@NotNull BlockState state) {

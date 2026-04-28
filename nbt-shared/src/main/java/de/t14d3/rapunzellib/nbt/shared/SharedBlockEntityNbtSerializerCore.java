@@ -10,7 +10,11 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import org.jetbrains.annotations.NotNull;
@@ -57,7 +61,7 @@ public final class SharedBlockEntityNbtSerializerCore<L extends SharedBlockEntit
     }
 
     private static @NotNull RKey typeKey(@NotNull BlockEntityType<?> type) {
-        Identifier key = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(Objects.requireNonNull(type, "type"));
+        var key = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(Objects.requireNonNull(type, "type"));
         if (key == null) {
             throw new SerializationException("Unknown block entity type: " + type);
         }

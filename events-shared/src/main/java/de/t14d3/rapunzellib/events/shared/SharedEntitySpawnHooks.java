@@ -84,7 +84,11 @@ public final class SharedEntitySpawnHooks {
     }
 
     private static @NotNull RWorldRef worldRef(@NotNull Level level) {
+        // #if VERSION >= 1.21.11
         String worldId = level.dimension().identifier().toString();
+        // #else
+        String worldId = level.dimension().location().toString();
+        // #endif
         return new RWorldRef(worldId, worldId);
     }
 

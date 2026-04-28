@@ -142,7 +142,11 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         BlockPos pos = event.getPos();
         RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
         RPlayer rPlayer = Rapunzel.players().require(player);
+        // #if VERSION >= 1.21.11
         RKey worldKey = RKey.of(level.dimension().identifier().toString());
+        // #else
+        RKey worldKey = RKey.of(level.dimension().location().toString());
+        // #endif
         RWorldRef worldRef = new RWorldRef(null, worldKey);
         RKey placedKey = RKey.of(BuiltInRegistries.BLOCK.getKey(event.getPlacedBlock().getBlock()).toString());
         boolean cancelled = event.isCanceled();

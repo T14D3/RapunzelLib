@@ -6,7 +6,11 @@ import de.t14d3.rapunzellib.common.registry.AbstractTypeRegistry;
 import de.t14d3.rapunzellib.registry.RBlockType;
 import de.t14d3.rapunzellib.registry.RBlockTypeRegistry;
 import net.minecraft.core.registries.BuiltInRegistries;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.world.level.block.Block;
 import org.jetbrains.annotations.NotNull;
 
@@ -17,7 +21,11 @@ public final class SharedBlockTypeRegistry extends AbstractTypeRegistry<Block, S
 
     public SharedBlockTypeRegistry(@NotNull PlatformId platformId) {
         super(
+            // #if VERSION >= 1.21.11
             requestedKey -> BuiltInRegistries.BLOCK.getValue(Identifier.fromNamespaceAndPath(requestedKey.namespace(), requestedKey.path())),
+            // #else
+            requestedKey -> BuiltInRegistries.BLOCK.getValue(ResourceLocation.fromNamespaceAndPath(requestedKey.namespace(), requestedKey.path())),
+            // #endif
             () -> BuiltInRegistries.BLOCK,
             handle -> RKey.of(BuiltInRegistries.BLOCK.getKey(handle).toString()),
             RBlockType.class

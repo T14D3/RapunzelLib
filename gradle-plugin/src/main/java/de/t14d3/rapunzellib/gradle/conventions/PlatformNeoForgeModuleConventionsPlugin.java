@@ -1,4 +1,4 @@
-package de.t14d3.rapunzellib.gradle;
+package de.t14d3.rapunzellib.gradle.conventions;
 
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;

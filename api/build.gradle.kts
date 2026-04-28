@@ -9,16 +9,23 @@ plugins {
     alias(libs.plugins.rapunzellib)
 }
 
+val activeMinecraftTarget = providers.gradleProperty("rapunzellib.minecraftTarget")
+    .orElse(providers.gradleProperty("rapunzellib.minecraftCoreVersion"))
+    .orElse(libs.versions.minecraft)
+val activePaperApiVersion = providers.gradleProperty("rapunzellib.version.${activeMinecraftTarget.get()}.paper-api")
+    .orElse(providers.gradleProperty("rapunzellib.version.paper-api"))
+    .orElse(activeMinecraftTarget.map { "$it-R0.1-SNAPSHOT" })
+
 val mainCompileClasspath = the<SourceSetContainer>().named("main").map { it.compileClasspath }
 val paperMappedServerJar = project(":platform-paper").layout.projectDirectory.file(".gradle/caches/paperweight/taskCache/mappedServerJar.jar")
 val paperDevBundleRuntime =
     configurations.detachedConfiguration(
-        dependencies.create("io.papermc.paper:dev-bundle:${libs.versions.paper.api.get()}")
+        dependencies.create("io.papermc.paper:dev-bundle:${activePaperApiVersion.get()}")
     )
 val paperParityClasspath = files(paperMappedServerJar, paperDevBundleRuntime)
 
 minecraft {
-    version(libs.versions.minecraft.get())
+    version(activeMinecraftTarget.get())
     platform(MinecraftPlatform.SERVER)
 }
 

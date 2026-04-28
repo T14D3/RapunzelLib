@@ -4,7 +4,11 @@ import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import net.minecraft.resources.ResourceKey;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.NotNull;
@@ -35,7 +39,11 @@ public interface SharedWorldHooks {
 
         RKey key = worldRef.key();
         if (key != null) {
+            // #if VERSION >= 1.21.11
             Identifier resourceLocation = Identifier.tryParse(key.asString());
+            // #else
+            ResourceLocation resourceLocation = ResourceLocation.tryParse(key.asString());
+            // #endif
             if (resourceLocation != null) {
                 ServerLevel level = server.getLevel(ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, resourceLocation));
                 if (level != null) {
@@ -77,6 +85,10 @@ public interface SharedWorldHooks {
 
     static @NotNull RKey key(@NotNull ServerLevel level) {
         Objects.requireNonNull(level, "level");
+        // #if VERSION >= 1.21.11
         return RKey.of(level.dimension().identifier().toString());
+        // #else
+        return RKey.of(level.dimension().location().toString());
+        // #endif
     }
 }

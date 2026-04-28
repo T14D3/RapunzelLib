@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.gradle;
 
+import de.t14d3.rapunzellib.multiversion.MultiVersionExtension;
 import org.gradle.api.Action;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Project;
@@ -19,6 +20,7 @@ public abstract class RapunzelLibExtension {
     private final KeyCatalogGenerationExtension keyCatalog;
     private final NamedDomainObjectContainer<RegistryCatalogSpec> registryCatalogs;
     private final RNbtSchemaGenerationExtension rNbtSchema;
+    private final MultiVersionExtension multiVersion;
 
     @Inject
     public RapunzelLibExtension(ObjectFactory objects) {
@@ -28,6 +30,7 @@ public abstract class RapunzelLibExtension {
             name -> objects.newInstance(RegistryCatalogSpec.class, name)
         );
         this.rNbtSchema = objects.newInstance(RNbtSchemaGenerationExtension.class);
+        this.multiVersion = objects.newInstance(MultiVersionExtension.class);
     }
 
     public abstract RegularFileProperty getMessagesFile();
@@ -70,44 +73,55 @@ public abstract class RapunzelLibExtension {
         return registryCatalogs;
     }
 
-    public RNbtSchemaGenerationExtension getRNbtSchema() {
-        return rNbtSchema;
-    }
+public RNbtSchemaGenerationExtension getRNbtSchema() {
+    return rNbtSchema;
+}
 
-    public void keyCatalog(Action<? super KeyCatalogGenerationExtension> action) {
-        action.execute(keyCatalog);
-    }
+public MultiVersionExtension getMultiVersion() {
+    return multiVersion;
+}
 
-    public void registryCatalogs(Action<? super NamedDomainObjectContainer<RegistryCatalogSpec>> action) {
-        action.execute(registryCatalogs);
-    }
+public void keyCatalog(Action<? super KeyCatalogGenerationExtension> action) {
+    action.execute(keyCatalog);
+}
 
-    public void rNbtSchema(Action<? super RNbtSchemaGenerationExtension> action) {
-        action.execute(rNbtSchema);
-    }
+public void registryCatalogs(Action<? super NamedDomainObjectContainer<RegistryCatalogSpec>> action) {
+    action.execute(registryCatalogs);
+}
 
-    public void applyDefaultConventions(Project project) {
-        getMessagesFile().convention(project.getLayout().getProjectDirectory().file("src/main/resources/messages.yml"));
-        getAdditionalMessagesFiles().convention(List.of());
-        getFailOnUnusedKeys().convention(true);
-        getAlwaysUsedKeys().convention(Set.of("prefix"));
-        getMessageKeyCallOwners().convention(Set.of());
-        getMessageKeyCallMethods().convention(Set.of("getMessage", "getRaw"));
-        getMessageKeyPrefix().convention("");
+public void rNbtSchema(Action<? super RNbtSchemaGenerationExtension> action) {
+    action.execute(rNbtSchema);
+}
 
-        getTemplateOutputDir().convention(project.getLayout().getProjectDirectory().dir("template"));
-        getTemplateBasePackage().convention("de.t14d3");
-        getTemplateProjectName().convention(project.getName());
+public void multiVersion(Action<? super MultiVersionExtension> action) {
+    action.execute(multiVersion);
+}
 
-        getScaffoldOutputDir().convention(project.getLayout().getProjectDirectory().dir("platform-adapter-scaffold"));
-        getScaffoldBasePackage().convention("de.t14d3.rapunzellib");
-        getScaffoldPlatformKey().convention("custom");
-        getScaffoldSharedCoreFamily().convention(ModuleMatrix.SHARED_CORE_FAMILY_AUTO);
-        getScaffoldSharedCoreFeatures().convention(Set.of());
-        getScaffoldFeatures().convention(Set.of("commands", "events", "gui", "inventory", "nbt"));
+public void applyDefaultConventions(Project project) {
+    getMessagesFile().convention(project.getLayout().getProjectDirectory().file("src/main/resources/messages.yml"));
+    getAdditionalMessagesFiles().convention(List.of());
+    getFailOnUnusedKeys().convention(true);
+    getAlwaysUsedKeys().convention(Set.of("prefix"));
+    getMessageKeyCallOwners().convention(Set.of());
+    getMessageKeyCallMethods().convention(Set.of("getMessage", "getRaw"));
+    getMessageKeyPrefix().convention("");
 
-        keyCatalog.applyDefaultConventions(project);
-        rNbtSchema.applyDefaultConventions(project);
-        registryCatalogs.configureEach(spec -> spec.applyDefaultConventions(project));
-    }
+    getTemplateOutputDir().convention(project.getLayout().getProjectDirectory().dir("template"));
+    getTemplateBasePackage().convention("de.t14d3");
+    getTemplateProjectName().convention(project.getName());
+
+    getScaffoldOutputDir().convention(project.getLayout().getProjectDirectory().dir("platform-adapter-scaffold"));
+    getScaffoldBasePackage().convention("de.t14d3.rapunzellib");
+    getScaffoldPlatformKey().convention("custom");
+    getScaffoldSharedCoreFamily().convention(ModuleMatrix.SHARED_CORE_FAMILY_AUTO);
+    getScaffoldSharedCoreFeatures().convention(Set.of());
+    getScaffoldFeatures().convention(Set.of("commands", "events", "gui", "inventory", "nbt"));
+
+    multiVersion.getEnabled().convention(false);
+    multiVersion.getTargetVersions().convention(List.of());
+
+    keyCatalog.applyDefaultConventions(project);
+    rNbtSchema.applyDefaultConventions(project);
+    registryCatalogs.configureEach(spec -> spec.applyDefaultConventions(project));
+}
 }

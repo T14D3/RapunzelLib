@@ -15,7 +15,11 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -208,7 +212,11 @@ public final class DialogPacketHandler {
     }
 
     public record DialogOpenPayload(String json) implements CustomPacketPayload {
+        // #if VERSION >= 1.21.11
         public static final Identifier CHANNEL = Identifier.parse("rapunzellib:dialog_open");
+        // #else
+        public static final ResourceLocation CHANNEL = ResourceLocation.parse("rapunzellib:dialog_open");
+        // #endif
         public static final CustomPacketPayload.Type<DialogOpenPayload> TYPE = new CustomPacketPayload.Type<>(CHANNEL);
         public static final StreamCodec<FriendlyByteBuf, DialogOpenPayload> CODEC = StreamCodec.of(
             DialogOpenPayload::write,
@@ -230,7 +238,11 @@ public final class DialogPacketHandler {
     }
 
     public record DialogResponsePayload(String json) implements CustomPacketPayload {
+        // #if VERSION >= 1.21.11
         public static final Identifier CHANNEL = Identifier.parse("rapunzellib:dialog_response");
+        // #else
+        public static final ResourceLocation CHANNEL = ResourceLocation.parse("rapunzellib:dialog_response");
+        // #endif
         public static final CustomPacketPayload.Type<DialogResponsePayload> TYPE = new CustomPacketPayload.Type<>(CHANNEL);
         public static final StreamCodec<FriendlyByteBuf, DialogResponsePayload> CODEC = StreamCodec.of(
             DialogResponsePayload::write,

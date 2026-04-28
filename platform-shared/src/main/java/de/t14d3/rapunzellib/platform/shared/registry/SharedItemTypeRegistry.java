@@ -6,7 +6,11 @@ import de.t14d3.rapunzellib.common.registry.AbstractTypeRegistry;
 import de.t14d3.rapunzellib.registry.RItemType;
 import de.t14d3.rapunzellib.registry.RItemTypeRegistry;
 import net.minecraft.core.registries.BuiltInRegistries;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.world.item.Item;
 import org.jetbrains.annotations.NotNull;
 
@@ -17,7 +21,11 @@ public final class SharedItemTypeRegistry extends AbstractTypeRegistry<Item, Sha
 
     public SharedItemTypeRegistry(@NotNull PlatformId platformId) {
         super(
+            // #if VERSION >= 1.21.11
             requestedKey -> BuiltInRegistries.ITEM.getValue(Identifier.fromNamespaceAndPath(requestedKey.namespace(), requestedKey.path())),
+            // #else
+            requestedKey -> BuiltInRegistries.ITEM.getValue(ResourceLocation.fromNamespaceAndPath(requestedKey.namespace(), requestedKey.path())),
+            // #endif
             () -> BuiltInRegistries.ITEM,
             handle -> RKey.of(BuiltInRegistries.ITEM.getKey(handle).toString()),
             RItemType.class

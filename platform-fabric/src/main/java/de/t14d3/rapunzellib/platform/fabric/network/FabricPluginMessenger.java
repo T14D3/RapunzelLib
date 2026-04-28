@@ -10,7 +10,11 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.FriendlyByteBuf;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
@@ -34,7 +38,11 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
     private final MinecraftServer server;
     private final Logger logger;
     private final Gson gson = JsonCodecs.gson();
+    // #if VERSION >= 1.21.11
     private final Identifier channelId = Identifier.parse(NetworkConstants.TRANSPORT_CHANNEL);
+    // #else
+    private final ResourceLocation channelId = ResourceLocation.parse(NetworkConstants.TRANSPORT_CHANNEL);
+    // #endif
     private final AtomicLong lastNoCarrierLog = new AtomicLong(0L);
 
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
@@ -154,7 +162,11 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
      * Payload carrying the JSON-encoded NetworkEnvelope over the proxy bridge.
      */
     public record BridgePayload(String json) implements net.minecraft.network.protocol.common.custom.CustomPacketPayload {
+        // #if VERSION >= 1.21.11
         public static final Type<BridgePayload> TYPE = new Type<>(Identifier.parse(NetworkConstants.TRANSPORT_CHANNEL));
+        // #else
+        public static final Type<BridgePayload> TYPE = new Type<>(ResourceLocation.parse(NetworkConstants.TRANSPORT_CHANNEL));
+        // #endif
         public static final StreamCodec<FriendlyByteBuf, BridgePayload> CODEC = StreamCodec.of(
                 BridgePayload::write,
                 BridgePayload::read

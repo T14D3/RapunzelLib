@@ -29,6 +29,7 @@ userdev = "2.0.0-beta.19"
 vanilla-gradle = "0.2.2"
 velocity-api = "3.4.0-SNAPSHOT"
 neoforge = "21.11.42"
+neoforge-ver-1_21_10 = "21.10.64"
 neoforge-moddev = "2.0.137"
 sponge-api = "11.0.0"
 

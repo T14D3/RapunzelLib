@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IntelliJ IDEA Compiler Settings for Multi-Version Code
+  
+  This configures the Java compiler to accept code patterns common in
+  multi-version preprocessed code.
+  
+  Place in: .idea/compiler.xml
+-->
+<project version="4">
+  <component name="CompilerConfiguration">
+    <!-- Disable deprecation warnings for legacy API usage -->
+    <option name="DEPRECATED_WARNING" value="false" />
+    
+    <!-- Additional compiler options -->
+    <option name="ADDITIONAL_OPTIONS_STRING" value="-Xlint:-deprecation -Xlint:-unchecked" />
+    
+    <!-- Ignore warnings in generated sources -->
+    <bytecodeTargetLevel>
+      <module name="RapunzelLib.main" target="17" />
+    </bytecodeTargetLevel>
+    
+    <!-- Exclude generated sources from inspection -->
+    <excludeFromCompile>
+      <directory url="file://$PROJECT_DIR$/build/generated-sources/multiversion" includeSubdirectories="true" />
+    </excludeFromCompile>
+  </component>
+  
+  <!-- Annotation processors for generated code -->
+  <component name="AnnotationProcessing">
+    <profile default="true" name="Default" enabled="true" />
+  </component>
+</project>

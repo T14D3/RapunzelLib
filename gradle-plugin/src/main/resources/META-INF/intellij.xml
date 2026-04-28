@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IntelliJ IDEA Settings for Multi-Version Code
+  
+  This file configures IntelliJ to better handle multi-version preprocessor directives.
+  Place this in your project's .idea/ directory.
+-->
+<project version="4">
+  <component name="InspectionProjectProfileManager">
+    <option name="PROJECT_PROFILE" value="MultiVersion" />
+    <option name="USE_PROJECT_PROFILE" value="true" />
+    <version value="1.0" />
+    <profile version="1.0">
+      <option name="myName" value="MultiVersion" />
+      <option name="myLocal" value="true" />
+      <inspection_tool class="com.intellij.codeInspection.unreachableCode.UnreachableCodeInspection" 
+                       enabled="false" 
+                       level="WARNING" />
+      <inspection_tool class="com.intellij.codeInspection.constantCondition.ConstantConditionInspection" 
+                       enabled="false" 
+                       level="WARNING" />
+      <inspection_tool class="com.intellij.codeInspection.unusedAssignment.UnusedAssignmentInspection" 
+                       enabled="false" 
+                       level="WARNING" />
+      <inspection_tool class="com.intellij.codeInspection.redundantCast.RedundantCastInspection" 
+                       enabled="false" 
+                       level="WARNING" />
+      <inspection_tool class="com.intellij.codeInspection.deprecation.DeprecationInspection" 
+                       enabled="false" 
+                       level="WARNING" />
+      <inspection_tool class="com.intellij.codeInspection.pointless.PointlessBooleanExpressionInspection" 
+                       enabled="false" 
+                       level="WARNING" />
+    </profile>
+  </component>
+  
+  <!-- Code Style Settings -->
+  <component name="ProjectCodeStyleConfiguration">
+    <code_scheme name="MultiVersion" version="173">
+      <option name="LINE_SEPARATOR" value="&#xA;" />
+      <JavaCodeStyleSettings>
+        <option name="CLASS_COUNT_TO_USE_IMPORT_ON_DEMAND" value="999" />
+        <option name="NAMES_COUNT_TO_USE_IMPORT_ON_DEMAND" value="999" />
+        <option name="PACKAGES_TO_USE_IMPORT_ON_DEMAND">
+          <value />
+        </option>
+        <option name="IMPORT_LAYOUT_TABLE">
+          <value>
+            <package name="" withSubpackages="true" static="false" />
+          </value>
+        </option>
+      </JavaCodeStyleSettings>
+    </code_scheme>
+  </component>
+  
+  <!-- Compiler Settings -->
+  <component name="CompilerConfiguration">
+    <option name="DEPRECATED_WARNING" value="false" />
+    <option name="ADDITIONAL_OPTIONS_STRING" value="-Xlint:unchecked -Xlint:deprecation" />
+  </component>
+  
+  <!-- Suppress specific inspections in files with multi-version code -->
+  <component name="InspectionSuppressor">
+    <option name="suppressions">
+      <list>
+        <option value="UnreachableCode" />
+        <option value="ConstantCondition" />
+        <option value="UnusedAssignment" />
+        <option value="RedundantCast" />
+        <option value="Deprecation" />
+        <option value="PointlessBooleanExpression" />
+      </list>
+    </option>
+  </component>
+</project>

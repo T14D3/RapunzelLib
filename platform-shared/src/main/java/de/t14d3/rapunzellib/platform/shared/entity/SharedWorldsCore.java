@@ -4,7 +4,11 @@ import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.Worlds;
 import net.minecraft.resources.ResourceKey;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import org.jetbrains.annotations.NotNull;
@@ -47,7 +51,11 @@ public abstract class SharedWorldsCore<W extends RWorld> implements Worlds, Shar
     @Override
     public @NotNull Optional<RWorld> get(@NotNull RKey key) {
         Objects.requireNonNull(key, "key");
+        // #if VERSION >= 1.21.11
         Identifier location = Identifier.tryParse(key.asString());
+        // #else
+        ResourceLocation location = ResourceLocation.tryParse(key.asString());
+        // #endif
         if (location == null) return Optional.empty();
         ServerLevel level = server.getLevel(ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, location));
         if (level == null) return Optional.empty();
@@ -74,7 +82,11 @@ public abstract class SharedWorldsCore<W extends RWorld> implements Worlds, Shar
     }
 
     protected boolean matchesName(@NotNull String name, @NotNull ServerLevel level, @NotNull RKey key) {
-        return name.equalsIgnoreCase(key.asString());
+        // #if VERSION >= 1.21.11
+        return name.equalsIgnoreCase(level.dimension().identifier().toString()) || name.equalsIgnoreCase(key.asString());
+        // #else
+        return name.equalsIgnoreCase(level.dimension().location().toString()) || name.equalsIgnoreCase(key.asString());
+        // #endif
     }
 
     protected abstract @NotNull W createWorldWrapper(@NotNull ServerLevel level);
@@ -91,6 +103,10 @@ public abstract class SharedWorldsCore<W extends RWorld> implements Worlds, Shar
     }
 
     private static @NotNull RKey key(@NotNull ServerLevel level) {
+        // #if VERSION >= 1.21.11
         return RKey.of(level.dimension().identifier().toString());
+        // #else
+        return RKey.of(level.dimension().location().toString());
+        // #endif
     }
 }

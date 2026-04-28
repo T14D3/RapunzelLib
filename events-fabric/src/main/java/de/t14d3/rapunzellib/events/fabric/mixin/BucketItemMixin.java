@@ -50,7 +50,11 @@ public class BucketItemMixin {
         ItemStack stack = player.getItemInHand(hand);
         String bucketTypeKey = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
 
+        // #if VERSION >= 1.21.11
         String worldId = serverLevel.dimension().identifier().toString();
+        // #else
+        String worldId = serverLevel.dimension().location().toString();
+        // #endif
         RWorldRef worldRef = new RWorldRef(worldId, worldId);
         RPlayer rPlayer = Rapunzel.players().require(serverPlayer);
 

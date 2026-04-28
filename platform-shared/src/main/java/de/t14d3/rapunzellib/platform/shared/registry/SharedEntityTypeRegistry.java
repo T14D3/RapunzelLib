@@ -6,7 +6,11 @@ import de.t14d3.rapunzellib.common.registry.AbstractTypeRegistry;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.REntityTypeRegistry;
 import net.minecraft.core.registries.BuiltInRegistries;
+// #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+// #else
+import net.minecraft.resources.ResourceLocation;
+// #endif
 import net.minecraft.world.entity.EntityType;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,7 +24,11 @@ public final class SharedEntityTypeRegistry
 
     public SharedEntityTypeRegistry(@NotNull PlatformId platformId) {
         super(
+            // #if VERSION >= 1.21.11
             requestedKey -> BuiltInRegistries.ENTITY_TYPE.getValue(Identifier.fromNamespaceAndPath(requestedKey.namespace(), requestedKey.path())),
+            // #else
+            requestedKey -> BuiltInRegistries.ENTITY_TYPE.getValue(ResourceLocation.fromNamespaceAndPath(requestedKey.namespace(), requestedKey.path())),
+            // #endif
             () -> BuiltInRegistries.ENTITY_TYPE,
             handle -> RKey.of(BuiltInRegistries.ENTITY_TYPE.getKey(handle).toString()),
             REntityType.class

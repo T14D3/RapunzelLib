@@ -6,8 +6,6 @@ import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.RRegistryHandles;
 import de.t14d3.rapunzellib.registry.RRegistryRef;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -79,8 +77,7 @@ public final class SharedEntityOperations {
         MinecraftServer server = level.getServer();
         ServerLevel targetLevel = worldHooks.resolveWorld(server, location.world()).orElse(level);
 
-        EntityType<?> entityType = RRegistryHandles.find(type, EntityType.class)
-            .orElseGet(() -> BuiltInRegistries.ENTITY_TYPE.getValue(Identifier.tryParse(type.key().asString())));
+        EntityType<?> entityType = RRegistryHandles.find(type, EntityType.class).orElse(null);
         if (entityType == null) {
             return Optional.empty();
         }
