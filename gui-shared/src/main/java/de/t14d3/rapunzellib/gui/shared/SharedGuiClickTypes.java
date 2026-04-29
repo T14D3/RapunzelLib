@@ -8,7 +8,11 @@ public final class SharedGuiClickTypes {
     }
 
     public static @NotNull InventoryClickType mapMenuClick(
-        @NotNull net.minecraft.world.inventory.ClickType clickType,
+        // #if VERSION >= 26.0.0
+        @NotNull net.minecraft.world.inventory.ContainerInput clickType,
+        // #else
+        // # @NotNull net.minecraft.world.inventory.ClickType clickType,
+        // #endif
         int button
     ) {
         return switch (clickType) {

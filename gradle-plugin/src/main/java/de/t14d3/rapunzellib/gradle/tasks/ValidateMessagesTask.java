@@ -8,9 +8,8 @@ import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.provider.SetProperty;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.InputFiles;
-import org.gradle.api.tasks.TaskAction;
+import org.gradle.api.tasks.*;
+import org.gradle.work.DisableCachingByDefault;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -37,16 +36,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+@DisableCachingByDefault
 public abstract class ValidateMessagesTask extends DefaultTask {
     private final ConfigurableFileCollection classesDirs = getProject().getObjects().fileCollection();
 
     @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
     public abstract RegularFileProperty getMessagesFile();
 
     @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
     public abstract ListProperty<RegularFile> getAdditionalMessagesFiles();
 
     @InputFiles
+    @PathSensitive(PathSensitivity.RELATIVE)
     public ConfigurableFileCollection getClassesDirs() {
         return classesDirs;
     }

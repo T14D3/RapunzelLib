@@ -2,15 +2,13 @@ import de.t14d3.rapunzellib.gradle.RapunzelLibExtension
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.Project
 import org.gradle.api.artifacts.VersionCatalogsExtension
-import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.Exec
-import org.jetbrains.gradle.ext.ProjectSettings
-import org.jetbrains.gradle.ext.TaskTriggersConfig
 import org.jetbrains.gradle.ext.settings
 import org.jetbrains.gradle.ext.taskTriggers
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.bundling.Zip
+import java.util.Properties
 
 plugins {
     base
@@ -33,14 +31,51 @@ val parityInCheck =
         .map { it.equals("true", ignoreCase = true) }
         .orElse(false)
 
+data class MinecraftTargetMatrix(
+    val properties: Properties,
+    val targetVersions: List<String>,
+    val coreVersion: String,
+) {
+    fun targetProperty(target: String, key: String): String? =
+        properties.getProperty("target.${target.toMinecraftTargetToken()}.$key")
+
+    fun version(target: String, alias: String): String? =
+        targetProperty(target, "version.$alias")
+
+    fun targetProperties(target: String, prefix: String): Map<String, String> {
+        val propertyPrefix = "target.${target.toMinecraftTargetToken()}.$prefix"
+        return properties.stringPropertyNames()
+            .asSequence()
+            .filter { it.startsWith(propertyPrefix) }
+            .associate { key -> key.removePrefix(propertyPrefix) to properties.getProperty(key) }
+    }
+}
+
+fun String.toMinecraftTargetToken(): String =
+    replace(Regex("[^A-Za-z0-9]"), "_")
+
+fun parseMinecraftTargetList(value: String): List<String> =
+    value.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+
+val minecraftTargetMatrixFile = layout.projectDirectory.file("gradle/minecraft-targets.properties").asFile
+val minecraftTargetMatrixProperties = Properties().apply {
+    minecraftTargetMatrixFile.inputStream().use { load(it) }
+}
+val minecraftTargetMatrix = MinecraftTargetMatrix(
+    properties = minecraftTargetMatrixProperties,
+    targetVersions = parseMinecraftTargetList(minecraftTargetMatrixProperties.getProperty("targets") ?: ""),
+    coreVersion = minecraftTargetMatrixProperties.getProperty("core")
+        ?: error("No core Minecraft target configured in ${minecraftTargetMatrixFile.relativeTo(rootDir)}"),
+)
+
 val minecraftTargetVersions =
     providers.gradleProperty("rapunzellib.minecraftTargetVersions")
-        .map { value -> value.split(',').map { it.trim() }.filter { it.isNotEmpty() } }
-        .orElse(listOf("1.21.11", "1.21.10"))
+        .map(::parseMinecraftTargetList)
+        .orElse(minecraftTargetMatrix.targetVersions)
 
 val minecraftCoreVersion =
     providers.gradleProperty("rapunzellib.minecraftCoreVersion")
-        .orElse("1.21.11")
+        .orElse(minecraftTargetMatrix.coreVersion)
 
 val activeMinecraftTarget =
     providers.gradleProperty("rapunzellib.minecraftTarget")
@@ -55,21 +90,18 @@ val collectedJarVersion = activeMinecraftTarget.get()
 
 fun multiversionDependencyVersion(alias: String): String? {
     val target = activeMinecraftTarget.orNull ?: return null
-    versionCatalogTargetOverride(alias, target)?.let { return it }
     providers.gradleProperty("rapunzellib.version.$target.$alias").orNull?.let { return it }
     providers.gradleProperty("rapunzellib.version.$alias").orNull?.let { return it }
+    minecraftTargetMatrix.version(target, alias)?.let { return it }
 
     return when (alias) {
         "minecraft" -> target
-        "paper-api" -> "$target-R0.1-SNAPSHOT"
+        "paper-api" -> if (target.startsWith("1.")) "$target-R0.1-SNAPSHOT" else "$target.build.+"
         else -> null
     }
 }
 
 fun String.toMinecraftTaskSuffix(): String =
-    replace(Regex("[^A-Za-z0-9]"), "_")
-
-fun String.toVersionCatalogTargetToken(): String =
     replace(Regex("[^A-Za-z0-9]"), "_")
 
 fun Project.versionCatalogAliasFor(group: String?, name: String): String? {
@@ -82,18 +114,6 @@ fun Project.versionCatalogAliasFor(group: String?, name: String): String? {
             null
         }
     }
-}
-
-fun Project.versionCatalogTargetOverride(alias: String, target: String): String? {
-    val catalog = extensions.getByType(VersionCatalogsExtension::class.java).named("libs")
-    val targetAlias = "$alias-ver-$target"
-    catalog.findVersion(targetAlias).orElse(null)?.requiredVersion?.let { return it }
-
-    val sanitizedTargetAlias = "$alias-ver-${target.toVersionCatalogTargetToken()}"
-    if (sanitizedTargetAlias == targetAlias) {
-        return null
-    }
-    return catalog.findVersion(sanitizedTargetAlias).orElse(null)?.requiredVersion
 }
 
 val syncGeneratedSources = tasks.register("rapunzellibSyncGeneratedSources") {
@@ -109,9 +129,27 @@ val collectAllJars = tasks.register<Copy>("collectAllJars") {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+fun Project.setDefaultProjectProperty(name: String, value: String) {
+    if (findProperty(name) == null) {
+        extensions.extraProperties[name] = value
+    }
+}
+
+val activeTargetVersionDefaults = minecraftTargetMatrix.targetProperties(activeMinecraftTarget.get(), "version.")
+val activeFabricDefaults = minecraftTargetMatrix.targetProperties(activeMinecraftTarget.get(), "fabric.")
+
 allprojects {
     group = "de.t14d3.rapunzellib"
     version = buildVersion
+
+    activeTargetVersionDefaults.forEach { (alias, version) ->
+        setDefaultProjectProperty("rapunzellib.version.$alias", version)
+    }
+    setDefaultProjectProperty("rapunzellib.minecraftCoreVersion", minecraftCoreVersion.get())
+    setDefaultProjectProperty("rapunzellib.minecraftTargetVersions", minecraftTargetVersions.get().joinToString(","))
+    activeFabricDefaults.forEach { (key, value) ->
+        setDefaultProjectProperty("rapunzellib.fabric.$key", value)
+    }
 
     repositories {
         mavenCentral()
@@ -181,6 +219,8 @@ val minecraftVersionBuilds = minecraftTargetVersions.get().map { minecraftVersio
         }
 
         workingDir = rootProject.rootDir
+        environment("JAVA_HOME", System.getenv("JAVA_HOME")?.takeIf { it.isNotBlank() }
+            ?: System.getProperty("java.home"))
         commandLine(
             wrapper.absolutePath,
             "build",
@@ -200,9 +240,10 @@ tasks.register("buildAllMinecraftVersions") {
 }
 
 tasks.named("build") {
-    dependsOn(collectAllJars)
     if (!hasExplicitMinecraftTarget.get()) {
         dependsOn("buildAllMinecraftVersions")
+    } else {
+        dependsOn(collectAllJars)
     }
 }
 

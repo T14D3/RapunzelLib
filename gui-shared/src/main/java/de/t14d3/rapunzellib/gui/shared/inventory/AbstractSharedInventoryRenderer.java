@@ -149,7 +149,11 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         @NotNull SimpleContainer container,
         int slot,
         int button,
-        @NotNull net.minecraft.world.inventory.ClickType clickType
+        // #if VERSION >= 26.0.0
+        @NotNull net.minecraft.world.inventory.ContainerInput clickType
+        // #else
+        // # @NotNull net.minecraft.world.inventory.ClickType clickType
+        // #endif
     ) {
         OpenGuiSession openGui = openGuis.get(playerId);
         if (openGui == null) {
@@ -345,7 +349,15 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         }
 
         @Override
-        public void clicked(int slot, int button, net.minecraft.world.inventory.ClickType clickType, Player player) {
+        public void clicked(
+                int slot,
+                int button,
+                // #if VERSION >= 26.0.0
+                @NotNull net.minecraft.world.inventory.ContainerInput clickType,
+                // #else
+                // # @NotNull net.minecraft.world.inventory.ClickType clickType,
+                // #endif
+                Player player) {
             if (slot >= 0 && slot < topInventory.getContainerSize()) {
                 handleRootClick(playerId, topInventory, slot, button, clickType);
                 return;
@@ -389,7 +401,15 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         }
 
         @Override
-        public void clicked(int slot, int button, net.minecraft.world.inventory.ClickType clickType, Player player) {
+        public void clicked(
+                int slot,
+                int button,
+                // #if VERSION >= 26.0.0
+                @NotNull net.minecraft.world.inventory.ContainerInput clickType,
+                // #else
+                // # @NotNull net.minecraft.world.inventory.ClickType clickType,
+                // #endif
+                Player player) {
             if (slot >= 0 && slot < topInventory.getContainerSize()) {
                 DropdownSession session = activeDropdowns.get(playerId);
                 if (session == null) {
@@ -469,7 +489,15 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         }
 
         @Override
-        public void clicked(int slot, int button, net.minecraft.world.inventory.ClickType clickType, Player player) {
+        public void clicked(
+                int slot,
+                int button,
+                // #if VERSION >= 26.0.0
+                @NotNull net.minecraft.world.inventory.ContainerInput clickType,
+                // #else
+                // # @NotNull net.minecraft.world.inventory.ClickType clickType,
+                // #endif
+                Player player) {
             InputSession session = activeInputs.get(playerId);
             if (slot >= 0 && slot < 3 && session != null) {
                 InventoryClickType eventClickType = SharedGuiClickTypes.mapMenuClick(clickType, button);

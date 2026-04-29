@@ -8,8 +8,16 @@ public final class FabricModuleConventionsPlugin implements Plugin<Project> {
     @Override
     public void apply(Project target) {
         ConventionPluginSupport.applyBaseJavaModule(target);
-        target.getPluginManager().apply("fabric-loom");
+        if (ConventionPluginSupport.isFabricLoomEnabled(target)) {
+            ConventionPluginSupport.configureFabricLoomProperties(target);
+            target.getPluginManager().apply("net.fabricmc.fabric-loom");
+        }
+        ConventionPluginSupport.configureFabricDependencyRouting(target);
         ConventionPluginSupport.addFamilyAndSharedDependencies(target);
-        ConventionPluginSupport.configureFabricLoom(target);
+        if (ConventionPluginSupport.isFabricLoomEnabled(target)) {
+            ConventionPluginSupport.configureFabricLoom(target);
+        } else {
+            ConventionPluginSupport.configureFabricWithoutLoom(target);
+        }
     }
 }

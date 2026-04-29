@@ -78,7 +78,11 @@ public final class PaperHandleBridge {
     }
 
     public static @NotNull BlockData toBukkit(@NotNull BlockState state) {
-        return CraftBlockData.fromData(Objects.requireNonNull(state, "state"));
+        // #if VERSION >= 26.0.0
+        return Objects.requireNonNull(state, "state").asBlockData();
+        // #else
+        // # return CraftBlockData.fromData(Objects.requireNonNull(state, "state"));
+        // #endif
     }
 
     public static @NotNull RKey blockTypeKey(@NotNull BlockState state) {

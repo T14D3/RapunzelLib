@@ -1,12 +1,55 @@
-import org.gradle.jvm.toolchain.JavaLanguageVersion
+import java.util.Properties
 
 plugins {
     `java-gradle-plugin`
     `maven-publish`
 }
 
-java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+fun String.toMinecraftTargetToken(): String =
+    replace(Regex("[^A-Za-z0-9]"), "_")
+
+val minecraftTargetMatrixFile = listOf(
+    rootProject.file("gradle/minecraft-targets.properties"),
+    rootProject.file("../gradle/minecraft-targets.properties"),
+).firstOrNull { it.isFile }
+    ?: error("Could not locate gradle/minecraft-targets.properties")
+
+val minecraftTargetMatrixProperties = Properties().apply {
+    minecraftTargetMatrixFile.inputStream().use { load(it) }
+}
+val activeMinecraftTarget = providers.gradleProperty("rapunzellib.minecraftTarget")
+    .orElse(providers.gradleProperty("rapunzellib.minecraftCoreVersion"))
+    .orElse(minecraftTargetMatrixProperties.getProperty("core") ?: error("No core Minecraft target configured"))
+
+fun targetMatrixProperty(target: String, key: String): String? =
+    minecraftTargetMatrixProperties.getProperty("target.${target.toMinecraftTargetToken()}.$key")
+
+fun pluginVersion(alias: String): String? =
+    providers.gradleProperty("rapunzellib.plugin.$alias").orNull
+        ?: targetMatrixProperty(activeMinecraftTarget.get(), "plugin.$alias")
+        ?: minecraftTargetMatrixProperties.getProperty("plugin.$alias")
+
+fun dependencyVersion(alias: String): String? =
+    providers.gradleProperty("rapunzellib.version.${activeMinecraftTarget.get()}.$alias").orNull
+        ?: providers.gradleProperty("rapunzellib.version.$alias").orNull
+        ?: targetMatrixProperty(activeMinecraftTarget.get(), "version.$alias")
+
+fun pluginDependency(module: String, alias: String): String =
+    "$module:${pluginVersion(alias) ?: error("No plugin dependency version configured for $alias")}"
+
+fun targetDependency(module: String, alias: String): String =
+    "$module:${dependencyVersion(alias) ?: error("No target dependency version configured for $alias")}"
+
+configurations.configureEach {
+    resolutionStrategy.eachDependency {
+        when ("${requested.group}:${requested.name}") {
+            "io.papermc.paperweight:paperweight-userdev" -> pluginVersion("paperweight-userdev")?.let(::useVersion)
+            "org.spongepowered:vanillagradle" -> pluginVersion("vanilla-gradle")?.let(::useVersion)
+            "net.fabricmc:fabric-loom" -> pluginVersion("fabric-loom")?.let(::useVersion)
+            "net.neoforged:moddev-gradle" -> pluginVersion("neoforge-moddev")?.let(::useVersion)
+            "io.papermc.paper:paper-api" -> dependencyVersion("paper-api")?.let(::useVersion)
+        }
+    }
 }
 
 dependencies {
@@ -16,14 +59,14 @@ dependencies {
     implementation(libs.asm.tree)
     implementation(libs.asm.analysis)
     implementation(libs.snakeyaml)
-    implementation(libs.paperweight.userdev)
-    implementation(libs.vanillagradle)
-    implementation(libs.fabric.loom.gradle)
-    implementation(libs.neoforge.moddev.gradle)
+    implementation(pluginDependency("io.papermc.paperweight:paperweight-userdev", "paperweight-userdev"))
+    implementation(pluginDependency("org.spongepowered:vanillagradle", "vanilla-gradle"))
+    implementation(pluginDependency("net.fabricmc:fabric-loom", "fabric-loom"))
+    implementation(pluginDependency("net.neoforged:moddev-gradle", "neoforge-moddev"))
 
     testImplementation(gradleTestKit())
     testImplementation(libs.junit.jupiter)
-    testImplementation(libs.paper.api)
+    testImplementation(targetDependency("io.papermc.paper:paper-api", "paper-api"))
 }
 
 gradlePlugin {

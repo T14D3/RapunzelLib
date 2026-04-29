@@ -6,6 +6,7 @@ import org.gradle.api.GradleException;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.VersionCatalog;
 import org.gradle.api.artifacts.VersionCatalogsExtension;
+import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.TaskAction;
 
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+@CacheableTask
 public abstract class VerifySharedParityTask extends DefaultTask {
     @TaskAction
     public void verify() {
@@ -48,7 +50,7 @@ public abstract class VerifySharedParityTask extends DefaultTask {
             }
 
             var minecraftDeps = minecraftConfig.getAllDependencies().stream()
-                .filter(dependency -> "com.shared".equals(dependency.getGroup())
+                .filter(dependency -> "com.mojang".equals(dependency.getGroup())
                     && "minecraft".equals(dependency.getName())
                     && dependency.getVersion() != null
                     && !dependency.getVersion().isBlank())

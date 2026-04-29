@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.gradle;
 
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.artifacts.MinimalExternalModuleDependency;
 import org.gradle.api.artifacts.repositories.PasswordCredentials;
 import org.gradle.api.artifacts.VersionCatalog;
@@ -18,12 +19,16 @@ import org.gradle.jvm.toolchain.JavaLanguageVersion;
 import org.spongepowered.gradle.vanilla.MinecraftExtension;
 import org.spongepowered.gradle.vanilla.repository.MinecraftPlatform;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.util.Properties;
 
 import de.t14d3.rapunzellib.gradle.tasks.CheckReposiliteConfigTask;
 
 public final class ConventionPluginSupport {
-    private static final int JAVA_VERSION = 21;
+    private static final int JAVA_VERSION = 25;
     private static final String REPOSILITE_REPOSITORY_NAME = "reposilite";
     private static final String DEFAULT_REPOSILITE_BASE_URL = "https://maven.t14d3.de";
 
@@ -151,15 +156,59 @@ public final class ConventionPluginSupport {
     public static void configureFabricLoom(Project project) {
         Object loom = project.getExtensions().findByName("loom");
         if (loom == null) {
+            project.getLogger().error("Loom not found!");
             return;
         }
         project.getDependencies().add("minecraft", library(project, "minecraft"));
-        Method mappingsMethod = firstZeroArgMethod(loom.getClass(), "officialMojangMappings");
-        if (mappingsMethod != null) {
-            Object mappings = invoke(mappingsMethod, loom);
-            if (mappings != null) {
-                project.getDependencies().add("mappings", mappings);
+        if (usesOfficialMojangMappings(project)) {
+            Method mappingsMethod = firstZeroArgMethod(loom.getClass(), "officialMojangMappings");
+            if (mappingsMethod != null) {
+                Object mappings = invoke(mappingsMethod, loom);
+                if (mappings != null) {
+                    project.getDependencies().add("mappings", mappings);
+                }
             }
+        }
+        project.getDependencies().add(
+            isFabricObfuscationDisabled(project) ? "implementation" : "modImplementation",
+            library(project, "fabric-loader")
+        );
+    }
+
+    public static boolean isFabricLoomEnabled(Project project) {
+        return booleanProperty(project, "rapunzellib.fabric.loom-enabled", "RAPUNZELLIB_FABRIC_LOOM_ENABLED", "fabric.loom-enabled", true);
+    }
+
+    public static void configureFabricDependencyRouting(Project project) {
+        Configuration fabricImplementation = project.getConfigurations().maybeCreate("fabricImplementation");
+        fabricImplementation.setDescription("Fabric dependencies routed to the target-appropriate implementation configuration.");
+
+        Configuration implementation = project.getConfigurations().findByName("implementation");
+        if (implementation == null) {
+            return;
+        }
+
+        if (isFabricObfuscationDisabled(project)) {
+            implementation.extendsFrom(fabricImplementation);
+            return;
+        }
+
+        project.getConfigurations().named("modImplementation").configure(configuration ->
+            configuration.extendsFrom(fabricImplementation)
+        );
+    }
+
+    public static void configureFabricLoomProperties(Project project) {
+        if (isFabricObfuscationDisabled(project)) {
+            project.getExtensions().getExtraProperties().set("fabric.loom.disableObfuscation", "true");
+        }
+    }
+
+    public static void configureFabricWithoutLoom(Project project) {
+        Configuration modImplementation = project.getConfigurations().maybeCreate("modImplementation");
+        Configuration implementation = project.getConfigurations().findByName("implementation");
+        if (implementation != null) {
+            implementation.extendsFrom(modImplementation);
         }
         project.getDependencies().add("modImplementation", library(project, "fabric-loader"));
     }
@@ -209,20 +258,76 @@ public final class ConventionPluginSupport {
         if (overrideVersion != null) {
             return overrideVersion;
         }
-        return libs(project).findVersion(alias).orElseThrow().getRequiredVersion();
+        return libs(project).findVersion(alias).map(version -> version.getRequiredVersion()).orElseThrow();
+    }
+
+    static boolean requiresOfficialMojangMappings(String minecraftVersion) {
+        String[] segments = minecraftVersion.split("\\.");
+        int[] parts = new int[segments.length];
+        for (int i1 = 0; i1 < segments.length; i1++) {
+            parts[i1] = Integer.parseInt(segments[i1]);
+        }
+        int[] cutoff = {1, 21, 11};
+        for (int i = 0; i < cutoff.length; i++) {
+            int currentPart = i < parts.length ? parts[i] : 0;
+            if (currentPart != cutoff[i]) {
+                return currentPart < cutoff[i];
+            }
+        }
+        return true;
+    }
+
+    private static boolean usesOfficialMojangMappings(Project project) {
+        return booleanProperty(
+            project,
+            "rapunzellib.fabric.official-mojang-mappings",
+            "RAPUNZELLIB_FABRIC_OFFICIAL_MOJANG_MAPPINGS",
+            "fabric.official-mojang-mappings",
+            requiresOfficialMojangMappings(version(project, "minecraft"))
+        );
+    }
+
+    private static boolean isFabricObfuscationDisabled(Project project) {
+        return booleanProperty(
+            project,
+            "rapunzellib.fabric.disable-obfuscation",
+            "RAPUNZELLIB_FABRIC_DISABLE_OBFUSCATION",
+            "fabric.disable-obfuscation",
+            !requiresOfficialMojangMappings(version(project, "minecraft"))
+        );
+    }
+
+    private static boolean booleanProperty(Project project, String propertyName, String environmentName, String matrixKey, boolean defaultValue) {
+        String configured = optionalProperty(project, propertyName, environmentName);
+        if (configured != null) {
+            return Boolean.parseBoolean(configured);
+        }
+        String activeTarget = activeMinecraftTarget(project);
+        if (activeTarget != null) {
+            String matrixValue = targetMatrixProperty(project, activeTarget, matrixKey);
+            if (matrixValue != null) {
+                return Boolean.parseBoolean(matrixValue);
+            }
+        }
+        return defaultValue;
     }
 
     private static String versionOverride(Project project, String alias) {
-        String activeTarget = optionalProperty(project, "rapunzellib.minecraftTarget", "RAPUNZELLIB_MINECRAFT_TARGET");
+        String activeTarget = activeMinecraftTarget(project);
         if (activeTarget != null) {
             String targetOverride = optionalProperty(project, "rapunzellib.version." + activeTarget + "." + alias, null);
             if (targetOverride != null) {
                 return targetOverride;
             }
 
-            String targetCatalogOverride = versionCatalogOverride(project, alias, activeTarget);
-            if (targetCatalogOverride != null) {
-                return targetCatalogOverride;
+            String globalOverride = optionalProperty(project, "rapunzellib.version." + alias, null);
+            if (globalOverride != null) {
+                return globalOverride;
+            }
+
+            String targetMatrixOverride = targetMatrixProperty(project, activeTarget, "version." + alias);
+            if (targetMatrixOverride != null) {
+                return targetMatrixOverride;
             }
         }
 
@@ -241,18 +346,48 @@ public final class ConventionPluginSupport {
         return null;
     }
 
-    private static String versionCatalogOverride(Project project, String alias, String activeTarget) {
-        String targetAlias = alias + "-ver-" + activeTarget;
-        String override = libs(project).findVersion(targetAlias).map(version -> version.getRequiredVersion()).orElse(null);
-        if (override != null) {
-            return override;
+    private static String activeMinecraftTarget(Project project) {
+        String activeTarget = optionalProperty(project, "rapunzellib.minecraftTarget", "RAPUNZELLIB_MINECRAFT_TARGET");
+        if (activeTarget != null) {
+            return activeTarget;
         }
-
-        String sanitizedTargetAlias = alias + "-ver-" + activeTarget.replaceAll("[^A-Za-z0-9]", "_");
-        if (sanitizedTargetAlias.equals(targetAlias)) {
+        activeTarget = optionalProperty(project, "rapunzellib.minecraftCoreVersion", "RAPUNZELLIB_MINECRAFT_CORE_VERSION");
+        if (activeTarget != null) {
+            return activeTarget;
+        }
+        Properties properties = targetMatrixProperties(project);
+        if (properties == null) {
             return null;
         }
-        return libs(project).findVersion(sanitizedTargetAlias).map(version -> version.getRequiredVersion()).orElse(null);
+        return properties.getProperty("core");
+    }
+
+    private static String targetMatrixProperty(Project project, String activeTarget, String key) {
+        Properties properties = targetMatrixProperties(project);
+        if (properties == null) {
+            return null;
+        }
+        return properties.getProperty("target." + targetToken(activeTarget) + "." + key);
+    }
+
+    private static String targetToken(String target) {
+        return target.replaceAll("[^A-Za-z0-9]", "_");
+    }
+
+    private static Properties targetMatrixProperties(Project project) {
+        File rootMatrix = project.getRootProject().file("gradle/minecraft-targets.properties");
+        File includedBuildMatrix = project.getRootProject().file("../gradle/minecraft-targets.properties");
+        File matrixFile = rootMatrix.isFile() ? rootMatrix : includedBuildMatrix;
+        if (!matrixFile.isFile()) {
+            return null;
+        }
+        Properties properties = new Properties();
+        try (FileInputStream input = new FileInputStream(matrixFile)) {
+            properties.load(input);
+        } catch (IOException ex) {
+            throw new RuntimeException("Failed to load Minecraft target matrix from " + matrixFile, ex);
+        }
+        return properties;
     }
 
     private static boolean isInternalPublishModule(String projectName) {

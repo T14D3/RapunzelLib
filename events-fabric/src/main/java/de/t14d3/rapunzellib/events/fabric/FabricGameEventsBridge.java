@@ -24,7 +24,11 @@ import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.objects.block.RBlock;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
+// #if VERSION >= 26
+// # import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLevelEvents;
+// #else
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+// #endif
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
@@ -76,9 +80,17 @@ final class FabricGameEventsBridge implements GameEventBridge {
         UseEntityCallback.EVENT.register(this::onUseEntity);
         AttackEntityCallback.EVENT.register(this::onAttackEntity);
 
+        // #if VERSION >= 26
+        // # ServerLevelEvents.LOAD.register((server, level) -> SharedLifecycleEventHooks.dispatchWorldLoadPost(bus, level));
+        // #else
         ServerWorldEvents.LOAD.register((server, world) -> SharedLifecycleEventHooks.dispatchWorldLoadPost(bus, world));
+        // #endif
         ServerChunkEvents.CHUNK_UNLOAD.register(
+            // #if VERSION >= 26
+            // # (world, chunk) -> SharedLifecycleEventHooks.dispatchChunkUnloadPost(bus, world, chunk.getPos().x(), chunk.getPos().z())
+            // #else
             (world, chunk) -> SharedLifecycleEventHooks.dispatchChunkUnloadPost(bus, world, chunk.getPos().x, chunk.getPos().z)
+            // #endif
         );
         ServerPlayConnectionEvents.DISCONNECT.register(
             (handler, server) -> SharedLifecycleEventHooks.dispatchPlayerQuitPost(bus, handler.getPlayer())

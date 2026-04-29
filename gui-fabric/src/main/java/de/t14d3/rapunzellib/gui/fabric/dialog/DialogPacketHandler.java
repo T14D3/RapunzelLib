@@ -46,9 +46,13 @@ public final class DialogPacketHandler {
             if (initialized) {
                 return;
             }
-
-            PayloadTypeRegistry.playS2C().register(DialogOpenPayload.TYPE, DialogOpenPayload.CODEC);
-            PayloadTypeRegistry.playC2S().register(DialogResponsePayload.TYPE, DialogResponsePayload.CODEC);
+            // #if VERSION >= 26.0.0
+            PayloadTypeRegistry.clientboundPlay().register(DialogOpenPayload.TYPE, DialogOpenPayload.CODEC);
+            PayloadTypeRegistry.serverboundPlay().register(DialogResponsePayload.TYPE, DialogResponsePayload.CODEC);
+            // #else
+            // # PayloadTypeRegistry.playS2C().register(DialogOpenPayload.TYPE, DialogOpenPayload.CODEC);
+            // # PayloadTypeRegistry.playC2S().register(DialogResponsePayload.TYPE, DialogResponsePayload.CODEC);
+            // #endif
             ServerPlayNetworking.registerGlobalReceiver(DialogResponsePayload.TYPE, DialogPacketHandler::handleResponsePacket);
 
             initialized = true;

@@ -3,10 +3,12 @@ package de.t14d3.rapunzellib.gradle.tasks;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
 import org.gradle.api.provider.Property;
+import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.TaskAction;
 
+@CacheableTask
 public abstract class CheckReposiliteConfigTask extends DefaultTask {
     @Input
     @Optional

@@ -8,6 +8,9 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.minecraft.SharedConstants;
+// #if VERSION >= 26.0.0
+import net.minecraft.core.component.DataComponentMap;
+// #endif
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.Bootstrap;
@@ -33,6 +36,16 @@ final class FabricItemStackAdapterTest {
     static void bootstrapMinecraft() {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
+        // #if VERSION >= 26.0.0
+        Items.AIR.builtInRegistryHolder().bindComponents(DataComponentMap.EMPTY);
+        Items.PAPER.builtInRegistryHolder().bindComponents(DataComponentMap.builder()
+            .set(DataComponents.MAX_STACK_SIZE, 64)
+            .build());
+        Items.DIAMOND_SWORD.builtInRegistryHolder().bindComponents(DataComponentMap.builder()
+            .set(DataComponents.MAX_STACK_SIZE, 1)
+            .set(DataComponents.MAX_DAMAGE, 1561)
+            .build());
+        // #endif
     }
 
     @Test

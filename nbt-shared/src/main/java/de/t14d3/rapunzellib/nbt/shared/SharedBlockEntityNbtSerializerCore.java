@@ -10,11 +10,6 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
-// #if VERSION >= 1.21.11
-import net.minecraft.resources.Identifier;
-// #else
-import net.minecraft.resources.ResourceLocation;
-// #endif
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import org.jetbrains.annotations.NotNull;
@@ -23,8 +18,6 @@ import java.time.Instant;
 import java.util.Objects;
 
 public final class SharedBlockEntityNbtSerializerCore<L extends SharedBlockEntityLocation> implements BlockEntityNbtSerializer<BlockEntity, L> {
-    private static final HolderLookup.Provider FALLBACK_REGISTRIES = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY).freeze();
-
     @Override
     public @NotNull SerializedBlockEntity serialize(@NotNull BlockEntity blockEntity) {
         try {
@@ -69,7 +62,11 @@ public final class SharedBlockEntityNbtSerializerCore<L extends SharedBlockEntit
     }
 
     private static @NotNull HolderLookup.Provider registries(@NotNull BlockEntity blockEntity) {
-        return blockEntity.getLevel() == null ? FALLBACK_REGISTRIES : blockEntity.getLevel().registryAccess();
+        return blockEntity.getLevel() == null ? fallbackRegistries() : blockEntity.getLevel().registryAccess();
+    }
+
+    private static @NotNull HolderLookup.Provider fallbackRegistries() {
+        return RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY).freeze();
     }
 
     private static @NotNull String blockEntityName(@NotNull BlockEntity blockEntity) {

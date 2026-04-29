@@ -6,12 +6,14 @@ import org.gradle.api.DefaultTask;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
+import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.Classpath;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.TaskAction;
 
 import java.util.List;
 
+@CacheableTask
 public abstract class VerifyRegistryCatalogParityTask extends DefaultTask {
     private final ConfigurableFileCollection parityClasspath = getProject().getObjects().fileCollection();
 

@@ -8,6 +8,6 @@ dependencies {
     implementation(project(":gui-shared"))
     implementation(project(":nbt-shared"))
     implementation(project(":nbt-fabric"))
-    modImplementation(libs.fabric.networking.api.v1)
-    modImplementation(libs.adventure.platform.fabric)
+    add("fabricImplementation", libs.fabric.networking.api.v1)
+    add("fabricImplementation", libs.adventure.platform.fabric)
 }

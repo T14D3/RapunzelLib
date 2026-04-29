@@ -10,7 +10,12 @@ final class SharedGuiClickTypesTest {
     void swapOffhandMapsToDedicatedClickType() {
         assertEquals(
             InventoryClickType.SWAP_OFFHAND,
-            SharedGuiClickTypes.mapMenuClick(net.minecraft.world.inventory.ClickType.SWAP, 40)
+            // #if VERSION >= 26.0.0
+            SharedGuiClickTypes.mapMenuClick(net.minecraft.world.inventory.ContainerInput.SWAP,
+            // #else
+            // # SharedGuiClickTypes.mapMenuClick(net.minecraft.world.inventory.ClickType.SWAP,
+            // #endif
+            40)
         );
     }
 
@@ -18,7 +23,12 @@ final class SharedGuiClickTypesTest {
     void controlDropMapsToDedicatedClickType() {
         assertEquals(
             InventoryClickType.CONTROL_DROP,
-            SharedGuiClickTypes.mapMenuClick(net.minecraft.world.inventory.ClickType.THROW, 1)
+            // #if VERSION >= 26.0.0
+            SharedGuiClickTypes.mapMenuClick(net.minecraft.world.inventory.ContainerInput.THROW,
+            // #else
+            // # SharedGuiClickTypes.mapMenuClick(net.minecraft.world.inventory.ClickType.THROW,
+            // #endif
+            1)
         );
     }
 }

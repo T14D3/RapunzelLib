@@ -17,6 +17,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 // #if VERSION >= 1.21.11
 import net.minecraft.resources.Identifier;
+import net.minecraft.core.Holder;
 // #else
 import net.minecraft.resources.ResourceLocation;
 // #endif
@@ -122,7 +123,11 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
     }
 
     protected @NotNull ItemStack createNativeShared(@NotNull RItem item) {
+        // #if VERSION >= 1.21.11
+        return applySharedState(new ItemStack(resolveItemHolder(item.typeRef()), item.amount()), item);
+        // #else
         return applySharedState(new ItemStack(resolveItem(item.typeRef()), item.amount()), item);
+        // #endif
     }
 
     protected @NotNull ItemStack updateNativeShared(@NotNull ItemStack currentHandle, @NotNull RItem updatedItem) {
@@ -156,6 +161,22 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
         // #endif
         return BuiltInRegistries.ITEM.getValue(location);
     }
+
+    // #if VERSION >= 1.21.11
+    protected @NotNull Holder<Item> resolveItemHolder(@NotNull RRegistryRef<RItemType> typeRef) {
+        Item resolved = RRegistryHandles.find(typeRef, Item.class).orElse(null);
+        if (resolved != null && resolved != Items.AIR) {
+            return BuiltInRegistries.ITEM.wrapAsHolder(resolved);
+        }
+
+        RKey typeKey = typeRef.key();
+        Identifier location = Identifier.tryParse(typeKey.asString());
+        if (location == null) {
+            location = Identifier.withDefaultNamespace(typeKey.path());
+        }
+        return BuiltInRegistries.ITEM.get(location).orElseGet(Items.AIR::builtInRegistryHolder);
+    }
+    // #endif
 
     protected @NotNull ItemStack applySharedState(@NotNull ItemStack stack, @NotNull RItem item) {
         stack.setCount(item.amount());

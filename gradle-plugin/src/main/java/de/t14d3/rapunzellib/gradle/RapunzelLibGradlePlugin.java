@@ -126,43 +126,97 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
         project.getLogger().lifecycle("Core version: " + coreVersion);
         project.getLogger().lifecycle("Active version: " + activeVersion);
 
+        TaskProvider<PreprocessSourcesTask> activeMainTask = createAndWirePreprocessTasks(
+            project,
+            versions,
+            activeVersion,
+            mainSourceSet,
+            sourceDir,
+            "preprocessSourcesFor",
+            "generated-sources/multiversion"
+        );
+
+        if (activeMainTask != null) {
+            if (project.getTasks().findByName(mainSourceSet.getSourcesJarTaskName()) != null) {
+                project.getTasks().named(mainSourceSet.getSourcesJarTaskName()).configure(t -> t.dependsOn(activeMainTask));
+            }
+            if (project.getTasks().findByName("javadoc") != null) {
+                File compileSourceDir = multiversionOutputDir(project, activeVersion, "generated-sources/multiversion");
+                Set<File> compileSourceDirs = new LinkedHashSet<>(mainSourceSet.getJava().getSrcDirs());
+                compileSourceDirs.remove(sourceDir);
+                project.getTasks().named("javadoc", Javadoc.class).configure(task -> {
+                    task.dependsOn(activeMainTask);
+                    task.setSource(project.files(compileSourceDir, compileSourceDirs));
+                });
+            }
+        }
+
+        SourceSet testSourceSet = sourceSets.findByName(SourceSet.TEST_SOURCE_SET_NAME);
+        if (testSourceSet != null) {
+            File testSourceDir = project.file("src/test/java");
+            if (testSourceDir.exists()) {
+                createAndWirePreprocessTasks(
+                    project,
+                    versions,
+                    activeVersion,
+                    testSourceSet,
+                    testSourceDir,
+                    "preprocessTestSourcesFor",
+                    "generated-test-sources/multiversion"
+                );
+            }
+        }
+    }
+
+    private TaskProvider<PreprocessSourcesTask> createAndWirePreprocessTasks(
+        Project project,
+        Set<String> versions,
+        String activeVersion,
+        SourceSet sourceSet,
+        File sourceDir,
+        String taskPrefix,
+        String outputRoot
+    ) {
         TaskProvider<PreprocessSourcesTask> activeTask = null;
         File activeOutputDir = null;
         for (String version : versions) {
             project.getLogger().lifecycle("Creating task for version: " + version);
-            TaskProvider<PreprocessSourcesTask> task = createVersionTask(project, version, sourceDir);
+            TaskProvider<PreprocessSourcesTask> task = createVersionTask(project, version, sourceDir, taskPrefix, outputRoot);
             if (version.equals(activeVersion)) {
                 activeTask = task;
-                activeOutputDir = multiversionOutputDir(project, version);
+                activeOutputDir = multiversionOutputDir(project, version, outputRoot);
             }
         }
 
         if (activeTask != null && activeOutputDir != null) {
             TaskProvider<PreprocessSourcesTask> activePreprocessTask = activeTask;
             File compileSourceDir = activeOutputDir;
-            Set<File> compileSourceDirs = new LinkedHashSet<>(mainSourceSet.getJava().getSrcDirs());
+            Set<File> compileSourceDirs = new LinkedHashSet<>(sourceSet.getJava().getSrcDirs());
             compileSourceDirs.remove(sourceDir);
-            project.getTasks().named(mainSourceSet.getCompileJavaTaskName(), JavaCompile.class).configure(task -> {
+            project.getTasks().named(sourceSet.getCompileJavaTaskName(), JavaCompile.class).configure(task -> {
                 task.dependsOn(activePreprocessTask);
                 task.setSource(project.files(compileSourceDir, compileSourceDirs));
             });
-            if (project.getTasks().findByName(mainSourceSet.getSourcesJarTaskName()) != null) {
-                project.getTasks().named(mainSourceSet.getSourcesJarTaskName()).configure(t -> t.dependsOn(activePreprocessTask));
-            }
-            if (project.getTasks().findByName("javadoc") != null) {
-                project.getTasks().named("javadoc", Javadoc.class).configure(task -> {
-                    task.dependsOn(activePreprocessTask);
-                    task.setSource(project.files(compileSourceDir, compileSourceDirs));
-                });
-            }
         }
+
+        return activeTask;
     }
 
     private TaskProvider<PreprocessSourcesTask> createVersionTask(Project project, String version, File sourceDir) {
-        String versionSafe = version.replaceAll("[^A-Za-z0-9]", "_");
-        String taskName = "preprocessSourcesFor" + versionSafe;
+        return createVersionTask(project, version, sourceDir, "preprocessSourcesFor", "generated-sources/multiversion");
+    }
 
-        File outputDir = multiversionOutputDir(project, version);
+    private TaskProvider<PreprocessSourcesTask> createVersionTask(
+        Project project,
+        String version,
+        File sourceDir,
+        String taskPrefix,
+        String outputRoot
+    ) {
+        String versionSafe = version.replaceAll("[^A-Za-z0-9]", "_");
+        String taskName = taskPrefix + versionSafe;
+
+        File outputDir = multiversionOutputDir(project, version, outputRoot);
 
         return project.getTasks().register(
             taskName,
@@ -178,6 +232,10 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
     }
 
     private File multiversionOutputDir(Project project, String version) {
-        return new File(project.getBuildDir(), "generated-sources/multiversion/" + version);
+        return multiversionOutputDir(project, version, "generated-sources/multiversion");
+    }
+
+    private File multiversionOutputDir(Project project, String version, String outputRoot) {
+        return new File(project.getBuildDir(), outputRoot + "/" + version);
     }
 }

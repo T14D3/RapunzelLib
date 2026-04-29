@@ -1,4 +1,8 @@
 [versions]
+# General dependency catalog.
+#
+# Keep target-independent library versions here. Minecraft-sensitive versions
+# belong in gradle/minecraft-targets.properties.
 junit-jupiter = "5.10.3"
 junit-platform = "1.10.3"
 jetbrains-annotations = "26.0.1"
@@ -8,14 +12,11 @@ adventure = "4.25.0"
 adventure-platform-fabric = "6.2.0"
 adventure-platform-neoforge = "6.8.0"
 
-fabric-api = "0.138.4+1.21.11"
 fabric-command-api-v2 = "2.4.5+129f1f4cb0"
 fabric-events-interaction-v0 = "4.0.41+129f1f4cb0"
 fabric-lifecycle-events-v1 = "2.6.14+129f1f4cb0"
 fabric-networking-api-v1 = "5.1.3+129f1f4cb0"
-minecraft = "1.21.11"
-fabric-loader = "0.18.3"
-fabric-loom = "1.13.3"
+fabric-loader = "0.19.2"
 
 snakeyaml = "2.0"
 gson = "2.10.1"
@@ -24,29 +25,21 @@ asm = "9.7.1"
 brigadier = "1.0.18"
 fastutil = "8.5.11"
 
-paper-api = "1.21.11-R0.1-SNAPSHOT"
-userdev = "2.0.0-beta.19"
-vanilla-gradle = "0.2.2"
 velocity-api = "3.4.0-SNAPSHOT"
-neoforge = "21.11.42"
-neoforge-ver-1_21_10 = "21.10.64"
-neoforge-moddev = "2.0.137"
 sponge-api = "11.0.0"
-
-shadow = "9.0.0-beta8"
 
 # Mixin for NeoForge
 mixin = "0.8.7"
 mixin-plugin = "0.8-SNAPSHOT"
 
 [plugins]
-shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+shadow = { id = "com.gradleup.shadow" }
 idea-ext = { id = "org.jetbrains.gradle.plugin.idea-ext", version.ref = "idea-ext" }
 
-userdev = { id = "io.papermc.paperweight.userdev", version.ref = "userdev" }
-vanilla-gradle = { id = "org.spongepowered.gradle.vanilla", version.ref = "vanilla-gradle" }
-neoforge-moddev = { id = "net.neoforged.moddev", version.ref = "neoforge-moddev" }
-fabric-loom = { id = "fabric-loom", version.ref = "fabric-loom" }
+userdev = { id = "io.papermc.paperweight.userdev" }
+vanilla-gradle = { id = "org.spongepowered.gradle.vanilla" }
+neoforge-moddev = { id = "net.neoforged.moddev" }
+fabric-loom = { id = "net.fabricmc.fabric-loom" }
 mixin = { id = "org.spongepowered.mixin", version.ref = "mixin-plugin" }
 rapunzellib = { id = "de.t14d3.rapunzellib" }
 
@@ -82,12 +75,12 @@ adventure-serializer-plain = { module = "net.kyori:adventure-text-serializer-pla
 adventure-platform-fabric = { module = "net.kyori:adventure-platform-fabric", version.ref = "adventure-platform-fabric" }
 adventure-platform-neoforge = { module = "net.kyori:adventure-platform-neoforge", version.ref = "adventure-platform-neoforge" }
 
-fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }
+fabric-api = { module = "net.fabricmc.fabric-api:fabric-api" }
 fabric-command-api-v2 = { module = "net.fabricmc.fabric-api:fabric-command-api-v2", version.ref = "fabric-command-api-v2" }
 fabric-events-interaction-v0 = { module = "net.fabricmc.fabric-api:fabric-events-interaction-v0", version.ref = "fabric-events-interaction-v0" }
 fabric-lifecycle-events-v1 = { module = "net.fabricmc.fabric-api:fabric-lifecycle-events-v1", version.ref = "fabric-lifecycle-events-v1" }
 fabric-networking-api-v1 = { module = "net.fabricmc.fabric-api:fabric-networking-api-v1", version.ref = "fabric-networking-api-v1" }
-minecraft = { module = "com.mojang:minecraft", version.ref = "minecraft" }
+minecraft = { module = "com.mojang:minecraft" }
 fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
 
 snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
@@ -102,11 +95,7 @@ asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
 asm-analysis = { module = "org.ow2.asm:asm-analysis", version.ref = "asm" }
 fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
 
-paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
-paperweight-userdev = { module = "io.papermc.paperweight:paperweight-userdev", version.ref = "userdev" }
-vanillagradle = { module = "org.spongepowered:vanillagradle", version.ref = "vanilla-gradle" }
-fabric-loom-gradle = { module = "net.fabricmc:fabric-loom", version.ref = "fabric-loom" }
-neoforge-moddev-gradle = { module = "net.neoforged:moddev-gradle", version.ref = "neoforge-moddev" }
+paper-api = { module = "io.papermc.paper:paper-api" }
 
 velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "velocity-api" }
 

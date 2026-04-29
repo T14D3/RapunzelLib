@@ -11,6 +11,7 @@ import org.gradle.api.provider.SetProperty;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.OutputDirectory;
 import org.gradle.api.tasks.TaskAction;
+import org.gradle.work.DisableCachingByDefault;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +22,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+@DisableCachingByDefault
 public abstract class GeneratePlatformAdapterScaffoldTask extends DefaultTask {
     private static final Pattern PLATFORM_KEY_PATTERN = Pattern.compile("[a-z0-9-]+");
     private static final Pattern NON_ALNUM = Pattern.compile("[^a-zA-Z0-9]+");

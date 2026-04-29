@@ -47,9 +47,7 @@ public final class SharedEntityOperations {
         if (amount == 0.0d) {
             return true;
         }
-        float before = entity.getHealth();
-        entity.hurt(entity.damageSources().generic(), (float) amount);
-        return entity.getHealth() < before || !entity.isAlive();
+        return entity.hurtServer((ServerLevel) entity.level(), entity.damageSources().generic(), (float) amount);
     }
 
     public static boolean heal(@NotNull LivingEntity entity, double amount) {

@@ -8,8 +8,8 @@ plugins {
 }
 
 dependencies {
-    modImplementation(libs.fabric.lifecycle.events.v1)
-    modImplementation(libs.fabric.networking.api.v1)
+    add("fabricImplementation", libs.fabric.lifecycle.events.v1)
+    add("fabricImplementation", libs.fabric.networking.api.v1)
 }
 
 val companionModJar by tasks.registering(Jar::class) {

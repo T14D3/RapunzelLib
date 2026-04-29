@@ -3,10 +3,16 @@ package de.t14d3.rapunzellib.nbt.shared;
 import de.t14d3.rapunzellib.nbt.SerializedBlockEntity;
 import de.t14d3.rapunzellib.nbt.generated.BlockEntityRootNbt;
 import net.kyori.adventure.text.Component;
+import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
+// #if VERSION >= 26.0.0
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponents;
+// #endif
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -14,6 +20,7 @@ import net.minecraft.world.level.block.entity.BaseContainerBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -21,7 +28,20 @@ import java.lang.reflect.Field;
 import static org.junit.jupiter.api.Assertions.*;
 
 final class SharedBlockEntityNbtSerializerCoreTest {
-    private static final HolderLookup.Provider REGISTRIES = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY).freeze();
+    private static HolderLookup.Provider registries;
+
+    @BeforeAll
+    static void bootstrapMinecraft() {
+        SharedConstants.tryDetectVersion();
+        Bootstrap.bootStrap();
+        // #if VERSION >= 26.0.0
+        Items.AIR.builtInRegistryHolder().bindComponents(DataComponentMap.EMPTY);
+        Items.DIAMOND.builtInRegistryHolder().bindComponents(DataComponentMap.builder()
+            .set(DataComponents.MAX_STACK_SIZE, 64)
+            .build());
+        // #endif
+        registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY).freeze();
+    }
 
     @Test
     void serializesCanonicalRootDataAndDeserializesAgainstTargetLocation() {
@@ -48,7 +68,7 @@ final class SharedBlockEntityNbtSerializerCoreTest {
         BlockState targetState = Blocks.CHEST.defaultBlockState();
         BlockEntity deserialized = serializer.deserialize(
             serialized,
-            new TestLocation(new BlockPos(20, 70, 5), targetState, REGISTRIES)
+            new TestLocation(new BlockPos(20, 70, 5), targetState, registries)
         );
 
         ChestBlockEntity restored = assertInstanceOf(ChestBlockEntity.class, deserialized);

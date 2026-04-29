@@ -3,6 +3,7 @@ package de.t14d3.rapunzellib.gradle.tasks;
 import de.t14d3.rapunzellib.gradle.ModuleMatrix;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
+import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.TaskAction;
 
 import java.nio.file.Files;
@@ -10,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+@CacheableTask
 public abstract class VerifyInstallerWiringTask extends DefaultTask {
     private static final String GAME_EVENT_SUPPORT_CONTRIBUTOR_TYPE =
         "de.t14d3.rapunzellib.events.GameEventSupportContributor";

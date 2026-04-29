@@ -10,10 +10,11 @@ plugins {
 }
 
 val activeMinecraftTarget = providers.gradleProperty("rapunzellib.minecraftTarget")
-    .orElse(providers.gradleProperty("rapunzellib.minecraftCoreVersion"))
-    .orElse(libs.versions.minecraft)
+    .orElse(providers.provider { findProperty("rapunzellib.minecraftCoreVersion") as? String })
+    .orElse(providers.provider { findProperty("rapunzellib.version.minecraft") as? String })
 val activePaperApiVersion = providers.gradleProperty("rapunzellib.version.${activeMinecraftTarget.get()}.paper-api")
     .orElse(providers.gradleProperty("rapunzellib.version.paper-api"))
+    .orElse(providers.provider { findProperty("rapunzellib.version.paper-api") as? String })
     .orElse(activeMinecraftTarget.map { "$it-R0.1-SNAPSHOT" })
 
 val mainCompileClasspath = the<SourceSetContainer>().named("main").map { it.compileClasspath }

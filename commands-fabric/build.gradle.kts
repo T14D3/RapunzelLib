@@ -5,5 +5,5 @@ plugins {
 }
 
 dependencies {
-    modImplementation(libs.fabric.command.api.v2)
+    add("fabricImplementation", libs.fabric.command.api.v2)
 }

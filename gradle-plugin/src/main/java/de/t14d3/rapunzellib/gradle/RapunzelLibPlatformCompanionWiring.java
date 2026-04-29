@@ -21,7 +21,7 @@ public final class RapunzelLibPlatformCompanionWiring {
     }
 
     public static void wire(Project project) {
-        project.getPluginManager().withPlugin("fabric-loom", ignored ->
+        project.getPluginManager().withPlugin("net.fabricmc.fabric-loom", ignored ->
             project.afterEvaluate(evalProject -> configureFabricCompanionDependencies(project))
         );
         project.getPluginManager().withPlugin("net.neoforged.moddev", ignored ->

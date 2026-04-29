@@ -4,10 +4,7 @@ import de.t14d3.rapunzellib.multiversion.SourcePreprocessor;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.provider.Property;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.InputDirectory;
-import org.gradle.api.tasks.OutputDirectory;
-import org.gradle.api.tasks.TaskAction;
+import org.gradle.api.tasks.*;
 import org.gradle.work.DisableCachingByDefault;
 
 import java.io.File;
@@ -19,6 +16,7 @@ import java.nio.file.Files;
 public abstract class PreprocessSourcesTask extends DefaultTask {
 
     @InputDirectory
+    @PathSensitive(PathSensitivity.RELATIVE)
     public abstract Property<File> getSourceDir();
 
     @OutputDirectory

@@ -52,8 +52,13 @@ public final class FabricPluginMessenger implements Messenger, AutoCloseable {
         this.server = Objects.requireNonNull(server, "server");
         this.logger = Objects.requireNonNull(logger, "logger");
 
+        // #if VERSION >= 26.0.0
+        PayloadTypeRegistry.serverboundPlay().register(BridgePayload.TYPE, BridgePayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(BridgePayload.TYPE, BridgePayload.CODEC);
+        // #else
         PayloadTypeRegistry.playC2S().register(BridgePayload.TYPE, BridgePayload.CODEC);
         PayloadTypeRegistry.playS2C().register(BridgePayload.TYPE, BridgePayload.CODEC);
+        // #endif
         ServerPlayNetworking.registerGlobalReceiver(BridgePayload.TYPE, this::handlePluginMessage);
     }
 
