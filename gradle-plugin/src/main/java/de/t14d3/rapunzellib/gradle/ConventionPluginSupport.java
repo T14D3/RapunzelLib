@@ -53,10 +53,6 @@ public final class ConventionPluginSupport {
     }
 
     public static void configureMavenPublishing(Project project) {
-        if (isInternalPublishModule(project.getName())) {
-            return;
-        }
-
         project.getPluginManager().apply("maven-publish");
         if (project.getComponents().findByName("java") == null) {
             return;
@@ -102,7 +98,6 @@ public final class ConventionPluginSupport {
         if (publishing == null) {
             return;
         }
-
         if (publishing.getRepositories().findByName(REPOSILITE_REPOSITORY_NAME) == null) {
             publishing.getRepositories().maven(repository -> {
                 repository.setName(REPOSILITE_REPOSITORY_NAME);
@@ -388,21 +383,6 @@ public final class ConventionPluginSupport {
             throw new RuntimeException("Failed to load Minecraft target matrix from " + matrixFile, ex);
         }
         return properties;
-    }
-
-    private static boolean isInternalPublishModule(String projectName) {
-        if ("common".equals(projectName)) {
-            return true;
-        }
-        return "platform-shared".equals(projectName) || projectName.endsWith("-shared");
-    }
-
-    public static boolean publishesToReposilite(Project project) {
-        String projectName = project.getName();
-        if ("bom".equals(projectName) || "gradle-plugin".equals(projectName)) {
-            return true;
-        }
-        return !isInternalPublishModule(projectName);
     }
 
     private static boolean isReposilitePublishTask(PublishToMavenRepository task) {

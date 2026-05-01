@@ -9,17 +9,7 @@ val excludedProjects = setOf(
 )
 
 fun isPublicBomModule(path: String): Boolean {
-    if (path in excludedProjects) {
-        return false
-    }
-    val projectName = path.removePrefix(":")
-    if (projectName == "common") {
-        return false
-    }
-    if (projectName.endsWith("-shared") || projectName == "platform-shared") {
-        return false
-    }
-    return true
+    return path !in excludedProjects
 }
 
 dependencies {

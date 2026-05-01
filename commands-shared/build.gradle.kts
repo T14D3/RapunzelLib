@@ -5,4 +5,5 @@ plugins {
 dependencies {
     api(project(":commands"))
     compileOnly(libs.annotations)
+    implementation(libs.adventure.serializer.gson)
 }

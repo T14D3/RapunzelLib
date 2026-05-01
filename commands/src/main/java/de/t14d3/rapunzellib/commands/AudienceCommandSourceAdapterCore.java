@@ -21,14 +21,30 @@ public final class AudienceCommandSourceAdapterCore {
         @NotNull BiPredicate<? super T, ? super String> permissionChecker,
         @NotNull Function<? super T, Optional<RPlayer>> playerExtractor
     ) {
+        return wrapReplyChannels(
+            platformId,
+            source,
+            value -> RCommandSources.replyChannels(audienceExtractor.apply(value)),
+            permissionChecker,
+            playerExtractor
+        );
+    }
+
+    public static <T> @NotNull RCommandSource wrapReplyChannels(
+        @NotNull PlatformId platformId,
+        @NotNull T source,
+        @NotNull Function<? super T, ? extends RCommandSources.ReplyChannels> replyChannelsExtractor,
+        @NotNull BiPredicate<? super T, ? super String> permissionChecker,
+        @NotNull Function<? super T, Optional<RPlayer>> playerExtractor
+    ) {
         Objects.requireNonNull(platformId, "platformId");
         Objects.requireNonNull(source, "source");
-        Objects.requireNonNull(audienceExtractor, "audienceExtractor");
+        Objects.requireNonNull(replyChannelsExtractor, "replyChannelsExtractor");
         Objects.requireNonNull(permissionChecker, "permissionChecker");
         Objects.requireNonNull(playerExtractor, "playerExtractor");
 
-        Audience audience = Objects.requireNonNull(audienceExtractor.apply(source), "audience");
+        RCommandSources.ReplyChannels replyChannels = Objects.requireNonNull(replyChannelsExtractor.apply(source), "replyChannels");
         Optional<RPlayer> player = Objects.requireNonNull(playerExtractor.apply(source), "player");
-        return RCommandSources.of(platformId, source, audience, player, permission -> permissionChecker.test(source, permission));
+        return RCommandSources.of(platformId, source, replyChannels, player, permission -> permissionChecker.test(source, permission));
     }
 }

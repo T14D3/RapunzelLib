@@ -5,5 +5,6 @@ plugins {
 }
 
 dependencies {
+    implementation(libs.adventure.serializer.gson)
     add("fabricImplementation", libs.fabric.command.api.v2)
 }
