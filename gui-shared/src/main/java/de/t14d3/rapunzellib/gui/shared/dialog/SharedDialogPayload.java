@@ -21,7 +21,7 @@ public record SharedDialogPayload(
     public record ButtonBody(
         @NotNull String label,
         boolean enabled,
-        @Nullable String tooltip,
+        @Nullable String[] tooltip,
         @Nullable String icon
     ) implements Body {
     }

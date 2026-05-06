@@ -93,15 +93,20 @@ public final class SpongeRapunzelBootstrap {
                 ctx -> {
                     ctx.register(Server.class, server);
 
-                    SpongePersistentAttachmentsStore attachmentStore = new SpongePersistentAttachmentsStore(
-                        logger,
-                        ctx.configs(),
-                        dataDirectory.resolve("attachments.yml")
+                    SpongePersistentAttachmentsStore attachmentStore = ctx.sharedRuntime().getOrCreate(
+                        SpongePersistentAttachmentsStore.class,
+                        () -> new SpongePersistentAttachmentsStore(
+                            logger,
+                            ctx.configs(),
+                            dataDirectory.resolve("attachments.yml")
+                        )
                     );
-                    SpongeAttachmentService attachmentService = new SpongeAttachmentService(attachmentStore);
-                    ctx.register(SpongePersistentAttachmentsStore.class, attachmentStore);
-                    ctx.register(SpongeAttachmentService.class, attachmentService);
-                    ctx.registerCloseable(attachmentStore);
+                    SpongeAttachmentService attachmentService = ctx.sharedRuntime().getOrCreate(
+                        SpongeAttachmentService.class,
+                        () -> new SpongeAttachmentService(attachmentStore)
+                    );
+                    ctx.services().register(SpongePersistentAttachmentsStore.class, attachmentStore);
+                    ctx.services().register(SpongeAttachmentService.class, attachmentService);
 
                     PlatformFeatures.install(ctx);
                 },

@@ -39,35 +39,34 @@ import static org.junit.jupiter.api.Assertions.*;
 
 final class RapunzelLeaseTest {
     @Test
-    void laterBootstrapCallsBecomeBorrowersAndOwnerShutdownCloses(@TempDir Path dir) {
+    void laterBootstrapCallsCreateIndependentConsumerContexts(@TempDir Path dir) {
         resetBootstrap();
 
         Object ownerA = new Object();
         Object ownerB = new Object();
         TestContext ctx = new TestContext(dir.resolve("owner"));
-        TestContext ignored = new TestContext(dir.resolve("ignored"));
+        TestContext ctxB = new TestContext(dir.resolve("consumer-b"));
 
         BootstrapHandle ownerHandle = Rapunzel.bootstrap(ownerA, ctx);
-        BootstrapHandle borrowerHandle = Rapunzel.bootstrap(ownerB, ignored);
+        BootstrapHandle consumerBHandle = Rapunzel.bootstrap(ownerB, ctxB);
 
         assertSame(ctx, ownerHandle.context());
         assertEquals(BootstrapOwnerRole.OWNER, ownerHandle.role());
-        assertEquals(1, Rapunzel.ownerCount());
-        assertEquals(1, Rapunzel.borrowerCount());
+        assertEquals(2, Rapunzel.ownerCount());
+        assertEquals(0, Rapunzel.borrowerCount());
         assertTrue(Rapunzel.isBootstrapped());
         assertFalse(ctx.isClosed());
 
-        assertSame(ctx, borrowerHandle.context());
-        assertEquals(BootstrapOwnerRole.BORROWER, borrowerHandle.role());
-        assertEquals(1, Rapunzel.ownerCount());
-        assertEquals(1, Rapunzel.borrowerCount());
-        assertFalse(ignored.isClosed());
+        assertSame(ctxB, consumerBHandle.context());
+        assertEquals(BootstrapOwnerRole.OWNER, consumerBHandle.role());
+        assertFalse(ctxB.isClosed());
 
         Rapunzel.shutdown(ownerB);
         assertEquals(1, Rapunzel.ownerCount());
         assertEquals(0, Rapunzel.borrowerCount());
         assertTrue(Rapunzel.isBootstrapped());
         assertFalse(ctx.isClosed());
+        assertTrue(ctxB.isClosed());
 
         Rapunzel.shutdown(ownerA);
         assertFalse(Rapunzel.isBootstrapped());
@@ -75,7 +74,7 @@ final class RapunzelLeaseTest {
     }
 
     @Test
-    void hostPreferredBootstrapClaimsOwnership(@TempDir Path dir) {
+    void registeredHostDoesNotStealConsumerOwnership(@TempDir Path dir) {
         resetBootstrap();
 
         Object borrower = new Object();
@@ -85,17 +84,13 @@ final class RapunzelLeaseTest {
 
         BootstrapHandle handle = Rapunzel.bootstrap(borrower, () -> ctx);
 
-        assertEquals(BootstrapOwnerRole.BORROWER, handle.role());
+        assertEquals(BootstrapOwnerRole.OWNER, handle.role());
         assertSame(ctx, handle.context());
         assertEquals(1, Rapunzel.ownerCount());
-        assertEquals(1, Rapunzel.borrowerCount());
-        assertSame(host.ownerToken(), Rapunzel.bootstrapState().ownerToken().orElseThrow());
+        assertEquals(0, Rapunzel.borrowerCount());
+        assertSame(borrower, Rapunzel.bootstrapState().ownerToken().orElseThrow());
 
         Rapunzel.shutdown(borrower);
-        assertTrue(Rapunzel.isBootstrapped());
-        assertFalse(ctx.isClosed());
-
-        Rapunzel.shutdown(host.ownerToken());
         assertFalse(Rapunzel.isBootstrapped());
         assertTrue(ctx.isClosed());
     }
@@ -146,24 +141,22 @@ final class RapunzelLeaseTest {
     }
 
     @Test
-    void bootstrapOrAcquireSkipsFactoryWhenAlreadyBootstrapped(@TempDir Path dir) {
+    void bootstrapOrAcquireCreatesIndependentContextForNewOwner(@TempDir Path dir) {
         resetBootstrap();
 
         Object ownerA = new Object();
         Object ownerB = new Object();
         TestContext ctx = new TestContext(dir);
+        TestContext ctxB = new TestContext(dir.resolve("consumer-b"));
 
         Rapunzel.bootstrap(ownerA, ctx);
 
-        BootstrapHandle leaseB = Rapunzel.bootstrapOrAcquire(ownerB, () -> {
-            fail("contextFactory should not be invoked when already bootstrapped");
-            return new TestContext(dir.resolve("unused"));
-        });
+        BootstrapHandle leaseB = Rapunzel.bootstrapOrAcquire(ownerB, () -> ctxB);
 
-        assertSame(ctx, leaseB.context());
-        assertEquals(BootstrapOwnerRole.BORROWER, leaseB.role());
-        assertEquals(1, Rapunzel.ownerCount());
-        assertEquals(1, Rapunzel.borrowerCount());
+        assertSame(ctxB, leaseB.context());
+        assertEquals(BootstrapOwnerRole.OWNER, leaseB.role());
+        assertEquals(2, Rapunzel.ownerCount());
+        assertEquals(0, Rapunzel.borrowerCount());
     }
 
     @Test
@@ -187,6 +180,36 @@ final class RapunzelLeaseTest {
         assertSame(ctx.exampleService(), service);
         assertSame(service, Rapunzel.findService(ExampleService.class).orElseThrow());
         assertTrue(Rapunzel.findService(MissingService.class).isEmpty());
+    }
+
+    @Test
+    void staticContextIsAmbiguousWithoutScopeWhenMultipleConsumersExist(@TempDir Path dir) {
+        resetBootstrap();
+
+        TestContext ctxA = new TestContext(dir.resolve("a"));
+        TestContext ctxB = new TestContext(dir.resolve("b"));
+        Rapunzel.bootstrap("a", ctxA);
+        Rapunzel.bootstrap("b", ctxB);
+
+        assertTrue(Rapunzel.findContext().isEmpty());
+        assertThrows(IllegalStateException.class, Rapunzel::context);
+    }
+
+    @Test
+    void scopedContextRestoresPreviousContext(@TempDir Path dir) {
+        resetBootstrap();
+
+        TestContext ctxA = new TestContext(dir.resolve("a"));
+        TestContext ctxB = new TestContext(dir.resolve("b"));
+        Rapunzel.bootstrap("a", ctxA);
+        Rapunzel.bootstrap("b", ctxB);
+
+        Rapunzel.withContext(ctxA, () -> {
+            assertSame(ctxA, Rapunzel.context());
+            Rapunzel.withContext(ctxB, () -> assertSame(ctxB, Rapunzel.context()));
+            assertSame(ctxA, Rapunzel.context());
+        });
+        assertTrue(Rapunzel.findContext().isEmpty());
     }
 
     private static void resetBootstrap() {

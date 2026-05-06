@@ -18,6 +18,7 @@ import de.t14d3.rapunzellib.registry.RRegistryAccess;
 import de.t14d3.rapunzellib.objects.interop.RNativeInterop;
 import de.t14d3.rapunzellib.runtime.LifecycleOwner;
 import de.t14d3.rapunzellib.runtime.PlatformRuntime;
+import de.t14d3.rapunzellib.runtime.RapunzelRuntime;
 import de.t14d3.rapunzellib.runtime.RuntimeCapability;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.jetbrains.annotations.NotNull;
@@ -29,6 +30,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public interface RapunzelContext extends AutoCloseable {
+    default @NotNull RapunzelRuntime sharedRuntime() {
+        return RapunzelRuntime.getInstance();
+    }
+
     @NotNull PlatformRuntime runtime();
 
     default @NotNull PlatformId platformId() {

@@ -4,6 +4,7 @@ import de.t14d3.rapunzellib.gui.dialog.GuiDialogModel;
 import de.t14d3.rapunzellib.gui.dialog.GuiDialogStateSupport;
 import de.t14d3.rapunzellib.gui.dialog.GuiDialogField;
 import de.t14d3.rapunzellib.gui.dialog.GuiDialogFieldValue;
+import de.t14d3.rapunzellib.gui.core.GuiInventoryPresentation;
 import de.t14d3.rapunzellib.gui.element.ButtonElement;
 import de.t14d3.rapunzellib.gui.element.DividerElement;
 import de.t14d3.rapunzellib.gui.element.GuiElement;
@@ -59,7 +60,7 @@ public final class SharedDialogPayloads {
         return new SharedDialogPayload.ButtonBody(
             plain(button.label()),
             button.enabled(),
-            plainNullable(button.tooltip()),
+            plain(button.tooltip()),
             iconId(button.icon())
         );
     }
@@ -145,7 +146,7 @@ public final class SharedDialogPayloads {
 
     private static @Nullable String iconId(@Nullable Icon icon) {
         return switch (icon) {
-            case Icon.ItemIcon itemIcon -> itemIcon.itemId();
+            case Icon.ItemIcon itemIcon -> GuiInventoryPresentation.normalizeItemKey(itemIcon.item().material(), "minecraft:stone");
             case Icon.CustomIcon customIcon -> customIcon.id();
             case Icon.NoneIcon ignored -> null;
             case null -> null;
@@ -160,8 +161,12 @@ public final class SharedDialogPayloads {
         return PlainTextComponentSerializer.plainText().serialize(component);
     }
 
-    private static @Nullable String plainNullable(@Nullable Component component) {
-        return component != null ? plain(component) : null;
+    private static @NotNull String[] plain(@NotNull Component[] components) {
+        String[] strings = new String[components.length];
+        for (int i = 0; i < components.length; i++) {
+            strings[i] = plain(components[i]);
+        }
+        return strings;
     }
 
 }

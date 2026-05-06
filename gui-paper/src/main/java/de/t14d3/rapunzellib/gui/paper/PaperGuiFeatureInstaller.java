@@ -11,6 +11,9 @@ import de.t14d3.rapunzellib.gui.paper.inventory.InventoryRenderer;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
+import java.util.List;
+
 public final class PaperGuiFeatureInstaller extends AbstractGuiFeatureInstaller {
     private JavaPlugin plugin;
     private InventoryClickListener listener;
@@ -26,10 +29,19 @@ public final class PaperGuiFeatureInstaller extends AbstractGuiFeatureInstaller 
     }
 
     @Override
-    protected @NotNull GuiRenderer createRenderer(@NotNull RapunzelContext context) {
+    public @NotNull Collection<GuiRenderer> provideRenderers(@NotNull RapunzelContext context) {
         plugin = context.requireLifecycleOwner(JavaPlugin.class);
         listener = new InventoryClickListener(plugin, InventoryRenderer.instance());
         listener.register();
+        return List.of(
+            PaperGuiRenderer.inventory(),
+            PaperGuiRenderer.dialog(),
+            PaperGuiRenderer.auto()
+        );
+    }
+
+    @Override
+    protected @NotNull GuiRenderer createRenderer(@NotNull RapunzelContext context) {
         return PaperGuiRenderer.auto();
     }
 

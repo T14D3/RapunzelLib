@@ -3,7 +3,9 @@ package de.t14d3.rapunzellib.common.context;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.context.ServiceRegistry;
+import de.t14d3.rapunzellib.common.scheduler.ContextualScheduler;
 import de.t14d3.rapunzellib.runtime.PlatformRuntime;
+import de.t14d3.rapunzellib.runtime.RapunzelRuntime;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -15,6 +17,7 @@ import java.util.List;
 import java.util.Objects;
 
 public final class DefaultRapunzelContext implements RapunzelContext {
+    private final RapunzelRuntime sharedRuntime;
     private final PlatformRuntime runtime;
     private final Logger logger;
     private final Path dataDirectory;
@@ -32,11 +35,29 @@ public final class DefaultRapunzelContext implements RapunzelContext {
         ResourceProvider resources,
         Scheduler scheduler
     ) {
+        this(RapunzelRuntime.getInstance(), runtime, logger, dataDirectory, resources, scheduler);
+    }
+
+    public DefaultRapunzelContext(
+        RapunzelRuntime sharedRuntime,
+        PlatformRuntime runtime,
+        Logger logger,
+        Path dataDirectory,
+        ResourceProvider resources,
+        Scheduler scheduler
+    ) {
+        this.sharedRuntime = Objects.requireNonNull(sharedRuntime, "sharedRuntime");
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dataDirectory = Objects.requireNonNull(dataDirectory, "dataDirectory");
         this.resources = Objects.requireNonNull(resources, "resources");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.scheduler = new ContextualScheduler(this, Objects.requireNonNull(scheduler, "scheduler"));
+        registerCloseable((AutoCloseable) this.scheduler);
+    }
+
+    @Override
+    public @NotNull RapunzelRuntime sharedRuntime() {
+        return sharedRuntime;
     }
 
     @Override

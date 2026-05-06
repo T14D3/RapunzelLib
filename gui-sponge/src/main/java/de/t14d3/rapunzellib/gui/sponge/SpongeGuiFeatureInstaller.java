@@ -8,6 +8,9 @@ import de.t14d3.rapunzellib.gui.AbstractGuiFeatureInstaller;
 import de.t14d3.rapunzellib.gui.GuiRenderer;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
+import java.util.List;
+
 public final class SpongeGuiFeatureInstaller extends AbstractGuiFeatureInstaller {
     @Override
     public @NotNull PlatformId platformId() {
@@ -17,6 +20,15 @@ public final class SpongeGuiFeatureInstaller extends AbstractGuiFeatureInstaller
     @Override
     public @NotNull GameEventSupportManifest supportManifest() {
         return GameEventSupportManifests.partialGuiInventoryBridgeSupport(platformId());
+    }
+
+    @Override
+    public @NotNull Collection<GuiRenderer> provideRenderers(@NotNull RapunzelContext context) {
+        return List.of(
+            SpongeGuiRenderer.inventory(),
+            SpongeGuiRenderer.dialog(),
+            SpongeGuiRenderer.auto()
+        );
     }
 
     @Override

@@ -6,10 +6,22 @@ import de.t14d3.rapunzellib.gui.AbstractGuiFeatureInstaller;
 import de.t14d3.rapunzellib.gui.GuiRenderer;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
+import java.util.List;
+
 public final class NeoForgeGuiFeatureInstaller extends AbstractGuiFeatureInstaller {
     @Override
     public @NotNull PlatformId platformId() {
         return PlatformId.NEOFORGE;
+    }
+
+    @Override
+    public @NotNull Collection<GuiRenderer> provideRenderers(@NotNull RapunzelContext context) {
+        return List.of(
+            NeoForgeGuiRenderer.inventory(),
+            NeoForgeGuiRenderer.dialog(),
+            NeoForgeGuiRenderer.auto()
+        );
     }
 
     @Override

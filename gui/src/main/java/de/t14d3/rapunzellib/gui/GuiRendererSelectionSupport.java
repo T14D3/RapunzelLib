@@ -6,9 +6,11 @@ import de.t14d3.rapunzellib.gui.layout.LinearLayout;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -104,6 +106,11 @@ public final class GuiRendererSelectionSupport {
 
     public static @NotNull Set<GuiCapability> unionCapabilities(@NotNull GuiRenderer... renderers) {
         Objects.requireNonNull(renderers, "renderers");
+        return unionCapabilities(java.util.Arrays.asList(renderers));
+    }
+
+    public static @NotNull Set<GuiCapability> unionCapabilities(@NotNull Collection<? extends GuiRenderer> renderers) {
+        Objects.requireNonNull(renderers, "renderers");
 
         EnumSet<GuiCapability> capabilities = EnumSet.noneOf(GuiCapability.class);
         for (GuiRenderer renderer : renderers) {
@@ -113,6 +120,33 @@ public final class GuiRendererSelectionSupport {
             capabilities.addAll(renderer.capabilities());
         }
         return Set.copyOf(capabilities);
+    }
+
+    public static @NotNull Optional<GuiRenderer> selectBest(
+        @NotNull Collection<? extends GuiRenderer> renderers,
+        @NotNull Gui gui,
+        @NotNull RPlayer player
+    ) {
+        Objects.requireNonNull(renderers, "renderers");
+        Objects.requireNonNull(gui, "gui");
+        Objects.requireNonNull(player, "player");
+
+        Set<GuiCapability> required = requiredCapabilities(gui);
+
+        GuiRenderer fallback = null;
+        for (GuiRenderer renderer : renderers) {
+            if (renderer == null) continue;
+
+            Set<GuiCapability> caps = renderer.capabilities();
+            if (caps.containsAll(required)) {
+                return Optional.of(renderer);
+            }
+            if (fallback == null) {
+                fallback = renderer;
+            }
+        }
+
+        return Optional.ofNullable(fallback);
     }
 
     public static @NotNull GuiRenderer autoRenderer(

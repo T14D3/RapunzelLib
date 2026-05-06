@@ -13,12 +13,15 @@ import de.t14d3.rapunzellib.gui.element.SliderElement;
 import de.t14d3.rapunzellib.gui.element.SpacerElement;
 import de.t14d3.rapunzellib.gui.element.TextElement;
 import de.t14d3.rapunzellib.gui.element.ToggleElement;
+import de.t14d3.rapunzellib.nbt.item.RItem;
 import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 
 public final class GuiInventoryPresentation {
     private static final String DEFAULT_BUTTON_ITEM = "minecraft:stone";
@@ -29,25 +32,24 @@ public final class GuiInventoryPresentation {
     public static @NotNull Entry present(@NotNull GuiElement element, @NotNull RenderContext context) {
         return switch (element) {
             case ButtonElement button -> button(button);
-            case TextElement text -> new Entry("minecraft:paper", text.text(), List.of(), false, false);
+            case TextElement text -> entry("minecraft:paper", text.text(), List.of(), false);
             case InputElement input -> input(input, context);
             case ToggleElement toggle -> toggle(toggle, context);
             case SliderElement slider -> slider(slider, context);
             case DropdownElement dropdown -> dropdown(dropdown, context);
             case PaginationElement pagination -> pagination(pagination);
-            case DividerElement ignored -> new Entry("minecraft:gray_stained_glass_pane", Component.text(" "), List.of(), false, false);
+            case DividerElement ignored -> entry("minecraft:gray_stained_glass_pane", Component.text(" "), List.of(), false);
             case SpacerElement ignored -> Entry.blank();
-            default -> new Entry(DEFAULT_BUTTON_ITEM, Component.text("Unsupported"), List.of(), false, false);
+            default -> entry(DEFAULT_BUTTON_ITEM, Component.text("Unsupported"), List.of(), false);
         };
     }
 
     public static @NotNull Entry presentDropdownOption(@NotNull Option option, boolean selected) {
         List<Component> lore = selected ? List.of(Component.text("Selected")) : List.of();
-        return new Entry(
+        return entry(
             selected ? "minecraft:lime_stained_glass_pane" : "minecraft:gray_stained_glass_pane",
             selected ? Component.text("> ").append(option.display()) : option.display(),
             lore,
-            false,
             false
         );
     }
@@ -56,23 +58,29 @@ public final class GuiInventoryPresentation {
         return label != null ? label : Component.text(key);
     }
 
-    public static @NotNull String iconItemKey(@Nullable Icon icon, @NotNull String fallback) {
+    public static @NotNull RItem iconItem(@Nullable Icon icon, @NotNull String fallback) {
         if (icon instanceof Icon.ItemIcon itemIcon) {
-            return normalizeItemKey(itemIcon.itemId(), fallback);
+            return itemIcon.item();
         }
-        return fallback;
+        return item(fallback);
+    }
+
+    public static @NotNull String iconItemKey(@Nullable Icon icon, @NotNull String fallback) {
+        return normalizeItemKey(iconItem(icon, fallback).material(), fallback);
     }
 
     public static @NotNull String normalizeItemKey(@Nullable String itemKey, @NotNull String fallback) {
         if (itemKey == null || itemKey.isBlank()) {
             return fallback;
         }
-        return itemKey.contains(":") ? itemKey.toLowerCase() : "minecraft:" + itemKey.toLowerCase();
+        String normalized = itemKey.toLowerCase(Locale.ROOT);
+        return normalized.contains(":") ? normalized : "minecraft:" + normalized;
     }
 
     private static @NotNull Entry button(@NotNull ButtonElement button) {
-        List<Component> lore = button.tooltip() != null ? List.of(button.tooltip()) : List.of();
-        return new Entry(iconItemKey(button.icon(), DEFAULT_BUTTON_ITEM), button.label(), lore, !button.enabled(), false);
+        RItem baseItem = iconItem(button.icon(), DEFAULT_BUTTON_ITEM);
+        RItem displayed = appendDisplay(baseItem, button.label(), tooltip(button.tooltip()), !button.enabled());
+        return new Entry(displayed, false);
     }
 
     private static @NotNull Entry input(@NotNull InputElement input, @NotNull RenderContext context) {
@@ -87,16 +95,15 @@ public final class GuiInventoryPresentation {
             lore.add(Component.text("Hint: " + input.placeholder()));
         }
         lore.add(Component.text("Click to edit"));
-        return new Entry("minecraft:writable_book", labelOrKey(input.key(), input.label()), lore, false, false);
+        return entry("minecraft:writable_book", labelOrKey(input.key(), input.label()), lore, false);
     }
 
     private static @NotNull Entry toggle(@NotNull ToggleElement toggle, @NotNull RenderContext context) {
         boolean value = GuiElementStates.toggleValue(toggle, context.state());
-        return new Entry(
+        return entry(
             value ? "minecraft:lime_wool" : "minecraft:red_wool",
             labelOrKey(toggle.key(), toggle.label()),
             List.of(Component.text(value ? "Enabled" : "Disabled"), Component.text("Click to toggle")),
-            false,
             false
         );
     }
@@ -105,7 +112,7 @@ public final class GuiInventoryPresentation {
         float value = GuiElementStates.sliderValue(slider, context.state());
         int percent = GuiElementStates.sliderPercent(slider, context.state());
         int filledBars = Math.round((percent / 100.0f) * 10.0f);
-        return new Entry(
+        return entry(
             "minecraft:repeater",
             labelOrKey(slider.key(), slider.label()),
             List.of(
@@ -116,7 +123,6 @@ public final class GuiInventoryPresentation {
                 Component.text("Left-click: +" + slider.step()),
                 Component.text("Right-click: -" + slider.step())
             ),
-            false,
             false
         );
     }
@@ -133,32 +139,114 @@ public final class GuiInventoryPresentation {
             lore.add(Component.text(option.id().equals(state.selectedId()) ? "> " : "  ").append(option.display()));
         }
         lore.add(Component.text("Click to select"));
-        return new Entry("minecraft:hopper", labelOrKey(dropdown.key(), dropdown.label()), lore, false, false);
+        return entry("minecraft:hopper", labelOrKey(dropdown.key(), dropdown.label()), lore, false);
     }
 
     private static @NotNull Entry pagination(@NotNull PaginationElement pagination) {
-        return new Entry(
+        return entry(
             "minecraft:book",
             Component.text("Pagination"),
             List.of(Component.text("Page " + (pagination.currentPage() + 1) + " of " + pagination.totalPages())),
-            false,
             false
         );
     }
 
-    public record Entry(
+    private static @NotNull Entry entry(
         @NotNull String itemKey,
         @Nullable Component label,
         @NotNull List<Component> lore,
-        boolean glow,
+        boolean glow
+    ) {
+        return new Entry(withDisplay(item(itemKey), label, lore, glow), false);
+    }
+
+    private static @NotNull RItem item(@NotNull String itemKey) {
+        return RItem.of(normalizeItemKey(itemKey, DEFAULT_BUTTON_ITEM));
+    }
+
+    private static @NotNull RItem withDisplay(
+        @NotNull RItem item,
+        @Nullable Component label,
+        @NotNull List<Component> lore,
+        boolean glow
+    ) {
+        RItem rendered = Objects.requireNonNull(item, "item")
+            .withName(label)
+            .withLore(lore)
+            .withEnchantmentGlintOverride(glow ? Boolean.TRUE : null);
+        return rendered;
+    }
+
+    private static @NotNull RItem appendDisplay(
+        @NotNull RItem item,
+        @NotNull Component fallbackLabel,
+        @NotNull List<Component> additionalLore,
+        boolean glow
+    ) {
+        RItem rendered = Objects.requireNonNull(item, "item");
+        if (rendered.name().isEmpty()) {
+            rendered = rendered.withName(fallbackLabel);
+        }
+        if (!additionalLore.isEmpty()) {
+            List<Component> lore = new ArrayList<>(rendered.lore());
+            lore.addAll(additionalLore);
+            rendered = rendered.withLore(lore);
+        }
+        if (glow) {
+            rendered = rendered.withEnchantmentGlintOverride(Boolean.TRUE);
+        }
+        return rendered;
+    }
+
+    private static @NotNull List<Component> tooltip(@Nullable Component[] tooltip) {
+        if (tooltip == null || tooltip.length == 0) {
+            return List.of();
+        }
+        List<Component> lines = new ArrayList<>(tooltip.length);
+        for (Component line : tooltip) {
+            if (line != null) {
+                lines.add(line);
+            }
+        }
+        return List.copyOf(lines);
+    }
+
+    public record Entry(
+        @NotNull RItem item,
         boolean empty
     ) {
         public Entry {
-            lore = List.copyOf(lore);
+            item = Objects.requireNonNull(item, "item");
+        }
+
+        public Entry(
+            @NotNull String itemKey,
+            @Nullable Component label,
+            @NotNull List<Component> lore,
+            boolean glow,
+            boolean empty
+        ) {
+            this(withDisplay(GuiInventoryPresentation.item(itemKey), label, lore, glow), empty);
+        }
+
+        public @NotNull String itemKey() {
+            return item.material();
+        }
+
+        public @Nullable Component label() {
+            return item.name().orElse(null);
+        }
+
+        public @NotNull List<Component> lore() {
+            return item.lore();
+        }
+
+        public boolean glow() {
+            return item.enchantmentGlintOverride().orElse(Boolean.FALSE);
         }
 
         public static @NotNull Entry blank() {
-            return new Entry("minecraft:air", Component.text(" "), List.of(), false, true);
+            return new Entry(GuiInventoryPresentation.item("minecraft:air"), true);
         }
     }
 }

@@ -10,7 +10,7 @@ import java.util.function.Consumer;
 public interface ButtonElement extends GuiElement {
     @NotNull Component label();
     
-    @Nullable Component tooltip();
+    @NotNull Component[] tooltip();
     
     @Nullable Icon icon();
     
@@ -27,7 +27,7 @@ public interface ButtonElement extends GuiElement {
     
     @NotNull
     static ButtonElement of(@NotNull Component label) {
-        return builder().label(label).build();
+        return builder().label(label).tooltip(Component.empty()).build();
     }
     
     @NotNull

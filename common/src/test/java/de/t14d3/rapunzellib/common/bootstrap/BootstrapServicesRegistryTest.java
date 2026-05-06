@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.common.bootstrap;
 
 import de.t14d3.rapunzellib.PlatformId;
+import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.common.registry.DefaultRRegistryAccess;
 import de.t14d3.rapunzellib.common.registry.RegistryAccessBackedBlockTypeRegistry;
@@ -33,6 +34,7 @@ import de.t14d3.rapunzellib.runtime.RuntimeCapability;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +54,11 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 final class BootstrapServicesRegistryTest {
+    @BeforeEach
+    void resetRuntime() throws Exception {
+        Rapunzel.sharedRuntime().shutdown();
+    }
+
     @Test
     void registerTypeRegistriesWiresUnifiedAccessAndCompatibilityFacades() {
         RapunzelContext context = BootstrapServices.createContext(

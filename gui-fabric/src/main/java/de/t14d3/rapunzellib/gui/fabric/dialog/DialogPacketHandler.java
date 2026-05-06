@@ -24,6 +24,7 @@ import net.minecraft.server.level.ServerPlayer;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -114,7 +115,7 @@ public final class DialogPacketHandler {
                 entry.addProperty("label", button.label());
                 entry.addProperty("enabled", button.enabled());
                 if (button.tooltip() != null) {
-                    entry.addProperty("tooltip", button.tooltip());
+                    entry.addProperty("tooltip", Arrays.toString(button.tooltip()));
                 }
                 if (button.icon() != null) {
                     entry.addProperty("icon", button.icon());

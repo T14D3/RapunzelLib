@@ -447,9 +447,12 @@ public final class SharedBackendBootstrap {
                 transportConfig,
                 runtime.platformId()
             );
-            InMemoryMessenger inMemoryMessenger = new InMemoryMessenger(
-                firstNonBlank(resolvedNames.serverName(), inMemorySourceId),
-                firstNonBlank(resolvedNames.proxyServerName(), NetworkDefaults.DEFAULT_PROXY_SERVER_NAME)
+            InMemoryMessenger inMemoryMessenger = context.sharedRuntime().getOrCreate(
+                InMemoryMessenger.class,
+                () -> new InMemoryMessenger(
+                    firstNonBlank(resolvedNames.serverName(), inMemorySourceId),
+                    firstNonBlank(resolvedNames.proxyServerName(), NetworkDefaults.DEFAULT_PROXY_SERVER_NAME)
+                )
             );
             context.register(Messenger.class, inMemoryMessenger);
             context.register(InMemoryMessenger.class, inMemoryMessenger);
@@ -500,7 +503,10 @@ public final class SharedBackendBootstrap {
             }
         } catch (Exception e) {
             logger.warn("Failed to initialize network transport; using in-memory.", e);
-            InMemoryMessenger inMemoryMessenger = new InMemoryMessenger(inMemorySourceId, NetworkDefaults.DEFAULT_PROXY_SERVER_NAME);
+            InMemoryMessenger inMemoryMessenger = context.sharedRuntime().getOrCreate(
+                InMemoryMessenger.class,
+                () -> new InMemoryMessenger(inMemorySourceId, NetworkDefaults.DEFAULT_PROXY_SERVER_NAME)
+            );
             context.services().register(Messenger.class, inMemoryMessenger);
             context.services().register(InMemoryMessenger.class, inMemoryMessenger);
             NetworkRuntime fallbackRuntime = NetworkRuntimeClassifier.fallback(runtime.platformId(), inMemoryMessenger);

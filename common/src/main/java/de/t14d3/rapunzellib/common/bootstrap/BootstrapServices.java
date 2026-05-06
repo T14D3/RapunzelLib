@@ -149,19 +149,19 @@ public final class BootstrapServices {
         Objects.requireNonNull(resources, "resources");
         Objects.requireNonNull(scheduler, "scheduler");
 
-        DefaultRapunzelContext ctx = new DefaultRapunzelContext(runtime, logger, dataDir, resources, scheduler);
-        if (scheduler instanceof AutoCloseable closeable) {
-            ctx.registerCloseable(closeable);
-        }
-        return ctx;
+        return new DefaultRapunzelContext(runtime, logger, dataDir, resources, scheduler);
     }
 
     public static DefaultRNativeInterop registerNativeInterop(RapunzelContext context) {
         Objects.requireNonNull(context, "context");
 
+        DefaultRNativeInterop interop = context.sharedRuntime().getOrCreate(
+            DefaultRNativeInterop.class,
+            () -> new DefaultRNativeInterop(context.platformId())
+        );
         return context.registerLinked(
             DefaultRNativeInterop.class,
-            new DefaultRNativeInterop(context.platformId()),
+            interop,
             RNativeInterop.class,
             MutableRNativeInterop.class
         );
@@ -186,7 +186,8 @@ public final class BootstrapServices {
         Objects.requireNonNull(players, "players");
         Objects.requireNonNull(playersType, "playersType");
 
-        context.registerLinked(playersType, players, Players.class);
+        P sharedPlayers = context.sharedRuntime().getOrCreate(playersType, () -> players);
+        context.registerLinked(playersType, sharedPlayers, Players.class);
     }
 
     public static <E extends Entities> void registerEntityAccessors(
@@ -198,7 +199,8 @@ public final class BootstrapServices {
         Objects.requireNonNull(entities, "entities");
         Objects.requireNonNull(entitiesType, "entitiesType");
 
-        context.registerLinked(entitiesType, entities, Entities.class);
+        E sharedEntities = context.sharedRuntime().getOrCreate(entitiesType, () -> entities);
+        context.registerLinked(entitiesType, sharedEntities, Entities.class);
     }
 
     public static <W extends Worlds, B extends Blocks> void registerWorldAccessors(
@@ -214,8 +216,10 @@ public final class BootstrapServices {
         Objects.requireNonNull(blocks, "blocks");
         Objects.requireNonNull(blocksType, "blocksType");
 
-        context.registerLinked(worldsType, worlds, Worlds.class);
-        context.registerLinked(blocksType, blocks, Blocks.class);
+        W sharedWorlds = context.sharedRuntime().getOrCreate(worldsType, () -> worlds);
+        B sharedBlocks = context.sharedRuntime().getOrCreate(blocksType, () -> blocks);
+        context.registerLinked(worldsType, sharedWorlds, Worlds.class);
+        context.registerLinked(blocksType, sharedBlocks, Blocks.class);
     }
 
     public static void registerTypeRegistries(
@@ -229,7 +233,7 @@ public final class BootstrapServices {
         Objects.requireNonNull(itemTypes, "itemTypes");
         Objects.requireNonNull(blockTypes, "blockTypes");
 
-        DefaultRRegistryAccess registries = context.getOrCreate(DefaultRRegistryAccess.class, DefaultRRegistryAccess::new);
+        DefaultRRegistryAccess registries = context.sharedRuntime().getOrCreate(DefaultRRegistryAccess.class, DefaultRRegistryAccess::new);
         registries.register(RRegistries.ENTITY_TYPES, entityTypes);
         registries.register(RRegistries.ITEM_TYPES, itemTypes);
         registries.register(RRegistries.BLOCK_TYPES, blockTypes);
@@ -246,15 +250,16 @@ public final class BootstrapServices {
         Objects.requireNonNull(registryAccessType, "registryAccessType");
         Objects.requireNonNull(registries, "registries");
 
-        context.register(registryAccessType, registries);
+        A sharedRegistries = context.sharedRuntime().getOrCreate(registryAccessType, () -> registries);
+        context.register(registryAccessType, sharedRegistries);
         if (registryAccessType != RRegistryAccess.class) {
             context.registerAlias(RRegistryAccess.class, registryAccessType);
         }
 
-        context.register(REntityTypeRegistry.class, new RegistryAccessBackedEntityTypeRegistry(registries));
-        context.register(RItemTypeRegistry.class, new RegistryAccessBackedItemTypeRegistry(registries));
-        context.register(RBlockTypeRegistry.class, new RegistryAccessBackedBlockTypeRegistry(registries));
-        return registries;
+        context.register(REntityTypeRegistry.class, new RegistryAccessBackedEntityTypeRegistry(sharedRegistries));
+        context.register(RItemTypeRegistry.class, new RegistryAccessBackedItemTypeRegistry(sharedRegistries));
+        context.register(RBlockTypeRegistry.class, new RegistryAccessBackedBlockTypeRegistry(sharedRegistries));
+        return sharedRegistries;
     }
 
     public static <P extends Players, W extends Worlds, B extends Blocks> void registerServerAccessors(

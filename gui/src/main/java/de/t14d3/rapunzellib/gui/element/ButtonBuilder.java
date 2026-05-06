@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.gui.element;
 
 import de.t14d3.rapunzellib.gui.context.ClickContext;
+import de.t14d3.rapunzellib.nbt.item.RItem;
 import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -9,7 +10,7 @@ import java.util.function.Consumer;
 
 public class ButtonBuilder {
     private Component label;
-    private Component tooltip;
+    private Component[] tooltip;
     private Icon icon;
     private Consumer<ClickContext> onClick;
     private boolean enabled = true;
@@ -24,9 +25,9 @@ public class ButtonBuilder {
     public ButtonBuilder label(@NotNull String label) {
         return label(Component.text(label));
     }
-    
+
     @NotNull
-    public ButtonBuilder tooltip(@Nullable Component tooltip) {
+    public ButtonBuilder tooltip(@NotNull Component... tooltip) {
         this.tooltip = tooltip;
         return this;
     }
@@ -45,6 +46,11 @@ public class ButtonBuilder {
     @NotNull
     public ButtonBuilder icon(@NotNull String itemId) {
         return icon(Icon.item(itemId));
+    }
+
+    @NotNull
+    public ButtonBuilder icon(@NotNull RItem item) {
+        return icon(Icon.item(item));
     }
     
     @NotNull
@@ -72,7 +78,7 @@ public class ButtonBuilder {
             }
             
             @Override
-            public @Nullable Component tooltip() {
+            public @NotNull Component[] tooltip() {
                 return tooltip;
             }
             

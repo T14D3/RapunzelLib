@@ -67,13 +67,15 @@ public final class VelocityRapunzelBootstrap {
 
         ConfigService configService = firstPhase.configService();
 
-            VelocityPersistentAttachmentsStore persistentAttachmentsStore = new VelocityPersistentAttachmentsStore(
-                logger,
-                configService,
-                dataDirectory.resolve("attachments.yml")
+            VelocityPersistentAttachmentsStore persistentAttachmentsStore = ctx.sharedRuntime().getOrCreate(
+                VelocityPersistentAttachmentsStore.class,
+                () -> new VelocityPersistentAttachmentsStore(
+                    logger,
+                    configService,
+                    dataDirectory.resolve("attachments.yml")
+                )
             );
-            ctx.register(VelocityPersistentAttachmentsStore.class, persistentAttachmentsStore);
-            ctx.registerCloseable(persistentAttachmentsStore);
+            ctx.services().register(VelocityPersistentAttachmentsStore.class, persistentAttachmentsStore);
             PlatformFeatures.install(ctx);
 
             var transportConfig = configService.load(dataDirectory.resolve("config.yml"), "config.yml");
@@ -81,9 +83,12 @@ public final class VelocityRapunzelBootstrap {
                 transportConfig,
                 PlatformId.VELOCITY
             );
-            InMemoryMessenger inMemory = new InMemoryMessenger(
-                firstNonBlank(resolvedNames.serverName(), NetworkDefaults.DEFAULT_PROXY_SERVER_NAME),
-                firstNonBlank(resolvedNames.proxyServerName(), NetworkDefaults.DEFAULT_PROXY_SERVER_NAME)
+            InMemoryMessenger inMemory = ctx.sharedRuntime().getOrCreate(
+                InMemoryMessenger.class,
+                () -> new InMemoryMessenger(
+                    firstNonBlank(resolvedNames.serverName(), NetworkDefaults.DEFAULT_PROXY_SERVER_NAME),
+                    firstNonBlank(resolvedNames.proxyServerName(), NetworkDefaults.DEFAULT_PROXY_SERVER_NAME)
+                )
             );
             ctx.register(Messenger.class, inMemory);
             ctx.register(InMemoryMessenger.class, inMemory);

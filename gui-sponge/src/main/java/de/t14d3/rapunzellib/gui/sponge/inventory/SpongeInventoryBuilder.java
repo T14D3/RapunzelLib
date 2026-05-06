@@ -6,16 +6,17 @@ import de.t14d3.rapunzellib.gui.core.GuiInventoryPresentation;
 import de.t14d3.rapunzellib.gui.core.GuiSlotPlan;
 import de.t14d3.rapunzellib.gui.element.*;
 import de.t14d3.rapunzellib.nbt.NbtFeatures;
+import de.t14d3.rapunzellib.nbt.item.RItem;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
-import org.spongepowered.api.Sponge;
-import org.spongepowered.api.data.Keys;
-import org.spongepowered.api.item.ItemTypes;
 import org.spongepowered.api.item.inventory.ContainerTypes;
 import org.spongepowered.api.item.inventory.Inventory;
 import org.spongepowered.api.item.inventory.ItemStack;
 import org.spongepowered.api.item.inventory.Slot;
 import org.spongepowered.api.item.inventory.type.ViewableInventory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 final class SpongeInventoryBuilder {
@@ -56,7 +57,13 @@ final class SpongeInventoryBuilder {
 
     static @NotNull ItemStack renderElement(@NotNull GuiElement element, @NotNull RenderContext context) {
         if (element instanceof ItemElement itemElement) {
-            return NbtFeatures.itemStackAdapter(ItemStack.class).create(itemElement.item());
+            RItem rendered = itemElement.item();
+            if (itemElement.tooltip() != null) {
+                List<Component> lore = new ArrayList<>(rendered.lore());
+                lore.add(itemElement.tooltip());
+                rendered = rendered.withLore(lore);
+            }
+            return NbtFeatures.itemStackAdapter(ItemStack.class).create(rendered);
         }
         return createItem(GuiInventoryPresentation.present(element, context));
     }
@@ -69,28 +76,11 @@ final class SpongeInventoryBuilder {
         if (entry.empty()) {
             return createEmptySlot();
         }
-
-        ItemStack.Builder builder = ItemStack.builder()
-            .itemType(resolveItemType(entry.itemKey()))
-            .quantity(1);
-
-        if (entry.label() != null) {
-            builder.add(Keys.CUSTOM_NAME, entry.label());
-        }
-        if (!entry.lore().isEmpty()) {
-            builder.add(Keys.LORE, entry.lore());
-        }
-        return builder.build();
+        return NbtFeatures.itemStackAdapter(ItemStack.class).create(entry.item());
     }
 
     private static @NotNull ItemStack createEmptySlot() {
         return ItemStack.empty();
-    }
-
-    private static @NotNull org.spongepowered.api.item.ItemType resolveItemType(@NotNull String itemId) {
-        return Sponge.server().registry(org.spongepowered.api.registry.RegistryTypes.ITEM_TYPE)
-            .findValue(org.spongepowered.api.ResourceKey.resolve(itemId))
-            .orElse(ItemTypes.STONE.get());
     }
 
     private static @NotNull org.spongepowered.api.item.inventory.ContainerType containerType(int rows) {

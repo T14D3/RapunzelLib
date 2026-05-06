@@ -6,6 +6,7 @@ import de.t14d3.rapunzellib.gui.core.GuiInventoryPresentation;
 import de.t14d3.rapunzellib.gui.core.GuiSlotPlan;
 import de.t14d3.rapunzellib.gui.element.*;
 import de.t14d3.rapunzellib.nbt.NbtFeatures;
+import de.t14d3.rapunzellib.nbt.item.RItem;
 import de.t14d3.rapunzellib.nbt.paper.PaperItemStackAdapter;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
@@ -13,7 +14,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -69,51 +69,20 @@ public final class InventoryBuilder {
 
     @NotNull
     private static ItemStack convertItem(@NotNull ItemElement item) {
-        ItemStack copy = adapter().create(item.item());
+        RItem rendered = item.item();
         if (item.tooltip() != null) {
-            var meta = copy.getItemMeta();
-            if (meta != null) {
-                List<Component> lore = new ArrayList<>(meta.lore() != null ? meta.lore() : List.of());
-                lore.add(item.tooltip());
-                meta.lore(lore);
-                copy.setItemMeta(meta);
-            }
+            List<Component> lore = new ArrayList<>(rendered.lore());
+            lore.add(item.tooltip());
+            rendered = rendered.withLore(lore);
         }
-        return copy;
+        return adapter().create(rendered);
     }
 
     private static @NotNull ItemStack createItem(@NotNull GuiInventoryPresentation.Entry entry) {
         if (entry.empty()) {
             return new ItemStack(Material.AIR);
         }
-        ItemStack stack = createItem(entry.itemKey(), entry.label(), entry.lore());
-        return entry.glow() ? adapter().addGlow(stack) : stack;
-    }
-
-    private static ItemStack createItem(String material, @Nullable Component name, @Nullable List<Component> lore) {
-        try {
-            Material mat = Material.matchMaterial(material);
-            if (mat == null) {
-                mat = Material.matchMaterial(material.replace("minecraft:", "").toUpperCase());
-            }
-            if (mat == null) {
-                mat = Material.STONE;
-            }
-            ItemStack stack = new ItemStack(mat);
-            ItemMeta meta = stack.getItemMeta();
-            if (meta != null) {
-                if (name != null) {
-                    meta.displayName(name);
-                }
-                if (lore != null) {
-                    meta.lore(lore);
-                }
-                stack.setItemMeta(meta);
-            }
-            return stack;
-        } catch (IllegalArgumentException e) {
-            return new ItemStack(Material.STONE);
-        }
+        return adapter().create(entry.item());
     }
 
     private static @NotNull PaperItemStackAdapter adapter() {

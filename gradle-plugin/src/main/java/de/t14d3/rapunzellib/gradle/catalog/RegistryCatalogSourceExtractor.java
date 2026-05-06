@@ -168,7 +168,7 @@ public final class RegistryCatalogSourceExtractor {
                 if (ex instanceof GradleException gradleException) {
                     throw gradleException;
                 }
-                throw new GradleException("Failed native static-field extraction for '" + ownerClassName + "'.", ex);
+                throw new GradleException("Failed native static-field extraction for '" + ownerClassName + "': " + ex.getMessage(), ex);
             }
         });
     }
