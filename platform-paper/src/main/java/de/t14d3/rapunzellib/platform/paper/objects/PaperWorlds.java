@@ -12,8 +12,11 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class PaperWorlds extends SharedWorldsCore<PaperWorld> {
+    private final ConcurrentHashMap<ServerLevel, RWorldRef> worldRefCache = new ConcurrentHashMap<>();
+
     public PaperWorlds(MinecraftServer server) {
         super(server);
     }
@@ -30,9 +33,11 @@ public final class PaperWorlds extends SharedWorldsCore<PaperWorld> {
 
     @Override
     public @NotNull RWorldRef worldRef(@NotNull ServerLevel level) {
-        RKey key = SharedWorldHooks.key(level);
-        String name = PaperHandleBridge.toBukkit(level).map(World::getName).orElse(key.asString());
-        return new RWorldRef(name, key);
+        return worldRefCache.computeIfAbsent(level, l -> {
+            RKey key = SharedWorldHooks.key(l);
+            String name = PaperHandleBridge.toBukkit(l).map(World::getName).orElse(key.asString());
+            return new RWorldRef(name, key);
+        });
     }
 
     @Override

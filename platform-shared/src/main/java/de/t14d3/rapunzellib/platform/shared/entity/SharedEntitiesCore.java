@@ -16,8 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public abstract class SharedEntitiesCore<E extends REntity> implements Entities {
-    private final MinecraftServer server;
-    private final Function<ServerPlayer, RServerPlayer> playerWrapper;
+    protected final MinecraftServer server;
+    protected final Function<ServerPlayer, RServerPlayer> playerWrapper;
     private final ConcurrentHashMap<UUID, E> cache = new ConcurrentHashMap<>();
 
     protected SharedEntitiesCore(@NotNull MinecraftServer server, @NotNull Function<ServerPlayer, RServerPlayer> playerWrapper) {
@@ -72,7 +72,8 @@ public abstract class SharedEntitiesCore<E extends REntity> implements Entities 
         });
     }
 
-    private @NotNull REntity wrapInternal(@NotNull Entity entity) {
+    @NotNull
+    protected REntity wrapInternal(@NotNull Entity entity) {
         if (entity instanceof ServerPlayer player) {
             return playerWrapper.apply(player);
         }

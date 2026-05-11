@@ -8,6 +8,7 @@ public enum RuntimeCapability {
     GUI,
     INVENTORY,
     NBT,
+    VISUALS,
     WORLDS,
     BLOCKS
 }

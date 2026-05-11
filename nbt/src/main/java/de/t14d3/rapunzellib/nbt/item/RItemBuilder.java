@@ -152,6 +152,7 @@ public class RItemBuilder {
         if (typeRef == null) {
             throw new IllegalStateException("Type ref must be set");
         }
-        return new SimpleRItem(typeRef, amount, data);
+        RItem result = RItemFactory.tryCreate(typeRef.key(), amount, data);
+        return result != null ? result : new SimpleRItem(typeRef, amount, data);
     }
 }

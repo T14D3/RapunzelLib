@@ -20,6 +20,7 @@ import de.t14d3.rapunzellib.runtime.RuntimeRole;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -244,6 +245,34 @@ final class InventoryEventBridgeTest {
         @Override
         public boolean isAlive() {
             return true;
+        }
+
+        @Override
+        public @NotNull Optional<String> getName() {
+            return Optional.empty();
+        }
+
+        @Override
+        public void setName(@NotNull String name) {
+        }
+
+        @Override
+        public @NotNull Optional<Component> getDisplayName() {
+            return Optional.empty();
+        }
+
+        @Override
+        public void setDisplayName(@NotNull Component displayName) {
+        }
+
+        @Override
+        public boolean remove() {
+            return false;
+        }
+
+        @Override
+        public boolean isRemoved() {
+            return false;
         }
     }
 

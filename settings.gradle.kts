@@ -117,6 +117,12 @@ include(
     "platform-velocity",
     "platform-neoforge",
     "platform-sponge",
+    "visuals",
+    "visuals-shared",
+    "visuals-paper",
+    "visuals-fabric",
+    "visuals-neoforge",
+    "visuals-sponge",
     "gradle-plugin",
 )
 

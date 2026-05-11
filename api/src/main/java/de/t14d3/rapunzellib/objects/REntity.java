@@ -4,6 +4,7 @@ import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.objects.snapshot.REntitySnapshot;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.RRegistryRef;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
@@ -102,4 +103,16 @@ public interface REntity extends RNative {
     static @NotNull Optional<REntity> wrap(@NotNull Object nativeEntity) {
         return Rapunzel.entities().wrap(nativeEntity);
     }
+
+    @NotNull Optional<String> getName();
+
+    void setName(@NotNull String name);
+
+    @NotNull Optional<Component> getDisplayName();
+
+    void setDisplayName(@NotNull Component displayName);
+
+    boolean remove();
+
+    boolean isRemoved();
 }

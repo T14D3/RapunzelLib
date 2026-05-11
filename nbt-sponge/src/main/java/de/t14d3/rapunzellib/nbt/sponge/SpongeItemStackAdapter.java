@@ -29,7 +29,7 @@ public class SpongeItemStackAdapter implements ItemStackAdapter<ItemStack> {
         return NativeRItem.of(
             PlatformId.SPONGE,
             copy,
-            toShared(copy),
+            this::toShared,
             this::apply
         );
     }

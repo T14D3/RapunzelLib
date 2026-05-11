@@ -58,6 +58,41 @@ final class SimpleRItem implements RItem {
     }
 
     @Override
+    public void setTypeKey(@NotNull RKey newTypeKey) {
+        throw new UnsupportedOperationException("SimpleRItem is immutable");
+    }
+
+    @Override
+    public void setAmount(int newAmount) {
+        throw new UnsupportedOperationException("SimpleRItem is immutable");
+    }
+
+    @Override
+    public boolean isEmpty() {
+        return amount <= 0;
+    }
+
+    @Override
+    public int count() {
+        return amount;
+    }
+
+    @Override
+    public int maxStackSize() {
+        return 64;
+    }
+
+    @Override
+    public boolean isSimilar(@NotNull RItem other) {
+        return typeKey().equals(other.typeKey()) && data.equals(other.data());
+    }
+
+    @Override
+    public @NotNull RItem withCount(int count) {
+        return withAmount(count);
+    }
+
+    @Override
     public boolean equals(Object obj) {
         if (this == obj) {
             return true;

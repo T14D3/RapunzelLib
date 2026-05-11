@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.nbt.item;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.objects.RKey;
+import de.t14d3.rapunzellib.nbt.RNbtCompound;
 import de.t14d3.rapunzellib.nbt.RNbtValue;
 import de.t14d3.rapunzellib.registry.RItemType;
 import net.kyori.adventure.text.Component;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 final class NativeRItemTest {
@@ -20,28 +22,37 @@ final class NativeRItemTest {
             .name(Component.text("Stone"))
             .build();
 
+        String[] capturedHandle = new String[1];
+        RItem[] capturedMutation = new RItem[1];
+
         NativeRItem<String> item = NativeRItem.of(
             PlatformId.FABRIC,
             "native:stone:2",
-            snapshot,
-            (_currentHandle, updatedItem) -> updatedItem.typeKey().asString() + ":" + updatedItem.amount()
+            handle -> snapshot,
+            (handle, mutation) -> {
+                capturedHandle[0] = handle;
+                capturedMutation[0] = mutation;
+            }
         );
 
         assertEquals(PlatformId.FABRIC, item.platformId());
         assertEquals("native:stone:2", item.handle());
         assertEquals(RItemType.ref("minecraft:stone"), item.typeRef());
+        assertEquals(2, item.amount());
 
         RItem updated = item.withAmount(4);
-        NativeRItem<?> updatedNative = assertInstanceOf(NativeRItem.class, updated);
+        assertSame(item, updated);
 
-        assertEquals(RKey.of("minecraft:stone"), updatedNative.typeKey());
-        assertEquals(RItemType.ref("minecraft:stone"), updatedNative.typeRef());
-        assertEquals(4, updatedNative.amount());
-        assertEquals("minecraft:stone:4", updatedNative.handle());
+        assertEquals("native:stone:2", capturedHandle[0]);
+        assertEquals(RKey.of("minecraft:stone"), capturedMutation[0].typeKey());
+        assertEquals(4, capturedMutation[0].amount());
     }
 
     @Test
     void simpleAndNativeItemsCompareBySharedState() {
+        RNbtCompound sharedData = RNbtCompound.empty()
+            .put("payload", RNbtValue.byteArray(new byte[] {1, 2, 3}));
+
         RItem simple = RItem.builder()
             .material("minecraft:paper")
             .amount(1)
@@ -51,12 +62,13 @@ final class NativeRItemTest {
         NativeRItem<String> nativeItem = NativeRItem.of(
             PlatformId.PAPER,
             "paper-handle",
-            RItem.builder()
+            handle -> RItem.builder()
                 .material("minecraft:paper")
                 .amount(1)
                 .custom("payload", RNbtValue.byteArray(new byte[] {1, 2, 3}))
                 .build(),
-            (currentHandle, _updatedItem) -> currentHandle
+            (currentHandle, _updatedItem) -> {
+            }
         );
 
         assertEquals(simple, nativeItem);
@@ -65,22 +77,23 @@ final class NativeRItemTest {
 
     @Test
     void customModelDataCanBeClearedWithoutDroppingNativeBacking() {
+        RItem[] capturedMutation = new RItem[1];
+
         NativeRItem<String> item = NativeRItem.of(
             PlatformId.NEOFORGE,
             "cmd:7",
-            RItem.builder()
+            handle -> RItem.builder()
                 .material("minecraft:paper")
                 .customModelData(7)
                 .build(),
-            (_currentHandle, updatedItem) -> updatedItem.customModelData()
-                .map(modelData -> "cmd:" + modelData)
-                .orElse("cleared")
+            (_currentHandle, updatedItem) -> {
+                capturedMutation[0] = updatedItem;
+            }
         );
 
         RItem updated = item.withoutCustomModelData();
-        NativeRItem<?> updatedNative = assertInstanceOf(NativeRItem.class, updated);
+        assertSame(item, updated);
 
-        assertTrue(updated.customModelData().isEmpty());
-        assertEquals("cleared", updatedNative.handle());
+        assertTrue(capturedMutation[0].customModelData().isEmpty());
     }
 }

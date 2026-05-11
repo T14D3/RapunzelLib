@@ -5,11 +5,13 @@ import org.jetbrains.annotations.NotNull;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 public record RKey(@NotNull String namespace, @NotNull String path) implements Serializable {
     private static final Pattern NAMESPACE_PATTERN = Pattern.compile("[A-Za-z0-9_.-]+");
     private static final Pattern PATH_PATTERN = Pattern.compile("[A-Za-z0-9_./-]+");
+    private static final ConcurrentHashMap<String, RKey> INTERN = new ConcurrentHashMap<>();
 
     public RKey {
         namespace = requireSegment(namespace, "namespace", NAMESPACE_PATTERN);
@@ -26,6 +28,10 @@ public record RKey(@NotNull String namespace, @NotNull String path) implements S
 
     public static @NotNull RKey parse(@NotNull String value) {
         String candidate = requireText(value, "value");
+        return INTERN.computeIfAbsent(candidate, RKey::parseUncached);
+    }
+
+    private static @NotNull RKey parseUncached(@NotNull String candidate) {
         int separator = candidate.indexOf(':');
         if (separator <= 0 || separator == candidate.length() - 1 || candidate.indexOf(':', separator + 1) != -1) {
             throw new IllegalArgumentException("Invalid key '" + candidate + "'. Expected '<namespace>:<path>'");

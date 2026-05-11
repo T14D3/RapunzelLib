@@ -9,6 +9,7 @@ public final class RuntimeProfiles {
         RuntimeCapability.GUI,
         RuntimeCapability.INVENTORY,
         RuntimeCapability.NBT,
+        RuntimeCapability.VISUALS,
         RuntimeCapability.WORLDS,
         RuntimeCapability.BLOCKS
     );

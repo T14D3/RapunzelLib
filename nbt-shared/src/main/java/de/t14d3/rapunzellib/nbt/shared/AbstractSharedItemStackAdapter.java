@@ -5,6 +5,8 @@ import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.nbt.RNbtCompound;
 import de.t14d3.rapunzellib.nbt.item.ItemStackAdapter;
 import de.t14d3.rapunzellib.nbt.item.NativeRItem;
+import de.t14d3.rapunzellib.nbt.item.NativeRItemAccessor;
+import de.t14d3.rapunzellib.nbt.item.NativeRItemFactory;
 import de.t14d3.rapunzellib.nbt.item.RItem;
 import de.t14d3.rapunzellib.nbt.item.RItemBuilder;
 import de.t14d3.rapunzellib.nbt.item.RItemFields;
@@ -35,7 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter<ItemStack> {
+public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter<ItemStack>, NativeRItemAccessor<ItemStack> {
     private final @NotNull PlatformId platformId;
 
     protected AbstractSharedItemStackAdapter(@NotNull PlatformId platformId) {
@@ -45,12 +47,7 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
     @Override
     public final @NotNull RItem snapshot(@NotNull ItemStack nativeItem) {
         ItemStack copy = nativeItem.copy();
-        return NativeRItem.of(
-            platformId,
-            copy,
-            toShared(copy),
-            this::updateNativeShared
-        );
+        return createLive(copy);
     }
 
     @Override
@@ -73,6 +70,209 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
     public final boolean supports(@Nullable Object object) {
         return object instanceof ItemStack;
     }
+
+    public final @NotNull NativeRItem<ItemStack> createLive(@NotNull ItemStack handle) {
+        return NativeRItem.of(platformId, handle, this);
+    }
+
+    public final @NotNull NativeRItemFactory factory() {
+        return (typeKey, amount, data) -> {
+            ItemStack stack = createNativeShared(RItem.builder().typeKey(typeKey).amount(amount).data(data).build());
+            return createLive(stack);
+        };
+    }
+
+    // ---- NativeRItemAccessor implementation ----
+
+    @Override
+    public @NotNull RRegistryRef<RItemType> typeRef(@NotNull ItemStack handle) {
+        return RItemType.ref(BuiltInRegistries.ITEM.getKey(handle.getItem()).toString());
+    }
+
+    @Override
+    public void setTypeKey(@NotNull ItemStack handle, @NotNull RRegistryRef<RItemType> typeRef) {
+        Item resolvedItem = resolveItem(typeRef);
+        if (resolvedItem == handle.getItem()) {
+            return;
+        }
+        RItem oldData = toShared(handle);
+        // #if VERSION >= 1.21.11
+        ItemStack newStack = new ItemStack(resolveItemHolder(typeRef), handle.getCount());
+        // #else
+        ItemStack newStack = new ItemStack(resolvedItem, handle.getCount());
+        // #endif
+        applySharedState(newStack, RItem.builder()
+            .typeRef(typeRef)
+            .amount(oldData.amount())
+            .data(oldData.data())
+            .build());
+        handle.setCount(newStack.getCount());
+    }
+
+    @Override
+    public int amount(@NotNull ItemStack handle) {
+        return handle.getCount();
+    }
+
+    @Override
+    public void setAmount(@NotNull ItemStack handle, int amount) {
+        handle.setCount(amount);
+    }
+
+    @Override
+    public @NotNull RNbtCompound data(@NotNull ItemStack handle) {
+        return toShared(handle).data();
+    }
+
+    @Override
+    public void setData(@NotNull ItemStack handle, @NotNull RNbtCompound data) {
+        RItem temp = RItem.builder()
+            .typeRef(RItemType.ref(BuiltInRegistries.ITEM.getKey(handle.getItem()).toString()))
+            .amount(handle.getCount())
+            .data(data)
+            .build();
+        applySharedState(handle, temp);
+    }
+
+    @Override
+    public @Nullable Component name(@NotNull ItemStack handle) {
+        net.minecraft.network.chat.Component customName = handle.get(DataComponents.CUSTOM_NAME);
+        return customName != null ? SharedAdventureComponentCodec.toAdventure(customName) : null;
+    }
+
+    @Override
+    public void setName(@NotNull ItemStack handle, @Nullable Component name) {
+        if (name != null) {
+            handle.set(DataComponents.CUSTOM_NAME, SharedAdventureComponentCodec.toNative(name));
+        } else {
+            handle.remove(DataComponents.CUSTOM_NAME);
+        }
+    }
+
+    @Override
+    public @NotNull List<Component> lore(@NotNull ItemStack handle) {
+        ItemLore loreComponent = handle.get(DataComponents.LORE);
+        if (loreComponent == null || loreComponent.lines().isEmpty()) {
+            return List.of();
+        }
+        return loreComponent.lines().stream().map(SharedAdventureComponentCodec::toAdventure).toList();
+    }
+
+    @Override
+    public void setLore(@NotNull ItemStack handle, @NotNull List<Component> lore) {
+        if (lore.isEmpty()) {
+            handle.remove(DataComponents.LORE);
+        } else {
+            List<net.minecraft.network.chat.Component> lines = new ArrayList<>(lore.size());
+            for (Component line : lore) {
+                lines.add(SharedAdventureComponentCodec.toNative(line));
+            }
+            handle.set(DataComponents.LORE, new ItemLore(lines));
+        }
+    }
+
+    @Override
+    public int damage(@NotNull ItemStack handle) {
+        return handle.getDamageValue();
+    }
+
+    @Override
+    public void setDamage(@NotNull ItemStack handle, int damage) {
+        handle.setDamageValue(Math.max(damage, 0));
+    }
+
+    @Override
+    public boolean unbreakable(@NotNull ItemStack handle) {
+        return handle.has(DataComponents.UNBREAKABLE);
+    }
+
+    @Override
+    public void setUnbreakable(@NotNull ItemStack handle, boolean unbreakable) {
+        if (unbreakable) {
+            handle.set(DataComponents.UNBREAKABLE, Unit.INSTANCE);
+        } else {
+            handle.remove(DataComponents.UNBREAKABLE);
+        }
+    }
+
+    @Override
+    public @Nullable Integer customModelData(@NotNull ItemStack handle) {
+        CustomModelData cmd = handle.get(DataComponents.CUSTOM_MODEL_DATA);
+        return readCustomModelData(cmd);
+    }
+
+    @Override
+    public void setCustomModelData(@NotNull ItemStack handle, @Nullable Integer modelData) {
+        if (modelData != null) {
+            handle.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(List.of(), List.of(), List.of(), List.of(modelData)));
+        } else {
+            handle.remove(DataComponents.CUSTOM_MODEL_DATA);
+        }
+    }
+
+    @Override
+    public int repairCost(@NotNull ItemStack handle) {
+        Integer cost = handle.get(DataComponents.REPAIR_COST);
+        return cost != null ? cost : 0;
+    }
+
+    @Override
+    public void setRepairCost(@NotNull ItemStack handle, int repairCost) {
+        if (repairCost > 0) {
+            handle.set(DataComponents.REPAIR_COST, repairCost);
+        } else {
+            handle.remove(DataComponents.REPAIR_COST);
+        }
+    }
+
+    @Override
+    public @Nullable Boolean enchantmentGlintOverride(@NotNull ItemStack handle) {
+        return handle.get(DataComponents.ENCHANTMENT_GLINT_OVERRIDE);
+    }
+
+    @Override
+    public void setEnchantmentGlintOverride(@NotNull ItemStack handle, @Nullable Boolean override) {
+        if (override != null) {
+            handle.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, override);
+        } else {
+            handle.remove(DataComponents.ENCHANTMENT_GLINT_OVERRIDE);
+        }
+    }
+
+    @Override
+    public boolean isEmpty(@NotNull ItemStack handle) {
+        return handle.isEmpty();
+    }
+
+    @Override
+    public int count(@NotNull ItemStack handle) {
+        return handle.getCount();
+    }
+
+    @Override
+    public int maxStackSize(@NotNull ItemStack handle) {
+        return handle.getMaxStackSize();
+    }
+
+    @Override
+    public boolean isSimilar(@NotNull ItemStack handle, @NotNull RItem other) {
+        RRegistryRef<RItemType> otherType = other.typeRef();
+        if (!typeRef(handle).equals(otherType)) {
+            return false;
+        }
+        return data(handle).equals(other.data());
+    }
+
+    @Override
+    public @NotNull ItemStack createHandle(@NotNull RRegistryRef<RItemType> typeRef, int amount) {
+        // #if VERSION >= 1.21.11
+        return new ItemStack(resolveItemHolder(typeRef), amount);
+        // #else
+        return new ItemStack(resolveItem(typeRef), amount);
+        // #endif
+    }
+
+    // ---- Existing helper methods ----
 
     protected @NotNull RItem toShared(@NotNull ItemStack nativeItem) {
         net.minecraft.network.chat.Component customName = nativeItem.get(DataComponents.CUSTOM_NAME);

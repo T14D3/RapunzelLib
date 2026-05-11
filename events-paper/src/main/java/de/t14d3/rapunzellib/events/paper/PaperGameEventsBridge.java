@@ -1,30 +1,28 @@
 package de.t14d3.rapunzellib.events.paper;
 
 import de.t14d3.rapunzellib.Rapunzel;
-import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.block.*;
 import de.t14d3.rapunzellib.events.entity.*;
-import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
-import de.t14d3.rapunzellib.events.item.BucketEntityPre;
-import de.t14d3.rapunzellib.events.item.BucketFillPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockPost;
 import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
-import de.t14d3.rapunzellib.events.player.InteractBlockPre;
-import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
-import de.t14d3.rapunzellib.events.player.PlayerMovePre;
-import de.t14d3.rapunzellib.events.player.PlayerMovePost;
+import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
+import de.t14d3.rapunzellib.events.item.BucketEntityPre;
+import de.t14d3.rapunzellib.events.item.BucketFillPre;
+import de.t14d3.rapunzellib.events.player.*;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.WorldLoadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.objects.block.RBlock;
+import io.papermc.paper.event.entity.EntityMoveEvent;
 import org.bukkit.Location;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -34,13 +32,8 @@ import org.bukkit.event.block.*;
 import org.bukkit.event.entity.*;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingPlaceEvent;
-import org.bukkit.event.player.PlayerBucketEmptyEvent;
-import org.bukkit.event.player.PlayerBucketEntityEvent;
-import org.bukkit.event.player.PlayerBucketFillEvent;
-import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerInteractEntityEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.*;
+import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -284,8 +277,56 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onPlayerQuitPost(PlayerQuitEvent event) {
-        if (!bus.hasPostListeners(PlayerQuitPost.class)) return;
-        bus.dispatchPost(new PlayerQuitPost(event.getPlayer().getUniqueId(), event.getPlayer().getName()));
+        if (bus.hasPostListeners(PlayerQuitPost.class)) {
+            bus.dispatchPost(new PlayerQuitPost(event.getPlayer().getUniqueId(), event.getPlayer().getName()));
+        }
+        if (bus.hasPostListeners(PlayerQuitPre.class)) {
+            bus.dispatchPost(new PlayerQuitPre(event.getPlayer().getUniqueId(), event.getPlayer().getName()));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onEntityMove(EntityMoveEvent event) {
+        if (!bus.hasPostListeners(EntityMovePost.class)) return;
+
+        var entity = Rapunzel.entities().require(event.getEntity());
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        RWorldRef world = new RWorldRef(from.getWorld().getName(), from.getWorld().getKey().toString());
+        RLocation fromLoc = new RLocation(world, from.getX(), from.getY(), from.getZ(), from.getYaw(), from.getPitch());
+        RLocation toLoc = new RLocation(world, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
+
+        bus.dispatchPost(new EntityMovePost(entity.uuid(), entity.typeKey(), fromLoc, toLoc));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onEntityTeleport(EntityTeleportEvent event) {
+        if (!bus.hasPostListeners(EntityTeleportPost.class)) return;
+
+        var entity = Rapunzel.entities().require(event.getEntity());
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        RWorldRef world = new RWorldRef(from.getWorld().getName(), from.getWorld().getKey().toString());
+        RLocation fromLoc = new RLocation(world, from.getX(), from.getY(), from.getZ(), from.getYaw(), from.getPitch());
+        RLocation toLoc = new RLocation(world, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
+
+        bus.dispatchPost(new EntityTeleportPost(entity.uuid(), entity.typeKey(), fromLoc, toLoc));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onVehicleMove(VehicleMoveEvent event) {
+        if (!bus.hasPostListeners(EntityMovePost.class)) return;
+
+        for (org.bukkit.entity.Entity passenger : event.getVehicle().getPassengers()) {
+            var entity = Rapunzel.entities().require(passenger);
+            Location from = event.getFrom();
+            Location to = event.getTo();
+            RWorldRef world = new RWorldRef(from.getWorld().getName(), from.getWorld().getKey().toString());
+            RLocation fromLoc = new RLocation(world, from.getX(), from.getY(), from.getZ(), from.getYaw(), from.getPitch());
+            RLocation toLoc = new RLocation(world, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
+
+            bus.dispatchPost(new EntityMovePost(entity.uuid(), entity.typeKey(), fromLoc, toLoc));
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)

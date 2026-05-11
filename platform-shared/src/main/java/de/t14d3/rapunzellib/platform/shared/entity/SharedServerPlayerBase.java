@@ -1,13 +1,21 @@
 package de.t14d3.rapunzellib.platform.shared.entity;
 
 import de.t14d3.rapunzellib.PlatformId;
+import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.attachments.RAttachmentContainer;
+import de.t14d3.rapunzellib.inventory.Inventories;
+import de.t14d3.rapunzellib.inventory.PlayerInventory;
+import de.t14d3.rapunzellib.inventory.RInventory;
+import de.t14d3.rapunzellib.nbt.shared.SharedAdventureComponentCodec;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RNativeHandle;
 import de.t14d3.rapunzellib.objects.RServerPlayer;
 import de.t14d3.rapunzellib.objects.RWorld;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
@@ -15,7 +23,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
-public abstract class SharedServerPlayerBase extends RNativeHandle<ServerPlayer> implements RServerPlayer {
+public abstract class SharedServerPlayerBase extends RNativeHandle<ServerPlayer> implements RServerPlayer, PlayerInventory {
     private final SharedWorldHooks worldHooks;
 
     protected SharedServerPlayerBase(
@@ -120,5 +128,71 @@ public abstract class SharedServerPlayerBase extends RNativeHandle<ServerPlayer>
     @Override
     public final boolean heal(double amount) {
         return SharedEntityOperations.heal(handle(), amount);
+    }
+
+    @Override
+    public @NotNull Optional<String> getName() {
+        Component customName = handle().getCustomName();
+        if (customName == null) {
+            return Optional.empty();
+        }
+        return Optional.of(PlainTextComponentSerializer.plainText().serialize(SharedAdventureComponentCodec.toAdventure(customName)));
+    }
+
+    @Override
+    public void setName(@NotNull String name) {
+        handle().setCustomName(Component.literal(name));
+    }
+
+    @Override
+    public @NotNull Optional<net.kyori.adventure.text.Component> getDisplayName() {
+        Component customName = handle().getCustomName();
+        if (customName == null) {
+            return Optional.empty();
+        }
+        return Optional.of(SharedAdventureComponentCodec.toAdventure(customName));
+    }
+
+    @Override
+    public void setDisplayName(@NotNull net.kyori.adventure.text.Component displayName) {
+        handle().setCustomName(SharedAdventureComponentCodec.toNative(displayName));
+    }
+
+    @Override
+    public boolean remove() {
+        handle().remove(Entity.RemovalReason.DISCARDED);
+        return true;
+    }
+
+    @Override
+    public boolean isRemoved() {
+        return handle().isRemoved();
+    }
+
+    @Override
+    public @NotNull RInventory inventory() {
+        return Rapunzel.context().services()
+            .find(Inventories.class)
+            .orElseThrow(() -> new UnsupportedOperationException(
+                "Inventory feature not installed. Add a dependency on the inventory-<platform> module."))
+            .require(handle().getInventory());
+    }
+
+    @Override
+    public @NotNull RInventory armor() {
+        return Rapunzel.context().services()
+            .find(Inventories.class)
+            .orElseThrow(() -> new UnsupportedOperationException(
+                "Inventory feature not installed. Add a dependency on the inventory-<platform> module."))
+            .require(handle().getInventory());
+    }
+
+    @Override
+    public @NotNull RInventory enderChest() {
+        return Rapunzel.context().services()
+            .find(Inventories.class)
+            .orElseThrow(() -> new UnsupportedOperationException(
+                "Inventory feature not installed. Add a dependency on the inventory-<platform> module."))
+            .require(handle().getEnderChestInventory());
     }
 }

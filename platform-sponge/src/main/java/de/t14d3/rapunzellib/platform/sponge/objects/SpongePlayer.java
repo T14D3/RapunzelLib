@@ -7,6 +7,7 @@ import de.t14d3.rapunzellib.objects.RServerPlayer;
 import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.platform.sponge.attachments.SpongeAttachmentService;
 import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.data.Keys;
 import org.spongepowered.api.entity.living.player.server.ServerPlayer;
@@ -111,5 +112,36 @@ final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RServerP
     @Override
     public boolean heal(double amount) {
         return SpongeEntitySemantics.heal(handle(), amount);
+    }
+
+    @Override
+    public @NotNull Optional<String> getName() {
+        return handle().get(org.spongepowered.api.data.Keys.CUSTOM_NAME).map(c -> net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(c));
+    }
+
+    @Override
+    public void setName(@NotNull String name) {
+        handle().offer(org.spongepowered.api.data.Keys.CUSTOM_NAME, Component.text(name));
+    }
+
+    @Override
+    public @NotNull Optional<Component> getDisplayName() {
+        return handle().get(org.spongepowered.api.data.Keys.CUSTOM_NAME);
+    }
+
+    @Override
+    public void setDisplayName(@NotNull Component displayName) {
+        handle().offer(org.spongepowered.api.data.Keys.CUSTOM_NAME, displayName);
+    }
+
+    @Override
+    public boolean remove() {
+        handle().remove();
+        return true;
+    }
+
+    @Override
+    public boolean isRemoved() {
+        return handle().isRemoved();
     }
 }

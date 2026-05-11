@@ -2,7 +2,6 @@ package de.t14d3.rapunzellib.nbt.paper;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.nbt.item.ItemStackAdapter;
-import de.t14d3.rapunzellib.nbt.item.NativeRItem;
 import de.t14d3.rapunzellib.nbt.item.RItem;
 import de.t14d3.rapunzellib.objects.RNative;
 import net.kyori.adventure.text.Component;
@@ -21,13 +20,8 @@ public class PaperItemStackAdapter implements ItemStackAdapter<ItemStack> {
 
     @Override
     public @NotNull RItem snapshot(@NotNull ItemStack nativeItem) {
-        ItemStack copy = nativeItem.clone();
-        return NativeRItem.of(
-            PlatformId.PAPER,
-            copy,
-            bridge.snapshotShared(CraftItemStack.asNMSCopy(copy)),
-            this::apply
-        );
+        net.minecraft.world.item.ItemStack nmsCopy = CraftItemStack.asNMSCopy(nativeItem);
+        return bridge.createLive(nmsCopy);
     }
 
     @Override

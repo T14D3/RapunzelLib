@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.nbt.BlockEntityNbtSerializer;
 import de.t14d3.rapunzellib.nbt.NbtFeatureInstallerSupport;
 import de.t14d3.rapunzellib.nbt.NbtSerializer;
 import de.t14d3.rapunzellib.nbt.item.ItemStackAdapter;
+import de.t14d3.rapunzellib.nbt.item.NativeRItemFactory;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
@@ -31,6 +32,11 @@ public final class SharedNbtFeatureInstallerSupport {
             adapterType,
             adapter
         );
+
+        if (adapter instanceof AbstractSharedItemStackAdapter sharedAdapter) {
+            context.register(NativeRItemFactory.class, sharedAdapter.factory());
+        }
+
         registerSerializers(context);
     }
 

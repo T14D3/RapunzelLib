@@ -1,3 +1,4 @@
+import de.t14d3.rapunzellib.gradle.tasks.GenerateDisplayMetadataTask
 import de.t14d3.rapunzellib.gradle.tasks.VerifyRegistryCatalogParityTask
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.kotlin.dsl.the
@@ -83,6 +84,32 @@ rapunzellib {
 
 tasks.withType(VerifyRegistryCatalogParityTask::class.java).configureEach {
     dependsOn(":platform-paper:paperweightUserdevSetup")
+}
+
+val displayMetadataGen = tasks.register<GenerateDisplayMetadataTask>("rapunzellibGenerateDisplayMetadata") {
+    description = "Generates BlockDisplayMetadata.java by reflecting on Minecraft Display/BlockDisplay classes"
+    group = "rapunzellib"
+
+    minecraftClasspath.from(mainCompileClasspath)
+    packageName.set("de.t14d3.rapunzellib.visuals.metadata")
+    className.set("BlockDisplayMetadata")
+    outputDir.set(layout.projectDirectory.dir("src/generated/java"))
+}
+
+val mainSourceSet = the<SourceSetContainer>().named("main")
+mainSourceSet.configure {
+    java.srcDir(layout.projectDirectory.dir("src/generated/java"))
+}
+
+tasks.named("compileJava") {
+    dependsOn(displayMetadataGen)
+}
+tasks.named("sourcesJar") {
+    dependsOn(displayMetadataGen)
+    (this as org.gradle.api.tasks.bundling.Jar).duplicatesStrategy = org.gradle.api.file.DuplicatesStrategy.EXCLUDE
+}
+tasks.named("javadoc") {
+    dependsOn(displayMetadataGen)
 }
 
 tasks.named("rapunzellibVerifyVanillaBlockTypesParity") {

@@ -8,6 +8,7 @@ import de.t14d3.rapunzellib.objects.snapshot.REntitySnapshot;
 import de.t14d3.rapunzellib.registry.RBlockType;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.RRegistryRef;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
@@ -181,6 +182,34 @@ final class LiveSnapshotAndActionContractsTest {
         public boolean heal(double amount) {
             health = Math.min(maxHealth(), health + amount);
             return true;
+        }
+
+        @Override
+        public @NotNull Optional<String> getName() {
+            return Optional.empty();
+        }
+
+        @Override
+        public void setName(@NotNull String name) {
+        }
+
+        @Override
+        public @NotNull Optional<Component> getDisplayName() {
+            return Optional.empty();
+        }
+
+        @Override
+        public void setDisplayName(@NotNull Component displayName) {
+        }
+
+        @Override
+        public boolean remove() {
+            return false;
+        }
+
+        @Override
+        public boolean isRemoved() {
+            return false;
         }
     }
 

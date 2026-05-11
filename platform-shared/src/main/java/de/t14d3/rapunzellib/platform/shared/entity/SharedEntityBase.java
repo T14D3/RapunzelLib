@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.platform.shared.entity;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.attachments.RAttachmentContainer;
+import de.t14d3.rapunzellib.nbt.shared.SharedAdventureComponentCodec;
 import de.t14d3.rapunzellib.objects.REntity;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RNativeHandle;
@@ -11,6 +12,7 @@ import de.t14d3.rapunzellib.registry.RRegistryRef;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
@@ -81,5 +83,44 @@ public abstract class SharedEntityBase extends RNativeHandle<Entity> implements 
     @Override
     public boolean teleport(@NotNull RLocation location) {
         return SharedEntityOperations.teleport(handle(), location, worldHooks);
+    }
+
+    @Override
+    public @NotNull Optional<String> getName() {
+        Component customName = handle().getCustomName();
+        if (customName == null) {
+            return Optional.empty();
+        }
+        return Optional.of(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(SharedAdventureComponentCodec.toAdventure(customName)));
+    }
+
+    @Override
+    public void setName(@NotNull String name) {
+        handle().setCustomName(net.minecraft.network.chat.Component.literal(name));
+    }
+
+    @Override
+    public @NotNull Optional<net.kyori.adventure.text.Component> getDisplayName() {
+        Component customName = handle().getCustomName();
+        if (customName == null) {
+            return Optional.empty();
+        }
+        return Optional.of(SharedAdventureComponentCodec.toAdventure(customName));
+    }
+
+    @Override
+    public void setDisplayName(@NotNull net.kyori.adventure.text.Component displayName) {
+        handle().setCustomName(SharedAdventureComponentCodec.toNative(displayName));
+    }
+
+    @Override
+    public boolean remove() {
+        handle().remove(Entity.RemovalReason.DISCARDED);
+        return true;
+    }
+
+    @Override
+    public boolean isRemoved() {
+        return handle().isRemoved();
     }
 }

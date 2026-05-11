@@ -24,6 +24,7 @@ import de.t14d3.rapunzellib.registry.catalog.VanillaEntityTypes;
 import de.t14d3.rapunzellib.registry.catalog.VanillaItemTypes;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
+import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -282,6 +283,34 @@ final class RegistryAccessTest {
         @Override
         public @NotNull Optional<RLocation> location() {
             return Optional.empty();
+        }
+
+        @Override
+        public @NotNull Optional<String> getName() {
+            return Optional.empty();
+        }
+
+        @Override
+        public void setName(@NotNull String name) {
+        }
+
+        @Override
+        public @NotNull Optional<Component> getDisplayName() {
+            return Optional.empty();
+        }
+
+        @Override
+        public void setDisplayName(@NotNull Component displayName) {
+        }
+
+        @Override
+        public boolean remove() {
+            return false;
+        }
+
+        @Override
+        public boolean isRemoved() {
+            return false;
         }
     }
 

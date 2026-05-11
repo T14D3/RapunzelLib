@@ -6,5 +6,8 @@ public record RLocation(@NotNull RWorldRef world, double x, double y, double z, 
     public @NotNull RBlockPos blockPos() {
         return new RBlockPos((int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z));
     }
+    public RLocation(@NotNull RWorldRef world, double x, double y, double z) {
+        this(world, x, y, z, 0f, 0f);
+    }
 }
 

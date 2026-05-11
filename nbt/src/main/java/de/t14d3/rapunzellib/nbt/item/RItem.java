@@ -1,6 +1,5 @@
 package de.t14d3.rapunzellib.nbt.item;
 
-import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.attachments.RAttachmentKey;
 import de.t14d3.rapunzellib.attachments.AttachmentStorageSupport;
@@ -8,6 +7,7 @@ import de.t14d3.rapunzellib.nbt.RNbtCompound;
 import de.t14d3.rapunzellib.nbt.RNbtField;
 import de.t14d3.rapunzellib.nbt.RNbtPath;
 import de.t14d3.rapunzellib.nbt.RNbtValue;
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.registry.RItemType;
 import de.t14d3.rapunzellib.registry.RRegistryRef;
 import net.kyori.adventure.text.Component;
@@ -120,6 +120,20 @@ public interface RItem {
 
     @NotNull RItem withData(@NotNull RNbtCompound data);
 
+    int count();
+
+    int maxStackSize();
+
+    boolean isSimilar(@NotNull RItem other);
+
+    @NotNull RItem withCount(int count);
+
+    boolean isEmpty();
+
+    void setTypeKey(@NotNull RKey typeKey);
+
+    void setAmount(int amount);
+
     default <T> @NotNull RItem with(@NotNull RNbtField<T> field, @NotNull T value) {
         return withData(Objects.requireNonNull(field, "field").write(data(), value));
     }
@@ -140,9 +154,26 @@ public interface RItem {
         return name == null ? without(RItemFields.NAME) : with(RItemFields.NAME, name);
     }
 
+    default void setName(@Nullable Component name) {
+        if (name == null) {
+            without(RItemFields.NAME);
+        } else {
+            with(RItemFields.NAME, name);
+        }
+    }
+
     default @NotNull RItem withLore(@NotNull List<Component> lore) {
         List<Component> lines = List.copyOf(Objects.requireNonNull(lore, "lore"));
         return lines.isEmpty() ? without(RItemFields.LORE) : with(RItemFields.LORE, lines);
+    }
+
+    default void setLore(@NotNull List<Component> lore) {
+        List<Component> lines = List.copyOf(Objects.requireNonNull(lore, "lore"));
+        if (lines.isEmpty()) {
+            without(RItemFields.LORE);
+        } else {
+            with(RItemFields.LORE, lines);
+        }
     }
 
     default @NotNull RItem withDurability(int durability) {
@@ -218,26 +249,32 @@ public interface RItem {
     }
 
     static @NotNull RItem of(@NotNull RKey typeKey) {
-        return builder().typeKey(typeKey).build();
+        RItem result = RItemFactory.tryCreate(typeKey, 1, RNbtCompound.empty());
+        return result != null ? result : builder().typeKey(typeKey).build();
     }
 
     static @NotNull RItem of(@NotNull RRegistryRef<RItemType> typeRef) {
-        return builder().typeRef(typeRef).build();
+        RItem result = RItemFactory.tryCreate(typeRef.key(), 1, RNbtCompound.empty());
+        return result != null ? result : builder().typeRef(typeRef).build();
     }
 
     static @NotNull RItem of(@NotNull RKey typeKey, int amount) {
-        return builder().typeKey(typeKey).amount(amount).build();
+        RItem result = RItemFactory.tryCreate(typeKey, amount, RNbtCompound.empty());
+        return result != null ? result : builder().typeKey(typeKey).amount(amount).build();
     }
 
     static @NotNull RItem of(@NotNull RRegistryRef<RItemType> typeRef, int amount) {
-        return builder().typeRef(typeRef).amount(amount).build();
+        RItem result = RItemFactory.tryCreate(typeRef.key(), amount, RNbtCompound.empty());
+        return result != null ? result : builder().typeRef(typeRef).amount(amount).build();
     }
 
     static @NotNull RItem of(@NotNull String material) {
-        return builder().material(material).build();
+        RItem result = RItemFactory.tryCreate(RKey.of(material), 1, RNbtCompound.empty());
+        return result != null ? result : builder().material(material).build();
     }
 
     static @NotNull RItem of(@NotNull String material, int amount) {
-        return builder().material(material).amount(amount).build();
+        RItem result = RItemFactory.tryCreate(RKey.of(material), amount, RNbtCompound.empty());
+        return result != null ? result : builder().material(material).amount(amount).build();
     }
 }

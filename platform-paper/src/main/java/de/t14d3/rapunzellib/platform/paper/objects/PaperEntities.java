@@ -1,11 +1,18 @@
 package de.t14d3.rapunzellib.platform.paper.objects;
 
+import de.t14d3.rapunzellib.objects.REntity;
 import de.t14d3.rapunzellib.platform.shared.entity.SharedEntitiesCore;
 import de.t14d3.rapunzellib.platform.paper.PaperHandleBridge;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 
 public final class PaperEntities extends SharedEntitiesCore<PaperEntity> {
     private final PaperWorlds worlds;
@@ -37,5 +44,24 @@ public final class PaperEntities extends SharedEntitiesCore<PaperEntity> {
             return java.util.Optional.of(PaperHandleBridge.toNms(entity));
         }
         return super.adaptNativeEntity(nativeEntity);
+    }
+
+    @Override
+    public @NotNull Optional<REntity> get(@NotNull UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+
+        ServerPlayer player = server.getPlayerList().getPlayer(uuid);
+        if (player != null) {
+            return Optional.of(playerWrapper.apply(player));
+        }
+
+        for (ServerLevel level : server.getAllLevels()) {
+            // AsyncCatcher workaround
+            Entity entity = level.moonrise$getEntityLookup().get(uuid);
+            if (entity != null) {
+                return Optional.of(wrapInternal(entity));
+            }
+        }
+        return Optional.empty();
     }
 }
