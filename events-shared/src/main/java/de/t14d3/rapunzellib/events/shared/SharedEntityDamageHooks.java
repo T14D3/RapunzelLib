@@ -10,10 +10,23 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
+/**
+ * Shared hooks for dispatching entity damage-related events through the {@link GameEventBus}.
+ * <p>
+ * Fires both synchronous post-events and async snapshot events when entities are hurt.
+ */
 public final class SharedEntityDamageHooks {
     private SharedEntityDamageHooks() {
     }
 
+    /**
+     * Dispatches the outcome of an entity hurt attempt.
+     *
+     * @param bus           the game event bus
+     * @param entity        the damaged entity
+     * @param damageTypeKey the key identifying the damage type
+     * @param cancelled     whether the damage was cancelled
+     */
     public static void dispatchHurtOutcome(
         @NotNull GameEventBus bus,
         @NotNull Entity entity,

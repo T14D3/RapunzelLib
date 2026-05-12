@@ -19,9 +19,23 @@ import org.joml.Vector3f;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Shared NMS implementation of a particle visual.
+ * <p>
+ * Emits dust particles at sampled points of a configurable shape on each tick.
+ * The particles are colored according to the config and respect view distance.
+ */
 public final class SharedNmsParticleVisual extends SharedNmsVisual<ParticleConfig> implements ParticleVisual {
     private ParticleShape currentShape;
 
+    /**
+     * Creates a new particle visual.
+     *
+     * @param id       the visual ID
+     * @param config   the particle config
+     * @param audience the visual audience
+     * @param manager  the visual manager
+     */
     public SharedNmsParticleVisual(
         @NotNull VisualId id,
         @NotNull ParticleConfig config,
@@ -45,6 +59,9 @@ public final class SharedNmsParticleVisual extends SharedNmsVisual<ParticleConfi
     protected void destroyFor(@NotNull ServerPlayer player) {
     }
 
+    /**
+     * Emits particles for the current tick to all viewers.
+     */
     public void emitTick() {
         List<RLocation> points = currentShape.sample(config.density());
         if (points.isEmpty()) return;
@@ -70,6 +87,11 @@ public final class SharedNmsParticleVisual extends SharedNmsVisual<ParticleConfi
         }
     }
 
+    /**
+     * Creates the dust particle options from the configured color.
+     *
+     * @return the dust particle options
+     */
     private DustParticleOptions createParticleOptions() {
         TextColor color = config.color();
         int rgb = color != null ? color.value() : 0xFFFFFF;

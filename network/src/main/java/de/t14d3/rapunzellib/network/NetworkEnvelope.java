@@ -66,9 +66,15 @@ import org.jetbrains.annotations.Nullable;
  * @see de.t14d3.rapunzellib.network.redis.RedisPubSubMessenger
  */
 public class NetworkEnvelope {
+    /**
+     * Routing target for network message delivery.
+     */
     public enum Target {
+        /** Deliver to the proxy server only. */
         PROXY,
+        /** Deliver to all servers (except the sender). */
         ALL,
+        /** Deliver to a specific named server. */
         SERVER
     }
 
@@ -79,9 +85,22 @@ public class NetworkEnvelope {
     private String sourceServer;
     private long createdAt;
 
+    /**
+     * Default constructor for JSON deserialization frameworks.
+     */
     public NetworkEnvelope() {
     }
 
+    /**
+     * Creates a fully specified network envelope.
+     *
+     * @param channel      the logical destination channel
+     * @param data         the serialized message payload
+     * @param target       the routing directive
+     * @param targetServer the specific target server (may be null for PROXY/ALL targets)
+     * @param sourceServer the originating server name
+     * @param createdAt    the creation timestamp
+     */
     public NetworkEnvelope(String channel, String data, Target target, String targetServer, String sourceServer, long createdAt) {
         this.channel = channel;
         this.data = data;
@@ -91,30 +110,65 @@ public class NetworkEnvelope {
         this.createdAt = createdAt;
     }
 
+    /**
+     * Returns the logical destination channel.
+     *
+     * @return the channel, or null if not set
+     */
     public @Nullable String getChannel() {
         return channel;
     }
 
+    /**
+     * Returns the serialized message payload.
+     *
+     * @return the data, or null if not set
+     */
     public @Nullable String getData() {
         return data;
     }
 
+    /**
+     * Returns the routing directive.
+     *
+     * @return the target, or null if not set
+     */
     public @Nullable Target getTarget() {
         return target;
     }
 
+    /**
+     * Returns the specific target server for SERVER-targeted messages.
+     *
+     * @return the target server name, or null if not applicable
+     */
     public @Nullable String getTargetServer() {
         return targetServer;
     }
 
+    /**
+     * Returns the originating server name.
+     *
+     * @return the source server name, or null if not set
+     */
     public @Nullable String getSourceServer() {
         return sourceServer;
     }
 
+    /**
+     * Sets the originating server name.
+     *
+     * @param sourceServer the source server name
+     */
     public void setSourceServer(@Nullable String sourceServer) {
         this.sourceServer = sourceServer;
     }
 
+    /**
+     * Returns the creation timestamp.
+     *
+     * @return the timestamp in milliseconds
+     */
     public long getCreatedAt() {
         return createdAt;
     }

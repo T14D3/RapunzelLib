@@ -4,6 +4,9 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Represents a cache key for identifying cached entities.
+ *
+ * @param entityClassName the fully qualified class name of the entity
+ * @param id              the entity identifier
  */
 public record CacheKey(@NotNull String entityClassName, @NotNull String id) {
     

@@ -28,18 +28,44 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
     private final Set<ManagedSubscription> subscriptions = ConcurrentHashMap.newKeySet();
     private volatile boolean closed;
 
+    /**
+     * Creates a gateway with a runtime and default Gson.
+     *
+     * @param runtime the network runtime
+     */
     public DefaultNetworkRuntimeGateway(@NotNull NetworkRuntime runtime) {
         this(runtime, null, LoggerFactory.getLogger(DefaultNetworkRuntimeGateway.class), JsonCodecs.gson());
     }
 
+    /**
+     * Creates a gateway with a runtime and custom Gson.
+     *
+     * @param runtime the network runtime
+     * @param gson    the Gson instance
+     */
     public DefaultNetworkRuntimeGateway(@NotNull NetworkRuntime runtime, @NotNull Gson gson) {
         this(runtime, null, LoggerFactory.getLogger(DefaultNetworkRuntimeGateway.class), gson);
     }
 
+    /**
+     * Creates a gateway with a runtime, scheduler, and logger.
+     *
+     * @param runtime   the network runtime
+     * @param scheduler the scheduler
+     * @param logger    the logger
+     */
     public DefaultNetworkRuntimeGateway(@NotNull NetworkRuntime runtime, @NotNull Scheduler scheduler, @NotNull Logger logger) {
         this(runtime, Objects.requireNonNull(scheduler, "scheduler"), logger, JsonCodecs.gson());
     }
 
+    /**
+     * Creates a fully configured gateway.
+     *
+     * @param runtime   the network runtime
+     * @param scheduler the scheduler (may be null, disables RPC)
+     * @param logger    the logger
+     * @param gson      the Gson instance
+     */
     public DefaultNetworkRuntimeGateway(
         @NotNull NetworkRuntime runtime,
         Scheduler scheduler,
@@ -53,10 +79,23 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
         this.rpcClient = scheduler != null ? new RpcClient(this, scheduler, logger, java.time.Duration.ofSeconds(3), gson) : null;
     }
 
+    /**
+     * Creates a compatibility gateway from a messenger (infers runtime metadata).
+     *
+     * @param messenger the messenger
+     * @return a compatibility gateway
+     */
     public static @NotNull DefaultNetworkRuntimeGateway compatibility(@NotNull Messenger messenger) {
         return compatibility(messenger, JsonCodecs.gson());
     }
 
+    /**
+     * Creates a compatibility gateway from a messenger with custom Gson.
+     *
+     * @param messenger the messenger
+     * @param gson      the Gson instance
+     * @return a compatibility gateway
+     */
     public static @NotNull DefaultNetworkRuntimeGateway compatibility(@NotNull Messenger messenger, @NotNull Gson gson) {
         Objects.requireNonNull(messenger, "messenger");
         Objects.requireNonNull(gson, "gson");
@@ -195,6 +234,9 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
         }
     }
 
+    /**
+     * Sends an RPC error response to a specific server.
+     */
     private void sendRpcError(String requestId, String sourceServer, String message) {
         try {
             publishToServer(
@@ -213,12 +255,18 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
         }
     }
 
+    /**
+     * Throws if the gateway has been closed.
+     */
     private void ensureOpen() {
         if (closed) {
             throw new IllegalStateException("NetworkRuntimeGateway is closed");
         }
     }
 
+    /**
+     * A managed subscription that automatically tracks and cleans up.
+     */
     private final class ManagedSubscription implements Subscription {
         private final NetworkEventBus.Subscription delegate;
         private volatile boolean closed;

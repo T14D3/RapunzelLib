@@ -17,6 +17,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 
+/**
+ * Bootstraps network info services for backend servers.
+ */
 public final class BackendNetworkInfoBootstrap {
     private BackendNetworkInfoBootstrap() {
     }

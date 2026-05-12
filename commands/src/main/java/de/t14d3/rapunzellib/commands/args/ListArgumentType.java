@@ -34,6 +34,8 @@ import java.util.regex.Pattern;
  * <p>Why not parse to {@code List<T>} directly? Brigadier's {@link ArgumentType#parse(StringReader)}
  * has no access to the sender/context, so validation against a dynamic allowed-values supplier
  * must happen in {@link #getList(CommandContext, String)}.</p>
+ *
+ * @param <T> the element type of the resulting list
  */
 public final class ListArgumentType<T> implements ArgumentType<String> {
     private final ArgumentType<String> delegate;
@@ -58,6 +60,12 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
         this.duplicateException = new SimpleCommandExceptionType(new LiteralMessage(b.duplicateMessage));
     }
 
+    /**
+     * Creates a new builder for this argument type.
+     *
+     * @param <T> the element type
+     * @return a new builder
+     */
     public static <T> Builder<T> builder() {
         return new Builder<>();
     }
@@ -65,6 +73,10 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
     /**
      * Converts and validates the parsed string argument into a typed list.
      *
+     * @param ctx the command context
+     * @param key the argument key
+     * @param <S> the command source type
+     * @return an immutable list of validated values
      * @throws CommandSyntaxException if an element is not allowed or duplicates are not allowed
      */
     public <S> List<T> getList(CommandContext<S> ctx, String key) throws CommandSyntaxException {
@@ -157,6 +169,11 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
         }
     }
 
+    /**
+     * Builder for {@link ListArgumentType}.
+     *
+     * @param <T> the element type
+     */
     public static final class Builder<T> {
         private String delimiter = " ";
         private boolean allowDuplicates = true;
@@ -170,11 +187,23 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
         private Builder() {
         }
 
+        /**
+         * Sets the delimiter between list elements.
+         *
+         * @param delimiter the delimiter string
+         * @return this builder
+         */
         public Builder<T> delimiter(String delimiter) {
             this.delimiter = Objects.requireNonNull(delimiter, "delimiter");
             return this;
         }
 
+        /**
+         * Sets whether duplicate values are allowed.
+         *
+         * @param allowDuplicates true to allow duplicates
+         * @return this builder
+         */
         public Builder<T> allowDuplicates(boolean allowDuplicates) {
             this.allowDuplicates = allowDuplicates;
             return this;
@@ -183,43 +212,87 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
         /**
          * When enabled, parses as {@link StringArgumentType#string()} and applies the
          * leading-quote suggestion offset used by CommandAPI's text argument mode.
+         *
+         * @param text true for text mode
+         * @return this builder
          */
         public Builder<T> text(boolean text) {
             this.text = text;
             return this;
         }
 
+        /**
+         * Sets a function to adapt the Brigadier source to {@link RCommandSource}.
+         *
+         * @param sourceAdapter the adapter function
+         * @return this builder
+         */
         public Builder<T> sourceAdapter(Function<Object, RCommandSource> sourceAdapter) {
             this.sourceAdapter = Objects.requireNonNull(sourceAdapter, "sourceAdapter");
             return this;
         }
 
+        /**
+         * Sets the supplier for allowed values based on context.
+         *
+         * @param supplier the values supplier
+         * @return this builder
+         */
         public Builder<T> values(BiFunction<RCommandSource, CommandContext<?>, Collection<T>> supplier) {
             this.supplier = Objects.requireNonNull(supplier, "supplier");
             return this;
         }
 
+        /**
+         * Sets a fixed collection of allowed values.
+         *
+         * @param values the allowed values
+         * @return this builder
+         */
         public Builder<T> values(Collection<T> values) {
             Objects.requireNonNull(values, "values");
             this.supplier = (src, ctx) -> values;
             return this;
         }
 
+        /**
+         * Sets the function that maps each value to a suggestion.
+         *
+         * @param mapper the mapper function
+         * @return this builder
+         */
         public Builder<T> mapper(Function<T, Suggestion> mapper) {
             this.mapper = Objects.requireNonNull(mapper, "mapper");
             return this;
         }
 
+        /**
+         * Sets the error message for values not in the allowed list.
+         *
+         * @param message the error message
+         * @return this builder
+         */
         public Builder<T> notAllowedMessage(String message) {
             this.notAllowedMessage = Objects.requireNonNull(message, "message");
             return this;
         }
 
+        /**
+         * Sets the error message for duplicate values.
+         *
+         * @param message the error message
+         * @return this builder
+         */
         public Builder<T> duplicateMessage(String message) {
             this.duplicateMessage = Objects.requireNonNull(message, "message");
             return this;
         }
 
+        /**
+         * Builds a new {@link ListArgumentType} from this builder.
+         *
+         * @return the constructed argument type
+         */
         public ListArgumentType<T> build() {
             if (supplier == null) throw new IllegalStateException("values supplier is required");
             if (delimiter.isEmpty()) throw new IllegalStateException("delimiter cannot be empty");
@@ -227,13 +300,28 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
         }
     }
 
+    /**
+     * A suggestion with an optional tooltip.
+     *
+     * @param suggestion the suggestion text
+     * @param tooltip optional tooltip message
+     */
     public record Suggestion(String suggestion, com.mojang.brigadier.Message tooltip) {
+        /**
+         * Compact canonical constructor that rejects blank suggestions.
+         */
         public Suggestion {
             if (suggestion == null || suggestion.isBlank()) {
                 throw new IllegalArgumentException("suggestion cannot be null/blank");
             }
         }
 
+        /**
+         * Creates a suggestion without a tooltip.
+         *
+         * @param suggestion the suggestion text
+         * @return a new Suggestion
+         */
         public static Suggestion none(String suggestion) {
             return new Suggestion(suggestion, null);
         }

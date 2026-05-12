@@ -17,6 +17,19 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * An immutable, serializable snapshot of a Minecraft entity.
+ * <p>
+ * Captures the entity type, NBT data, passenger list, original UUID,
+ * serialization timestamp, and optional metadata.</p>
+ *
+ * @param entityType  the entity type reference
+ * @param data        the entity's NBT data compound
+ * @param passengers  the list of passenger entities (recursive)
+ * @param originalUuid the original entity UUID
+ * @param serializedAt the timestamp when this snapshot was created
+ * @param metadata    additional metadata associated with this serialization
+ */
 public record SerializedEntity(
     @NotNull RRegistryRef<REntityType> entityType,
     @NotNull RNbtCompound data,
@@ -35,6 +48,15 @@ public record SerializedEntity(
         Objects.requireNonNull(metadata, "metadata");
     }
 
+    /**
+     * Creates a serialized entity from a string entity type, with empty metadata.
+     *
+     * @param entityType   the entity type as a string
+     * @param data         the NBT data
+     * @param passengers   the passengers
+     * @param originalUuid the original UUID
+     * @param serializedAt the serialization timestamp
+     */
     public SerializedEntity(
         @NotNull String entityType,
         @NotNull RNbtCompound data,
@@ -45,6 +67,16 @@ public record SerializedEntity(
         this(REntityType.ref(entityType), data, passengers, originalUuid, serializedAt, RNbtCompound.empty());
     }
 
+    /**
+     * Creates a serialized entity from a string entity type with metadata.
+     *
+     * @param entityType   the entity type as a string
+     * @param data         the NBT data
+     * @param passengers   the passengers
+     * @param originalUuid the original UUID
+     * @param serializedAt the serialization timestamp
+     * @param metadata     additional metadata
+     */
     public SerializedEntity(
         @NotNull String entityType,
         @NotNull RNbtCompound data,
@@ -56,6 +88,14 @@ public record SerializedEntity(
         this(REntityType.ref(entityType), data, passengers, originalUuid, serializedAt, metadata);
     }
 
+    /**
+     * Creates a simple serialized entity with no passengers, current timestamp, and no metadata.
+     *
+     * @param entityType   the entity type as a string
+     * @param data         the NBT data
+     * @param originalUuid the original UUID
+     * @return a new serialized entity
+     */
     public static @NotNull SerializedEntity of(
         @NotNull String entityType,
         @NotNull RNbtCompound data,
@@ -64,14 +104,30 @@ public record SerializedEntity(
         return new SerializedEntity(REntityType.ref(entityType), data, List.of(), originalUuid, Instant.now(), RNbtCompound.empty());
     }
 
+    /**
+     * Returns the entity type as an {@link RKey}.
+     *
+     * @return the entity type key
+     */
     public @NotNull RKey entityTypeKey() {
         return entityType.key();
     }
 
+    /**
+     * Returns the entity type as a string ID.
+     *
+     * @return the entity type string
+     */
     public @NotNull String entityTypeId() {
         return entityTypeKey().asString();
     }
 
+    /**
+     * Serializes this entity snapshot to a Base64-encoded string.
+     *
+     * @return the Base64 string
+     * @throws SerializationException if serialization fails
+     */
     public String toBase64() {
         try {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -84,6 +140,13 @@ public record SerializedEntity(
         }
     }
 
+    /**
+     * Deserializes a Base64-encoded string back into a {@link SerializedEntity}.
+     *
+     * @param data the Base64 string
+     * @return the deserialized entity
+     * @throws SerializationException if deserialization fails
+     */
     public static @NotNull SerializedEntity fromBase64(@NotNull String data) {
         Objects.requireNonNull(data, "data");
         try {
@@ -96,10 +159,24 @@ public record SerializedEntity(
         }
     }
 
+    /**
+     * Returns a new snapshot with additional metadata written via the given field.
+     *
+     * @param <T>   the metadata value type
+     * @param field the field to write
+     * @param value the value to write
+     * @return a new serialized entity with updated metadata
+     */
     public <T> @NotNull SerializedEntity withMetadata(@NotNull RNbtField<T> field, @NotNull T value) {
         return new SerializedEntity(entityType, data, passengers, originalUuid, serializedAt, field.write(metadata, value));
     }
 
+    /**
+     * Returns a new snapshot with the NBT data replaced.
+     *
+     * @param data the new NBT data
+     * @return a new serialized entity
+     */
     public @NotNull SerializedEntity withData(@NotNull RNbtCompound data) {
         return new SerializedEntity(entityType, Objects.requireNonNull(data, "data"), passengers, originalUuid, serializedAt, metadata);
     }

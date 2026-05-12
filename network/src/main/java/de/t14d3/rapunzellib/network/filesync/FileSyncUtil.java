@@ -6,10 +6,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 
+/**
+ * Utility methods for SHA-256 hashing used in file synchronization.
+ */
 final class FileSyncUtil {
     private FileSyncUtil() {
     }
 
+    /**
+     * Computes the SHA-256 hash of a file.
+     *
+     * @param file the file to hash
+     * @return hex-encoded SHA-256 hash
+     * @throws IOException if an I/O error occurs
+     */
     static String sha256Hex(Path file) throws IOException {
         MessageDigest digest = sha256();
         try (InputStream in = Files.newInputStream(file)) {
@@ -23,6 +33,12 @@ final class FileSyncUtil {
         return hex(digest.digest());
     }
 
+    /**
+     * Computes the SHA-256 hash of a byte array.
+     *
+     * @param bytes the bytes to hash
+     * @return hex-encoded SHA-256 hash
+     */
     static String sha256Hex(byte[] bytes) {
         MessageDigest digest = sha256();
         digest.update(bytes);

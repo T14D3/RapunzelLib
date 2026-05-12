@@ -6,10 +6,21 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A {@link ParticleShape} that samples points along a line segment
+ * between two locations in the same world.
+ */
 final class LineParticleShape implements ParticleShape {
     private final RLocation from;
     private final RLocation to;
 
+    /**
+     * Creates a line shape between two points.
+     *
+     * @param from the start location
+     * @param to   the end location
+     * @throws IllegalArgumentException if the two locations are in different worlds
+     */
     LineParticleShape(@NotNull RLocation from, @NotNull RLocation to) {
         if (!from.world().identifier().equals(to.world().identifier())) {
             throw new IllegalArgumentException("from and to must be in the same world");

@@ -13,10 +13,25 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
+/**
+ * Shared hooks for dispatching entity interaction and attack events.
+ * <p>
+ * Supports pre-cancellation checks and post-event notifications for
+ * both interactions and attacks through the {@link GameEventBus}.
+ */
 public final class SharedEntityInteractionHooks {
     private SharedEntityInteractionHooks() {
     }
 
+    /**
+     * Dispatches a pre-interact event and returns whether it was denied.
+     *
+     * @param bus       the game event bus
+     * @param player    the interacting player
+     * @param target    the target entity
+     * @param cancelled the current cancelled state
+     * @return {@code true} if the interaction should be denied
+     */
     public static boolean dispatchInteractPre(
         @NotNull GameEventBus bus,
         @NotNull ServerPlayer player,
@@ -39,6 +54,14 @@ public final class SharedEntityInteractionHooks {
         return pre.isDenied();
     }
 
+    /**
+     * Dispatches a post-interact event.
+     *
+     * @param bus       the game event bus
+     * @param player    the interacting player
+     * @param target    the target entity
+     * @param cancelled whether the interaction was cancelled
+     */
     public static void dispatchInteractPost(
         @NotNull GameEventBus bus,
         @NotNull ServerPlayer player,
@@ -59,6 +82,15 @@ public final class SharedEntityInteractionHooks {
         ));
     }
 
+    /**
+     * Dispatches a pre-attack event and returns whether it was denied.
+     *
+     * @param bus       the game event bus
+     * @param player    the attacking player
+     * @param target    the target entity
+     * @param cancelled the current cancelled state
+     * @return {@code true} if the attack should be denied
+     */
     public static boolean dispatchAttackPre(
         @NotNull GameEventBus bus,
         @NotNull ServerPlayer player,
@@ -81,6 +113,14 @@ public final class SharedEntityInteractionHooks {
         return pre.isDenied();
     }
 
+    /**
+     * Dispatches a post-attack event.
+     *
+     * @param bus       the game event bus
+     * @param player    the attacking player
+     * @param target    the target entity
+     * @param cancelled whether the attack was cancelled
+     */
     public static void dispatchAttackPost(
         @NotNull GameEventBus bus,
         @NotNull ServerPlayer player,

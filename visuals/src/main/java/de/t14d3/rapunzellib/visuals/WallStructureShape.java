@@ -7,11 +7,23 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
+/**
+ * A {@link BlockStructureShape} that produces a single rectangular face
+ * spanning between two corners. Handles degenerate axes by adjusting
+ * the resulting face thickness accordingly.
+ */
 final class WallStructureShape implements BlockStructureShape {
     private final RBlockPos corner1, corner2;
     private final RWorldRef world;
     private final float thickness;
 
+    /**
+     * Creates a wall structure shape from two corner positions.
+     *
+     * @param corner1       the first corner
+     * @param corner2       the second corner
+     * @param worldLocation a reference location to derive the world
+     */
     WallStructureShape(@NotNull RBlockPos corner1, @NotNull RBlockPos corner2, @NotNull RLocation worldLocation) {
         this.world = worldLocation.world();
         this.corner1 = corner1;

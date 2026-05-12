@@ -9,12 +9,28 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 
+/**
+ * Shared utility for registering Brigadier commands that operate on
+ * {@code CommandSourceStack}.
+ * <p>
+ * Coordinates between {@link CommandFeatures}, the registrar, and
+ * {@link SharedRuntimeCommandRegistrationSupport} to safely register
+ * shared commands at the appropriate time.
+ */
 public final class SharedBrigadierCommandRegistrationSupport {
     private static final String MOJANG_COMMAND_SOURCE_STACK_CLASS_NAME = "net.minecraft.commands.CommandSourceStack";
 
     private SharedBrigadierCommandRegistrationSupport() {
     }
 
+    /**
+     * Attempts to register shared {@code CommandSourceStack}-based commands
+     * on the given dispatcher.
+     *
+     * @param platformId the platform identifier
+     * @param dispatcher the command dispatcher
+     * @return {@code true} if registration was performed, {@code false} otherwise
+     */
     public static boolean registerCommandSourceStackCommandsIfAvailable(
         @NotNull PlatformId platformId,
         @NotNull CommandDispatcher<?> dispatcher
@@ -59,6 +75,12 @@ public final class SharedBrigadierCommandRegistrationSupport {
         return true;
     }
 
+    /**
+     * Resolves the {@code CommandSourceStack} class via reflection.
+     *
+     * @return the CommandSourceStack class
+     * @throws IllegalStateException if the class is not found
+     */
     private static @NotNull Class<?> commandSourceStackType() {
         try {
             return Class.forName(MOJANG_COMMAND_SOURCE_STACK_CLASS_NAME);

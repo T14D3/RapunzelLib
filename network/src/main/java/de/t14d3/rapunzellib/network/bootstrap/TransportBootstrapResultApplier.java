@@ -11,10 +11,24 @@ import org.slf4j.Logger;
 
 import java.util.Objects;
 
+/**
+ * Applies the result of a backend transport bootstrap to a RapunzelContext.
+ *
+ * <p>Registers the effective messenger, network runtime, gateway, and any closeable
+ * resources into the context.
+ */
 public final class TransportBootstrapResultApplier {
     private TransportBootstrapResultApplier() {
     }
 
+    /**
+     * Applies the transport bootstrap result to the Rapunzel context.
+     *
+     * @param ctx       the Rapunzel context
+     * @param logger    the logger
+     * @param transport the transport bootstrap result
+     * @return the effective messenger
+     */
     public static Messenger apply(RapunzelContext ctx, Logger logger, BackendTransportBootstrap.Result transport) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(logger, "logger");
@@ -50,6 +64,9 @@ public final class TransportBootstrapResultApplier {
         return effective;
     }
 
+    /**
+     * Registers a closeable resource in the context if non-null.
+     */
     private static void registerCloseable(RapunzelContext ctx, AutoCloseable closeable) {
         if (closeable != null) {
             ctx.registerCloseable(closeable);

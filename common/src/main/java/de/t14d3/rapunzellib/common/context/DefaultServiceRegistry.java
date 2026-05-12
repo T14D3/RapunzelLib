@@ -12,11 +12,32 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+/**
+ * Default implementation of {@link ServiceRegistry}.
+ * <p>
+ * Thread-safe service registry supporting direct registration, linked (alias)
+ * registrations, and lazy creation via suppliers. Uses a monitor lock on an
+ * internal object for all mutation operations.
+ * <p>
+ * Alias chains are followed transitively during lookup and cycle-detected
+ * to prevent infinite loops.
+ */
 public final class DefaultServiceRegistry implements ServiceRegistry {
+    /** Synchronization lock */
     private final Object lock = new Object();
+    /** Primary service registration map */
     private final LinkedHashMap<Class<?>, Object> services = new LinkedHashMap<>();
+    /** Alias map: alias type -> primary type */
     private final LinkedHashMap<Class<?>, Class<?>> aliases = new LinkedHashMap<>();
 
+    /**
+     * Registers a service instance under its exact type.
+     *
+     * @param type     the service type class
+     * @param instance the service instance
+     * @param <T>      the service type
+     * @throws IllegalStateException if the type is already registered as an alias
+     */
     @Override
     public <T> void register(@NotNull Class<T> type, @NotNull T instance) {
         Objects.requireNonNull(type, "type");
@@ -29,6 +50,15 @@ public final class DefaultServiceRegistry implements ServiceRegistry {
         }
     }
 
+    /**
+     * Registers a service under a primary type and creates aliases to it.
+     *
+     * @param primaryType the primary registration type
+     * @param instance    the service instance
+     * @param linkedTypes additional types to alias to the primary
+     * @param <T>         the service type
+     * @return the registered instance
+     */
     @Override
     public <T> @NotNull T registerLinked(
         @NotNull Class<T> primaryType,
@@ -54,6 +84,13 @@ public final class DefaultServiceRegistry implements ServiceRegistry {
         }
     }
 
+    /**
+     * Creates an alias from one type to another.
+     *
+     * @param aliasType  the alias type
+     * @param targetType the target type that implements the alias
+     * @param <T>        the service type
+     */
     @Override
     public <T> void registerAlias(@NotNull Class<T> aliasType, @NotNull Class<? extends T> targetType) {
         Objects.requireNonNull(aliasType, "aliasType");
@@ -67,6 +104,15 @@ public final class DefaultServiceRegistry implements ServiceRegistry {
         }
     }
 
+    /**
+     * Registers a service instance if no registration exists for the type
+     * (following aliases). Returns the existing instance if already registered.
+     *
+     * @param type     the service type
+     * @param instance the service instance
+     * @param <T>      the service type
+     * @return the existing or newly registered instance
+     */
     @Override
     public <T> @NotNull T registerIfAbsent(@NotNull Class<T> type, @NotNull T instance) {
         Objects.requireNonNull(type, "type");
@@ -90,6 +136,14 @@ public final class DefaultServiceRegistry implements ServiceRegistry {
         }
     }
 
+    /**
+     * Registers a service via supplier if no registration exists for the type.
+     *
+     * @param type     the service type
+     * @param supplier the factory for creating the instance
+     * @param <T>      the service type
+     * @return the existing or newly created instance
+     */
     @Override
     public <T> @NotNull T registerIfAbsent(@NotNull Class<T> type, @NotNull Supplier<? extends T> supplier) {
         Objects.requireNonNull(type, "type");
@@ -114,11 +168,26 @@ public final class DefaultServiceRegistry implements ServiceRegistry {
         }
     }
 
+    /**
+     * Gets an existing service or creates and registers it via the supplier.
+     *
+     * @param type     the service type
+     * @param supplier the factory for creating the instance
+     * @param <T>      the service type
+     * @return the existing or newly created instance
+     */
     @Override
     public <T> @NotNull T getOrCreate(@NotNull Class<T> type, @NotNull Supplier<? extends T> supplier) {
         return registerIfAbsent(type, supplier);
     }
 
+    /**
+     * Finds a registered service by type.
+     *
+     * @param type the service type
+     * @param <T>  the service type
+     * @return an optional containing the service, or empty if not found
+     */
     @Override
     public <T> @NotNull Optional<T> find(@NotNull Class<T> type) {
         Objects.requireNonNull(type, "type");
@@ -132,6 +201,11 @@ public final class DefaultServiceRegistry implements ServiceRegistry {
         }
     }
 
+    /**
+     * Returns all registered service types including aliases.
+     *
+     * @return an immutable list of service types
+     */
     @Override
     public @NotNull List<Class<?>> serviceTypes() {
         synchronized (lock) {
@@ -141,6 +215,11 @@ public final class DefaultServiceRegistry implements ServiceRegistry {
         }
     }
 
+    /**
+     * Returns all unique service instances.
+     *
+     * @return an immutable list of service instances
+     */
     @Override
     public @NotNull List<Object> services() {
         synchronized (lock) {

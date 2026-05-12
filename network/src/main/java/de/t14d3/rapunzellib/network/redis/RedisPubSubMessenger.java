@@ -15,6 +15,13 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Redis pub/sub implementation of {@link Messenger}.
+ *
+ * <p>Uses Redis PUBLISH/SUBSCRIBE commands to broadcast messages across all
+ * servers in the network. Maintains separate connections for publishing and
+ * subscribing with automatic reconnection.
+ */
 public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
     private final RedisPubSubConfig config;
     private final Logger logger;
@@ -30,10 +37,21 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
     private volatile boolean connected;
     private final Thread subscribeThread;
 
+    /**
+     * Creates a Redis pub/sub messenger with the given configuration.
+     *
+     * @param config the Redis configuration
+     */
     public RedisPubSubMessenger(RedisPubSubConfig config) {
         this(config, LoggerFactory.getLogger(RedisPubSubMessenger.class));
     }
 
+    /**
+     * Creates a Redis pub/sub messenger with the given configuration and logger.
+     *
+     * @param config the Redis configuration
+     * @param logger the logger
+     */
     public RedisPubSubMessenger(RedisPubSubConfig config, Logger logger) {
         this.config = Objects.requireNonNull(config, "config");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -84,6 +102,11 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
         return config.proxyServerName();
     }
 
+    /**
+     * Publishes a network envelope to the Redis transport channel.
+     *
+     * @param env the envelope to publish
+     */
     private void publish(NetworkEnvelope env) {
         String payload = gson.toJson(env);
 
@@ -118,6 +141,9 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Closes the current publish connection.
+     */
     private void closePublishConnection() {
         RedisConnection conn = publishConnection;
         publishConnection = null;
@@ -126,6 +152,9 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Main subscribe loop that listens for Redis pub/sub messages.
+     */
     private void runSubscribeLoop() {
         while (running) {
             try (RedisConnection conn = RedisConnection.connect(config, true)) {
@@ -151,6 +180,11 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Handles a pub/sub reply from Redis.
+     *
+     * @param reply the parsed RESP array reply
+     */
     private void handlePubSubReply(List<?> reply) {
         if (reply.isEmpty()) return;
         Object kind = reply.getFirst();
@@ -174,6 +208,12 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Determines whether this server should deliver the given envelope.
+     *
+     * @param env the network envelope
+     * @return true if the envelope should be delivered locally
+     */
     private boolean shouldDeliver(NetworkEnvelope env) {
         if (env == null || env.getChannel() == null) return false;
         NetworkEnvelope.Target target = env.getTarget();
@@ -194,6 +234,11 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
         };
     }
 
+    /**
+     * Delivers an envelope to all local listeners registered on its channel.
+     *
+     * @param env the network envelope
+     */
     private void deliverToLocalListeners(NetworkEnvelope env) {
         List<MessageListener> list = listeners.get(env.getChannel());
         if (list == null || list.isEmpty()) return;
@@ -206,6 +251,11 @@ public final class RedisPubSubMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Sleeps the current thread quietly, ignoring interrupts.
+     *
+     * @param millis the duration to sleep in milliseconds
+     */
     private static void sleepQuietly(long millis) {
         if (millis <= 0) return;
         try {

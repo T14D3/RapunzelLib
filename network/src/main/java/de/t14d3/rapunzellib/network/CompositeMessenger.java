@@ -13,6 +13,9 @@ import java.util.Objects;
 /**
  * Messenger wrapper that attempts sends on a primary messenger and falls back to others.
  */
+/**
+ * A messenger that delegates to a primary messenger with configurable fallbacks.
+ */
 public final class CompositeMessenger implements Messenger {
     private final Messenger primary;
     private final List<Messenger> messengers;

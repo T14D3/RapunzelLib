@@ -5,6 +5,12 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.Type;
 import java.util.Objects;
 
+/**
+ * Descriptor for an RPC method with request and response types.
+ *
+ * @param <Req> the request type
+ * @param <Res> the response type
+ */
 public record RpcMethod<Req, Res>(
     @NotNull String service,
     @NotNull String method,

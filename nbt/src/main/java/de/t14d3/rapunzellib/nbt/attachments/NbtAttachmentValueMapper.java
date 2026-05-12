@@ -11,10 +11,27 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Utility for encoding/decoding {@link de.t14d3.rapunzellib.attachments.RAttachmentKey attachment}
+ * values to/from {@link RNbtValue NBT values} for persistent storage on items.
+ * <p>
+ * Supports standard Java types (String, UUID, Boolean, numeric primitives, byte[])
+ * and custom {@link de.t14d3.rapunzellib.attachments.RAttachmentCodec codecs}.</p>
+ */
 public final class NbtAttachmentValueMapper {
     private NbtAttachmentValueMapper() {
     }
 
+    /**
+     * Encodes a Java attachment value into an {@link RNbtValue} for persistent storage.
+     *
+     * @param <T>   the value type
+     * @param key   the attachment key (provides type and optional codec)
+     * @param value the value to encode
+     * @return the encoded NBT value
+     * @throws ClassCastException if the value is not of the declared type
+     * @throws IllegalArgumentException if the type is unsupported
+     */
     public static <T> @NotNull RNbtValue encode(@NotNull RAttachmentKey<T> key, @NotNull T value) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(value, "value");
@@ -40,6 +57,15 @@ public final class NbtAttachmentValueMapper {
         throw new IllegalArgumentException("Unsupported persistent attachment type " + key.type().getName() + " for " + key.id().asString());
     }
 
+    /**
+     * Decodes an attachment value from an {@link RNbtValue}.
+     *
+     * @param <T>   the value type
+     * @param key   the attachment key (provides type and optional codec)
+     * @param value the NBT value to decode
+     * @return the decoded Java value
+     * @throws IllegalArgumentException if the type is unsupported
+     */
     public static <T> @NotNull T decode(@NotNull RAttachmentKey<T> key, @NotNull RNbtValue value) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(value, "value");

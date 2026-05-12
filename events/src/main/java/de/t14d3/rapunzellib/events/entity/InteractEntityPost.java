@@ -11,28 +11,63 @@ import de.t14d3.rapunzellib.objects.snapshot.REntitySnapshot;
 
 import java.util.Optional;
 
+/**
+ * Post-event fired after a player has interacted with an entity.
+ *
+ * @param player    the interacting player
+ * @param entity    the entity that was interacted with
+ * @param snapshot  a snapshot of the entity's state
+ * @param cancelled whether the interaction was cancelled
+ */
 public record InteractEntityPost(
     RPlayer player,
     REntity entity,
     REntitySnapshot snapshot,
     boolean cancelled
 ) implements GamePostEvent {
+    /**
+     * Creates an InteractEntityPost from a player, entity, and cancelled state.
+     *
+     * @param player    the interacting player
+     * @param entity    the entity that was interacted with
+     * @param cancelled whether the interaction was cancelled
+     */
     public InteractEntityPost(RPlayer player, REntity entity, boolean cancelled) {
         this(player, entity, entity.snapshot(), cancelled);
     }
 
+    /**
+     * Returns the world from the snapshot.
+     *
+     * @return the world
+     */
     public RWorldRef world() {
         return snapshot.world();
     }
 
+    /**
+     * Returns the position from the snapshot.
+     *
+     * @return the position
+     */
     public RBlockPos pos() {
         return snapshot.pos();
     }
 
+    /**
+     * Returns the entity type key from the snapshot.
+     *
+     * @return the entity type key
+     */
     public RKey entityTypeKey() {
         return snapshot.entityTypeKey();
     }
 
+    /**
+     * Returns the entity as a living entity, if applicable.
+     *
+     * @return an optional containing the living entity
+     */
     public Optional<RLivingEntity> livingEntity() {
         return entity.asLivingEntity();
     }

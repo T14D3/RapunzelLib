@@ -9,6 +9,11 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Resolves Adventure {@link TextColor} values to Minecraft concrete block types.
+ * <p>
+ * Uses a nearest-color matching algorithm for colors that are not exact named colors.
+ */
 public final class ConcreteColorResolver {
     private static final Map<NamedTextColor, String> CONCRETE_MAP = new LinkedHashMap<>();
 
@@ -34,17 +39,35 @@ public final class ConcreteColorResolver {
     private ConcreteColorResolver() {
     }
 
+    /**
+     * Resolves a text color to the closest matching concrete block type.
+     *
+     * @param color the text color to resolve
+     * @return the matching concrete block type (defaults to white concrete)
+     */
     public static @NotNull RBlockType resolve(@NotNull TextColor color) {
         NamedTextColor named = color instanceof NamedTextColor n ? n : nearestNamed(color);
         String blockKey = CONCRETE_MAP.getOrDefault(named, "minecraft:white_concrete");
         return RBlockType.require(blockKey);
     }
 
+    /**
+     * Resolves a text color to its concrete block key string.
+     *
+     * @param color the text color to resolve
+     * @return the Minecraft block key (e.g. "minecraft:white_concrete")
+     */
     public static @NotNull String resolveKey(@NotNull TextColor color) {
         NamedTextColor named = color instanceof NamedTextColor n ? n : nearestNamed(color);
         return CONCRETE_MAP.getOrDefault(named, "minecraft:white_concrete");
     }
 
+    /**
+     * Finds the nearest named text color by Euclidean RGB distance.
+     *
+     * @param color the color to match
+     * @return the closest named text color
+     */
     @NotNull
     static NamedTextColor nearestNamed(@NotNull TextColor color) {
         int rgb = color.value();

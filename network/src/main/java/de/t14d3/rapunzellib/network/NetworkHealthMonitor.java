@@ -6,6 +6,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * Tracks network transport health for observability.
  */
 public final class NetworkHealthMonitor {
+    /**
+     * Snapshot of connection health metrics for a transport.
+     *
+     * @param transport         the transport name
+     * @param connected         whether the transport is currently connected
+     * @param latencyMs         the last measured latency in milliseconds
+     * @param lastSuccess       timestamp of the last successful operation
+     * @param failuresLastMinute number of failures in the last minute
+     */
     public record ConnectionHealth(
         String transport,
         boolean connected,
@@ -20,10 +29,22 @@ public final class NetworkHealthMonitor {
     private final ConcurrentHashMap<String, ConnectionHealth> healthMap = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, FailureWindow> failureWindows = new ConcurrentHashMap<>();
 
+    /**
+     * Returns the current health snapshot for a transport.
+     *
+     * @param transport the transport identifier
+     * @return the connection health record, or null if no data recorded
+     */
     public ConnectionHealth getHealth(String transport) {
         return healthMap.get(transport);
     }
 
+    /**
+     * Records a successful send operation for a transport.
+     *
+     * @param transport the transport identifier
+     * @param latencyMs the latency of the send operation in milliseconds
+     */
     public void recordSuccess(String transport, long latencyMs) {
         String key = normalize(transport);
         long now = System.currentTimeMillis();
@@ -35,6 +56,11 @@ public final class NetworkHealthMonitor {
         );
     }
 
+    /**
+     * Records a failed send operation for a transport.
+     *
+     * @param transport the transport identifier
+     */
     public void recordFailure(String transport) {
         String key = normalize(transport);
         long now = System.currentTimeMillis();
@@ -55,6 +81,12 @@ public final class NetworkHealthMonitor {
         );
     }
 
+    /**
+     * Normalizes a transport name for consistent keying.
+     *
+     * @param transport the transport name
+     * @return the normalized name, never null
+     */
     private static String normalize(String transport) {
         if (transport == null) {
             return "unknown";
@@ -63,6 +95,9 @@ public final class NetworkHealthMonitor {
         return trimmed.isBlank() ? "unknown" : trimmed;
     }
 
+    /**
+     * Tracks failure counts within a sliding time window.
+     */
     private static final class FailureWindow {
         private final long windowStart;
         private int failures;

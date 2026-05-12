@@ -8,6 +8,13 @@ import de.t14d3.rapunzellib.inventory.InventoryFeatures;
 import de.t14d3.rapunzellib.runtime.RuntimeCapability;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Entry point for installing and accessing GUI features in RapunzelLib.
+ * <p>
+ * Provides static methods to install the GUI feature set, resolve a renderer,
+ * and manage the {@link GuiFeatureInstaller} registry.
+ * </p>
+ */
 public final class GuiFeatures {
     private static final FeatureInstallerRegistry<GuiFeatureInstaller> INSTALLER_REGISTRY = FeatureInstallerRegistry.create(
         GuiFeatureInstaller.class,

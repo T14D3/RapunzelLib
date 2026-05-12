@@ -30,6 +30,9 @@ import java.util.concurrent.TimeoutException;
  * <p>Authority responds to per-server manifest requests. Payload is transferred in chunks to support transports with
  * small message limits (e.g. plugin messaging).</p>
  */
+/**
+ * Endpoint for file synchronization between servers.
+ */
 public final class FileSyncEndpoint implements AutoCloseable {
     public interface Listener {
         default void onInvalidateReceived(FileSyncInvalidate invalidate, String sourceServer) {

@@ -123,18 +123,34 @@ import java.util.UUID;
  * @see <a href="https://bitbucket.org/snakeyaml/snakeyaml">SnakeYAML Library</a>
  */
 public final class SnakeYamlConfig implements YamlConfig {
+    /** YAML indentation width */
     private static final int INDENT = 2;
 
+    /** Path to the config file on disk */
     private final Path file;
+    /** Resource provider for loading defaults from classpath */
     private final ResourceProvider resources;
+    /** Logger for warnings and errors */
     private final Logger logger;
+    /** Classpath resource path for default configuration */
     private final String defaultResourcePath;
 
+    /** SnakeYAML parser/dumper */
     private final Yaml yaml;
 
+    /** Root configuration map (parsed YAML mapping) */
     private Map<String, Object> root = new LinkedHashMap<>();
+    /** Map of path -> comment text for comment preservation */
     private Map<String, String> comments = new LinkedHashMap<>();
 
+    /**
+     * Creates a new SnakeYAML config instance.
+     *
+     * @param file                the path to the config file on disk
+     * @param resources           provider for loading default resource files
+     * @param logger              logger for warnings and errors
+     * @param defaultResourcePath the classpath resource path for default values, may be null or blank
+     */
     SnakeYamlConfig(Path file, ResourceProvider resources, Logger logger, String defaultResourcePath) {
         this.file = Objects.requireNonNull(file, "file");
         this.resources = Objects.requireNonNull(resources, "resources");
@@ -155,11 +171,23 @@ public final class SnakeYamlConfig implements YamlConfig {
         this.yaml = new Yaml(constructor, representer, dumperOptions, loaderOptions);
     }
 
+    /**
+     * Checks whether the given path exists in the configuration.
+     *
+     * @param path the dot-separated path
+     * @return true if the path exists
+     */
     @Override
     public boolean contains(@NotNull String path) {
         return resolve(path, false) != null;
     }
 
+    /**
+     * Returns all keys in the configuration.
+     *
+     * @param deep if true, returns deeply nested keys (e.g. "a.b.c"); otherwise only top-level keys
+     * @return a set of key paths
+     */
     @Override
     public @NotNull Set<String> keys(boolean deep) {
         if (!deep) {
@@ -171,6 +199,12 @@ public final class SnakeYamlConfig implements YamlConfig {
         return out;
     }
 
+    /**
+     * Gets the raw value at the given path.
+     *
+     * @param path the dot-separated path
+     * @return the value, or null if not found
+     */
     @Override
     public Object get(@NotNull String path) {
         Resolved resolved = resolve(path, false);
@@ -178,6 +212,15 @@ public final class SnakeYamlConfig implements YamlConfig {
         return resolved.parent.get(resolved.key);
     }
 
+    /**
+     * Gets a typed value at the given path, coercing if necessary.
+     *
+     * @param path the dot-separated path
+     * @param type the target type
+     * @param def  the default value if path is missing or coercion fails
+     * @param <T>  the target type
+     * @return the coerced value, or the default
+     */
     @Override
     public <T> T get(@NotNull String path, @NotNull Class<T> type, T def) {
         Object value = get(path);
@@ -185,30 +228,65 @@ public final class SnakeYamlConfig implements YamlConfig {
         return coerced != null ? coerced : def;
     }
 
+    /**
+     * Gets a string value at the given path.
+     *
+     * @param path the dot-separated path
+     * @param def  the default value
+     * @return the string value, or the default
+     */
     @Override
     public String getString(@NotNull String path, String def) {
         String v = get(path, String.class, null);
         return v != null ? v : def;
     }
 
+    /**
+     * Gets an integer value at the given path.
+     *
+     * @param path the dot-separated path
+     * @param def  the default value
+     * @return the integer value, or the default
+     */
     @Override
     public int getInt(@NotNull String path, int def) {
         Integer v = get(path, Integer.class, null);
         return v != null ? v : def;
     }
 
+    /**
+     * Gets a boolean value at the given path.
+     *
+     * @param path the dot-separated path
+     * @param def  the default value
+     * @return the boolean value, or the default
+     */
     @Override
     public boolean getBoolean(@NotNull String path, boolean def) {
         Boolean v = get(path, Boolean.class, null);
         return v != null ? v : def;
     }
 
+    /**
+     * Gets a double value at the given path.
+     *
+     * @param path the dot-separated path
+     * @param def  the default value
+     * @return the double value, or the default
+     */
     @Override
     public double getDouble(@NotNull String path, double def) {
         Double v = get(path, Double.class, null);
         return v != null ? v : def;
     }
 
+    /**
+     * Gets a list value at the given path.
+     *
+     * @param path the dot-separated path
+     * @param def  the default value
+     * @return the list value, or the default
+     */
     @Override
     public @NotNull List<?> getList(@NotNull String path, @NotNull List<?> def) {
         Object v = get(path);
@@ -216,6 +294,13 @@ public final class SnakeYamlConfig implements YamlConfig {
         return def;
     }
 
+    /**
+     * Gets a string list value at the given path.
+     *
+     * @param path the dot-separated path
+     * @param def  the default value
+     * @return the string list, or the default
+     */
     @Override
     public @NotNull List<String> getStringList(@NotNull String path, @NotNull List<String> def) {
         Object v = get(path);
@@ -223,6 +308,12 @@ public final class SnakeYamlConfig implements YamlConfig {
         return list.stream().map(String::valueOf).toList();
     }
 
+    /**
+     * Sets a value at the given path. If the value is null, the path is removed.
+     *
+     * @param path  the dot-separated path
+     * @param value the value to set, or null to remove
+     */
     @Override
     public void set(@NotNull String path, Object value) {
         Objects.requireNonNull(path, "path");
@@ -240,11 +331,23 @@ public final class SnakeYamlConfig implements YamlConfig {
         resolved.parent.put(resolved.key, toYamlValue(value));
     }
 
+    /**
+     * Gets the comment for the given path.
+     *
+     * @param path the dot-separated path
+     * @return the comment string, or null if not set
+     */
     @Override
     public String getComment(@NotNull String path) {
         return comments.get(path);
     }
 
+    /**
+     * Sets a comment for the given path. Blank comments are removed.
+     *
+     * @param path    the dot-separated path
+     * @param comment the comment text
+     */
     @Override
     public void setComment(@NotNull String path, @NotNull String comment) {
         Objects.requireNonNull(path, "path");
@@ -255,6 +358,9 @@ public final class SnakeYamlConfig implements YamlConfig {
         }
     }
 
+    /**
+     * Saves the configuration to disk with comments.
+     */
     @Override
     public void save() {
         try {
@@ -273,6 +379,9 @@ public final class SnakeYamlConfig implements YamlConfig {
         }
     }
 
+    /**
+     * Reloads the configuration from disk, merging default values from the resource path.
+     */
     @Override
     public void reload() {
         try {

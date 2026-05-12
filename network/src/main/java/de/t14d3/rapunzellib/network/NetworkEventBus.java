@@ -23,10 +23,29 @@ import java.util.stream.Collectors;
 public final class NetworkEventBus {
     private static final Logger logger = LoggerFactory.getLogger(NetworkEventBus.class);
 
+    /**
+     * Listener interface for typed events with deserialized payloads.
+     *
+     * @param <T> the payload type
+     */
+    /**
+     * Listener interface for typed events with deserialized payloads.
+     *
+     * @param <T> the payload type
+     */
     public interface TypedListener<T> {
+        /**
+         * Called when a typed event is received.
+         *
+         * @param payload      the deserialized event payload
+         * @param sourceServer the name of the server that sent the event
+         */
         void onEvent(T payload, String sourceServer);
     }
 
+    /**
+     * Subscription handle that can be closed to unregister listeners.
+     */
     public interface Subscription extends AutoCloseable {
         @Override
         void close();
@@ -110,22 +129,53 @@ public final class NetworkEventBus {
     /**
      * Registers a typed listener with synchronous dispatch (default behavior).
      */
+    /**
+     * Registers a typed listener with synchronous dispatch (default behavior).
+     *
+     * @param channel     the channel to listen on
+     * @param payloadType the type of payload
+     * @param listener    the listener to register
+     * @param <T>         the payload type
+     * @return a subscription handle
+     */
     public <T> Subscription register(String channel, Class<T> payloadType, TypedListener<T> listener) {
         return register(channel, payloadType, listener, false);
     }
 
+    /**
+     * Sends a payload to all servers on the given channel.
+     *
+     * @param channel the channel to send on
+     * @param payload the payload to send
+     */
     public void sendToAll(String channel, Object payload) {
         messenger.sendToAll(channel, json.toJson(payload));
     }
 
+    /**
+     * Sends a payload to a specific server.
+     *
+     * @param channel    the channel to send on
+     * @param serverName the target server name
+     * @param payload    the payload to send
+     */
     public void sendToServer(String channel, String serverName, Object payload) {
         messenger.sendToServer(channel, serverName, json.toJson(payload));
     }
 
+    /**
+     * Sends a payload to the proxy.
+     *
+     * @param channel the channel to send on
+     * @param payload the payload to send
+     */
     public void sendToProxy(String channel, Object payload) {
         messenger.sendToProxy(channel, json.toJson(payload));
     }
 
+    /**
+     * Dispatches a received message to all registered typed listeners.
+     */
     private void dispatchTyped(String channel, String data, String serverName) {
         List<TypedRegistration<?>> regs = typedListeners.get(channel);
         if (regs == null || regs.isEmpty()) return;
@@ -158,8 +208,14 @@ public final class NetworkEventBus {
         }
     }
 
+    /**
+     * Internal record holding a typed listener with its payload class.
+     */
     private record TypedRegistration<T>(Class<T> type, TypedListener<T> listener) {
 
+        /**
+         * Deserializes and dispatches the message to the typed listener.
+         */
         private void dispatch(JsonCodec json, String data, String serverName) {
             T payload = json.fromJson(data, type);
             listener.onEvent(payload, serverName);
@@ -174,26 +230,56 @@ public final class NetworkEventBus {
         private JsonCodec json;
         private ExecutorService dispatcher;
 
+        /**
+         * Sets the messenger.
+         *
+         * @param messenger the messenger
+         * @return this builder
+         */
         public Builder messenger(Messenger messenger) {
             this.messenger = messenger;
             return this;
         }
 
+        /**
+         * Sets the JSON codec.
+         *
+         * @param json the codec
+         * @return this builder
+         */
         public Builder json(JsonCodec json) {
             this.json = json;
             return this;
         }
 
+        /**
+         * Sets the Gson instance (wraps in GsonJsonCodec).
+         *
+         * @param gson the Gson instance
+         * @return this builder
+         */
         public Builder gson(Gson gson) {
             this.json = new GsonJsonCodec(gson);
             return this;
         }
 
+        /**
+         * Sets the executor service for async dispatch.
+         *
+         * @param dispatcher the executor
+         * @return this builder
+         */
         public Builder dispatcher(ExecutorService dispatcher) {
             this.dispatcher = dispatcher;
             return this;
         }
 
+        /**
+         * Builds the {@link NetworkEventBus}.
+         *
+         * @return the configured event bus
+         * @throws IllegalStateException if messenger is not set
+         */
         public NetworkEventBus build() {
             if (messenger == null) {
                 throw new IllegalStateException("messenger is required");

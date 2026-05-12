@@ -10,11 +10,26 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 import java.util.function.Supplier;
 
+/**
+ * Abstract base for platform-specific NBT feature installers.
+ * <p>
+ * Delegates registration of the primary item stack adapter and NBT
+ * serializers to {@link SharedNbtFeatureInstallerSupport}.
+ *
+ * @param <A> the concrete item stack adapter type
+ */
 public abstract class AbstractSharedNbtFeatureInstaller<A extends ItemStackAdapter<ItemStack>> implements NbtFeatureInstaller {
     private final PlatformId platformId;
     private final Class<A> adapterType;
     private final Supplier<? extends A> adapterFactory;
 
+    /**
+     * Creates an NBT feature installer.
+     *
+     * @param platformId     the platform identifier
+     * @param adapterType    the adapter class
+     * @param adapterFactory the adapter factory
+     */
     protected AbstractSharedNbtFeatureInstaller(
         @NotNull PlatformId platformId,
         @NotNull Class<A> adapterType,

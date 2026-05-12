@@ -5,6 +5,12 @@ import net.minecraft.world.entity.Entity;
 import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Provides access to the Minecraft internal entity ID counter.
+ *
+ * <p>This is a low-level utility for assigning entity IDs outside of normal
+ * Minecraft channels, used primarily on Mojang-mapped platforms.</p>
+ */
 public final class EntityIdAccessor {
 
     private EntityIdAccessor() {
@@ -27,6 +33,11 @@ public final class EntityIdAccessor {
 
     }
 
+    /**
+     * Returns the next available entity ID.
+     *
+     * @return the next entity ID
+     */
     public static int nextEntityId() {
         return counter.incrementAndGet();
     }

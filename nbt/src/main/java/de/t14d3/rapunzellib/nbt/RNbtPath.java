@@ -8,6 +8,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * A typed NBT path that can navigate into nested compounds and lists to read, write, or remove values.
+ * <p>
+ * Paths are composed of {@link Segment segments} - either named keys (for compounds) or numeric
+ * indices (for lists). Each path carries a {@link RNbtCodec} for type-safe value conversion.</p>
+ *
+ * @param <T> the type of the value at this path
+ */
 public final class RNbtPath<T> implements Serializable {
     private final @NotNull List<Segment> segments;
     private final @NotNull RNbtCodec<T> codec;
@@ -17,28 +25,66 @@ public final class RNbtPath<T> implements Serializable {
         this.codec = Objects.requireNonNull(codec, "codec");
     }
 
+    /**
+     * Creates an empty path (root) with the given codec.
+     *
+     * @param <T>   the value type
+     * @param codec the codec for encoding/decoding values
+     * @return a new root-level path
+     */
     public static <T> @NotNull RNbtPath<T> of(@NotNull RNbtCodec<T> codec) {
         return new RNbtPath<>(List.of(), codec);
     }
 
+    /**
+     * Creates a path with a single key segment.
+     *
+     * @param <T>   the value type
+     * @param codec the codec
+     * @param key   the first key segment
+     * @return a new path
+     */
     public static <T> @NotNull RNbtPath<T> of(@NotNull RNbtCodec<T> codec, @NotNull String key) {
         return of(codec).key(key);
     }
 
+    /**
+     * Returns the codec associated with this path.
+     *
+     * @return the codec
+     */
     public @NotNull RNbtCodec<T> codec() {
         return codec;
     }
 
+    /**
+     * Returns the list of path segments (unmodifiable).
+     *
+     * @return the segments
+     */
     public @NotNull List<Segment> segments() {
         return segments;
     }
 
+    /**
+     * Appends a key segment to this path.
+     *
+     * @param key the key to append
+     * @return a new extended path
+     */
     public @NotNull RNbtPath<T> key(@NotNull String key) {
         ArrayList<Segment> updated = new ArrayList<>(segments);
         updated.add(new KeySegment(Objects.requireNonNull(key, "key")));
         return new RNbtPath<>(updated, codec);
     }
 
+    /**
+     * Appends an index segment to this path (for navigating into lists).
+     *
+     * @param index the index (must be >= 0)
+     * @return a new extended path
+     * @throws IllegalArgumentException if index < 0
+     */
     public @NotNull RNbtPath<T> index(int index) {
         if (index < 0) {
             throw new IllegalArgumentException("Index must be >= 0");
@@ -48,14 +94,33 @@ public final class RNbtPath<T> implements Serializable {
         return new RNbtPath<>(updated, codec);
     }
 
+    /**
+     * Reads the value at this path from the given compound.
+     *
+     * @param root the root compound
+     * @return an Optional containing the decoded value, or empty if the path does not exist
+     */
     public @NotNull Optional<T> read(@NotNull RNbtCompound root) {
         return resolve(Objects.requireNonNull(root, "root")).map(codec::decode);
     }
 
+    /**
+     * Checks whether a value exists at this path.
+     *
+     * @param root the root compound
+     * @return true if the path resolves to a value
+     */
     public boolean exists(@NotNull RNbtCompound root) {
         return resolve(Objects.requireNonNull(root, "root")).isPresent();
     }
 
+    /**
+     * Writes a value at this path into the given compound, returning the new compound.
+     *
+     * @param root  the root compound
+     * @param value the value to write
+     * @return a new compound with the value written at this path
+     */
     public @NotNull RNbtCompound write(@NotNull RNbtCompound root, @NotNull T value) {
         RNbtValue encoded = codec.encode(Objects.requireNonNull(value, "value"));
         if (segments.isEmpty()) {
@@ -68,6 +133,12 @@ public final class RNbtPath<T> implements Serializable {
         return updated.asCompound();
     }
 
+    /**
+     * Removes the value at this path from the given compound, returning the new compound.
+     *
+     * @param root the root compound
+     * @return a new compound with the value at this path removed
+     */
     public @NotNull RNbtCompound remove(@NotNull RNbtCompound root) {
         if (segments.isEmpty()) {
             return Objects.requireNonNull(root, "root");
@@ -183,15 +254,29 @@ public final class RNbtPath<T> implements Serializable {
         return segments.toString();
     }
 
+    /**
+     * A segment of an NBT path - either a {@link KeySegment} (compound key)
+     * or an {@link IndexSegment} (list index).
+     */
     public sealed interface Segment permits KeySegment, IndexSegment {
     }
 
+    /**
+     * A path segment that navigates into a compound by key.
+     *
+     * @param key the compound key
+     */
     public record KeySegment(@NotNull String key) implements Segment {
         public KeySegment {
             Objects.requireNonNull(key, "key");
         }
     }
 
+    /**
+     * A path segment that navigates into a list by numeric index.
+     *
+     * @param index the list index (must be >= 0)
+     */
     public record IndexSegment(int index) implements Segment {
         public IndexSegment {
             if (index < 0) {

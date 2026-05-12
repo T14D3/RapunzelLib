@@ -30,31 +30,98 @@ import java.util.function.Supplier;
  * <p>When immediate delivery isn't possible, selected channels are persisted to a shared DB and retried
  * periodically.</p>
  */
-public final class DbQueuedMessenger implements Messenger, AutoCloseable {   
+public final class DbQueuedMessenger implements Messenger, AutoCloseable {
+
+    /**
+     * Callback interface for observing outbox message lifecycle events.
+     */
     public interface Listener {
+        /**
+         * Called when a message is enqueued into the outbox.
+         *
+         * @param id           the message ID
+         * @param target       the delivery target
+         * @param targetServer the target server name, or null
+         * @param channel      the message channel
+         */
         default void onEnqueued(long id, NetworkEnvelope.Target target, String targetServer, String channel) {
         }
 
+        /**
+         * Called when a message is successfully delivered.
+         *
+         * @param id           the message ID
+         * @param target       the delivery target
+         * @param targetServer the target server name, or null
+         * @param channel      the message channel
+         */
         default void onDelivered(long id, NetworkEnvelope.Target target, String targetServer, String channel) {
         }
 
+        /**
+         * Called when a message is dropped without delivery.
+         *
+         * @param id           the message ID
+         * @param reason       the reason for dropping
+         * @param target       the delivery target
+         * @param targetServer the target server name, or null
+         * @param channel      the message channel
+         */
         default void onDropped(long id, DropReason reason, NetworkEnvelope.Target target, String targetServer, String channel) {
         }
 
+        /**
+         * Called when a message expires (exceeds its maximum age).
+         *
+         * @param id        the message ID
+         * @param target    the delivery target
+         * @param targetServer the target server name, or null
+         * @param channel   the message channel
+         * @param ageMillis the age of the message in milliseconds
+         */
         default void onExpired(long id, NetworkEnvelope.Target target, String targetServer, String channel, long ageMillis) {
         }
 
+        /**
+         * Called when a delivery attempt fails with an exception.
+         *
+         * @param id           the message ID
+         * @param target       the delivery target
+         * @param targetServer the target server name, or null
+         * @param channel      the message channel
+         * @param error        the exception that occurred
+         */
         default void onDeliveryFailed(long id, NetworkEnvelope.Target target, String targetServer, String channel, Exception error) {
         }
     }
 
+    /**
+     * Reasons why a message may be dropped from the outbox.
+     */
     public enum DropReason {
+        /** The message was rejected by the outbox policy. */
         POLICY_REJECTED,
+        /** The target value could not be parsed. */
         INVALID_TARGET,
+        /** A SERVER-targeted message has no target server specified. */
         MISSING_TARGET_SERVER
     }
 
+    /**
+     * Internal interface abstracting the persistence layer for queued messages.
+     */
     interface OutboxStore {
+        /**
+         * Enqueues a new message.
+         *
+         * @param ownerId      the owner identifier
+         * @param target       the delivery target
+         * @param targetServer the target server name, or null
+         * @param channel      the message channel
+         * @param data         the message payload
+         * @param createdAt    the creation timestamp
+         * @return the assigned message ID
+         */
         long enqueue(
             String ownerId,
             NetworkEnvelope.Target target,
@@ -64,13 +131,44 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             long createdAt
         );
 
+        /**
+         * Fetches a batch of stored messages for a given owner.
+         *
+         * @param ownerId the owner identifier
+         * @param limit   the maximum number of messages to fetch
+         * @return the list of stored messages
+         */
         List<StoredMessage> fetchBatch(String ownerId, int limit);
 
+        /**
+         * Deletes messages by their IDs.
+         *
+         * @param ids the list of message IDs to delete
+         */
         void deleteByIds(List<Long> ids);
 
+        /**
+         * Records a delivery attempt for a message.
+         *
+         * @param id  the message ID
+         * @param now the current timestamp
+         */
         void recordAttempt(long id, long now);
     }
 
+    /**
+     * Immutable record representing a stored outbox message.
+     *
+     * @param id           the message ID
+     * @param ownerId      the owner identifier
+     * @param target       the delivery target string
+     * @param targetServer the target server name
+     * @param channel      the message channel
+     * @param data         the message payload
+     * @param createdAt    the creation timestamp
+     * @param attempts     the number of delivery attempts
+     * @param lastAttemptAt the timestamp of the last attempt
+     */
     record StoredMessage(
         long id,
         String ownerId,
@@ -84,15 +182,26 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     ) {
     }
 
+    /**
+     * Database-backed implementation of {@link OutboxStore}.
+     */
     static final class DatabaseOutboxStore implements OutboxStore, AutoCloseable {
         private final SpoolDatabase database;
         private final NetworkOutboxRepository repository;
 
+        /**
+         * Constructs a new database outbox store.
+         *
+         * @param database the spool database instance
+         */
         DatabaseOutboxStore(SpoolDatabase database) {
             this.database = Objects.requireNonNull(database, "database");
             this.repository = new NetworkOutboxRepository(database.entityManager());
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public long enqueue(
             String ownerId,
@@ -121,6 +230,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             return id[0];
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public List<StoredMessage> fetchBatch(String ownerId, int limit) {
             if (limit <= 0) return List.of();
@@ -143,6 +255,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
                 .toList());
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public void deleteByIds(List<Long> ids) {
             if (ids == null || ids.isEmpty()) return;
@@ -155,6 +270,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             database.flushAsync();
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public void recordAttempt(long id, long now) {
             if (id <= 0L) return;
@@ -168,16 +286,25 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             database.flushAsync();
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public void close() throws Exception {
             database.close();
         }
     }
 
+    /**
+     * In-memory implementation of {@link OutboxStore} for testing or fallback scenarios.
+     */
     static final class InMemoryOutboxStore implements OutboxStore {
         private final AtomicLong ids = new AtomicLong(0L);
         private final ConcurrentHashMap<Long, StoredMessage> messages = new ConcurrentHashMap<>();
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public long enqueue(
             String ownerId,
@@ -202,6 +329,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             return id;
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public List<StoredMessage> fetchBatch(String ownerId, int limit) {
             if (limit <= 0) return List.of();
@@ -213,6 +343,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
                 .toList();
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public void deleteByIds(List<Long> ids) {
             if (ids == null || ids.isEmpty()) return;
@@ -222,6 +355,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             }
         }
 
+        /**
+         * {@inheritDoc}
+         */
         @Override
         public void recordAttempt(long id, long now) {
             messages.computeIfPresent(id, (_id, existing) -> new StoredMessage(
@@ -237,6 +373,11 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
             ));
         }
 
+        /**
+         * Returns the number of messages currently stored in memory.
+         *
+         * @return the message count
+         */
         int size() {
             return messages.size();
         }
@@ -256,6 +397,19 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
     private final AtomicBoolean flushing = new AtomicBoolean();
     private final ScheduledTask flushTask;
 
+    /**
+     * Constructs a new DB-backed queued messenger with a database store and default server resolution.
+     *
+     * @param database        the spool database for persistence
+     * @param delegate        the underlying messenger to delegate to
+     * @param scheduler       the scheduler for periodic flush tasks
+     * @param logger          the logger
+     * @param ownerId         the owner identifier (must not be blank)
+     * @param outboxPolicy    the policy governing which messages are stored
+     * @param flushPeriod     the period between flush cycles
+     * @param maxBatchSize    the maximum number of messages to process per flush
+     * @param maxAge          the maximum age of messages before they expire
+     */
     public DbQueuedMessenger(
         SpoolDatabase database,
         Messenger delegate,
@@ -282,6 +436,19 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         );
     }
 
+    /**
+     * Constructs with a database store and a channel allowlist (legacy API).
+     *
+     * @param database         the spool database for persistence
+     * @param delegate         the underlying messenger
+     * @param scheduler        the scheduler for periodic flush tasks
+     * @param logger           the logger
+     * @param ownerId          the owner identifier
+     * @param channelAllowlist the set of channels eligible for queuing
+     * @param flushPeriod      the period between flush cycles
+     * @param maxBatchSize     the maximum number of messages per flush
+     * @param maxAge           the maximum message age
+     */
     public DbQueuedMessenger(
         SpoolDatabase database,
         Messenger delegate,
@@ -308,6 +475,21 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         );
     }
 
+    /**
+     * Constructs with a database store, policy, and server resolution hooks.
+     *
+     * @param database                the spool database for persistence
+     * @param delegate                the underlying messenger
+     * @param scheduler               the scheduler for periodic flush tasks
+     * @param logger                  the logger
+     * @param ownerId                 the owner identifier
+     * @param outboxPolicy            the outbox policy
+     * @param flushPeriod             the period between flush cycles
+     * @param maxBatchSize            the maximum number of messages per flush
+     * @param maxAge                  the maximum message age
+     * @param allServersSupplier      supplier for the list of all known servers
+     * @param canSendToServerOverride predicate to override send-to-server decisions
+     */
     public DbQueuedMessenger(
         SpoolDatabase database,
         Messenger delegate,
@@ -337,6 +519,21 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         );
     }
 
+    /**
+     * Constructs with a database store, allowlist, and server resolution hooks (legacy API).
+     *
+     * @param database                the spool database for persistence
+     * @param delegate                the underlying messenger
+     * @param scheduler               the scheduler for periodic flush tasks
+     * @param logger                  the logger
+     * @param ownerId                 the owner identifier
+     * @param channelAllowlist        the set of channels eligible for queuing
+     * @param flushPeriod             the period between flush cycles
+     * @param maxBatchSize            the maximum number of messages per flush
+     * @param maxAge                  the maximum message age
+     * @param allServersSupplier      supplier for the list of all known servers
+     * @param canSendToServerOverride predicate to override send-to-server decisions
+     */
     public DbQueuedMessenger(
         SpoolDatabase database,
         Messenger delegate,
@@ -366,6 +563,22 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         );
     }
 
+    /**
+     * Full constructor with database store, policy, server hooks, and listener.
+     *
+     * @param database                the spool database for persistence
+     * @param delegate                the underlying messenger
+     * @param scheduler               the scheduler for periodic flush tasks
+     * @param logger                  the logger
+     * @param ownerId                 the owner identifier
+     * @param outboxPolicy            the outbox policy
+     * @param flushPeriod             the period between flush cycles
+     * @param maxBatchSize            the maximum number of messages per flush
+     * @param maxAge                  the maximum message age
+     * @param allServersSupplier      supplier for the list of all known servers
+     * @param canSendToServerOverride predicate to override send-to-server decisions
+     * @param listener                the lifecycle listener
+     */
     public DbQueuedMessenger(
         SpoolDatabase database,
         Messenger delegate,
@@ -396,6 +609,22 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         );
     }
 
+    /**
+     * Full constructor with database store, allowlist, server hooks, and listener (legacy API).
+     *
+     * @param database                the spool database for persistence
+     * @param delegate                the underlying messenger
+     * @param scheduler               the scheduler for periodic flush tasks
+     * @param logger                  the logger
+     * @param ownerId                 the owner identifier
+     * @param channelAllowlist        the set of channels eligible for queuing
+     * @param flushPeriod             the period between flush cycles
+     * @param maxBatchSize            the maximum number of messages per flush
+     * @param maxAge                  the maximum message age
+     * @param allServersSupplier      supplier for the list of all known servers
+     * @param canSendToServerOverride predicate to override send-to-server decisions
+     * @param listener                the lifecycle listener
+     */
     public DbQueuedMessenger(
         SpoolDatabase database,
         Messenger delegate,
@@ -426,6 +655,22 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         );
     }
 
+    /**
+     * Core constructor accepting a pre-constructed OutboxStore.
+     *
+     * @param store                   the outbox store implementation
+     * @param delegate                the underlying messenger
+     * @param scheduler               the scheduler for periodic flush tasks
+     * @param logger                  the logger
+     * @param ownerId                 the owner identifier (must not be blank)
+     * @param outboxPolicy            the outbox policy, or null for direct-only
+     * @param flushPeriod             the period between flush cycles, or null for default (2s)
+     * @param maxBatchSize            the maximum number of messages per flush
+     * @param maxAge                  the maximum message age, or null for no expiry
+     * @param allServersSupplier      supplier for the list of all known servers
+     * @param canSendToServerOverride predicate to override send-to-server decisions
+     * @param listener                the lifecycle listener, or null for no-op
+     */
     DbQueuedMessenger(
         OutboxStore store,
         Messenger delegate,
@@ -467,6 +712,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         this.flushTask = scheduler.runRepeating(Duration.ofSeconds(1), period, this::flush);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void sendToAll(@NotNull String channel, @NotNull String data) {
         NetworkSendRequest request = request(NetworkEnvelope.Target.ALL, null, channel, data);
@@ -492,6 +740,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         delegate.sendToAll(channel, data);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
         NetworkSendRequest request = request(NetworkEnvelope.Target.SERVER, serverName, channel, data);
@@ -506,6 +757,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         delegate.sendToServer(channel, serverName, data);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void sendToProxy(@NotNull String channel, @NotNull String data) {
         NetworkSendRequest request = request(NetworkEnvelope.Target.PROXY, null, channel, data);
@@ -520,31 +774,49 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         delegate.sendToProxy(channel, data);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         delegate.registerListener(channel, listener);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void unregisterListener(@NotNull String channel, @NotNull MessageListener listener) {
         delegate.unregisterListener(channel, listener);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean isConnected() {
         return delegate.isConnected();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public @NotNull String getServerName() {
         return delegate.getServerName();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public @NotNull String getProxyServerName() {
         return delegate.getProxyServerName();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void close() {
         try {
@@ -561,10 +833,21 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Checks whether a direct send-to-all is possible.
+     *
+     * @return {@code true} if the delegate is connected
+     */
     private boolean canSendToAll() {
         return delegate.isConnected();
     }
 
+    /**
+     * Checks whether a direct send-to-server is possible for the given server name.
+     *
+     * @param serverName the target server name
+     * @return {@code true} if sending is possible
+     */
     private boolean canSendToServer(String serverName) {
         if (serverName == null || serverName.isBlank()) return false;
         String normalized = serverName.trim();
@@ -582,14 +865,30 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         return delegate.isConnected();
     }
 
+    /**
+     * Checks whether a direct send-to-proxy is possible.
+     *
+     * @return {@code true} if the delegate is connected
+     */
     private boolean canSendToProxy() {
         return delegate.isConnected();
     }
 
+    /**
+     * Determines whether a message should be stored in the outbox.
+     *
+     * @param request the send request
+     * @return {@code true} if the message should be queued
+     */
     private boolean shouldStore(NetworkSendRequest request) {
         return outboxPolicy.shouldStore(request);
     }
 
+    /**
+     * Retrieves the list of all known servers from the supplier.
+     *
+     * @return the list of server names, or an empty list
+     */
     private List<String> allServers() {
         Supplier<List<String>> supplier = allServersSupplier;
         if (supplier == null) return List.of();
@@ -603,6 +902,11 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Enqueues a message into the outbox store.
+     *
+     * @param request the send request to enqueue
+     */
     private void enqueue(NetworkSendRequest request) {
         if (request == null) return;
         if (request.channel().isBlank()) return;
@@ -618,6 +922,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         listener.onEnqueued(id, request.target(), targetServerValue, normalizedChannel);
     }
 
+    /**
+     * Triggers a flush cycle if not already flushing.
+     */
     private void flush() {
         if (maxBatchSize <= 0) return;
         if (!flushing.compareAndSet(false, true)) return;
@@ -631,6 +938,9 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Executes a single flush cycle: fetches a batch, delivers or expires messages.
+     */
     private void flushOnce() {
         List<StoredMessage> batch = store.fetchBatch(ownerId, maxBatchSize);
 
@@ -691,6 +1001,13 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Checks whether the delegate can send to the given target.
+     *
+     * @param target       the delivery target
+     * @param targetServer the target server name (for SERVER target)
+     * @return {@code true} if sending is possible
+     */
     private boolean canSend(NetworkEnvelope.Target target, String targetServer) {
         return switch (target) {
             case ALL -> canSendToAll();
@@ -699,6 +1016,14 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         };
     }
 
+    /**
+     * Delivers a message via the delegate messenger.
+     *
+     * @param target       the delivery target
+     * @param targetServer the target server name
+     * @param channel      the message channel
+     * @param data         the message payload
+     */
     private void deliver(NetworkEnvelope.Target target, String targetServer, String channel, String data) {
         switch (target) {
             case ALL -> delegate.sendToAll(channel, data);
@@ -707,11 +1032,24 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Records a delivery attempt for a message.
+     *
+     * @param id  the message ID
+     * @param now the current timestamp
+     */
     private void recordAttempt(long id, long now) {
         if (id <= 0L) return;
         store.recordAttempt(id, now);
     }
 
+    /**
+     * Parses a raw target string into a {@link NetworkEnvelope.Target}.
+     *
+     * @param raw the raw target string
+     * @return the parsed target
+     * @throws IllegalArgumentException if the string is null, blank, or not a valid target
+     */
     private static NetworkEnvelope.Target parseTarget(String raw) {
         if (raw == null) throw new IllegalArgumentException("target is null");
         String normalized = raw.trim().toUpperCase(Locale.ROOT);
@@ -719,6 +1057,12 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         return NetworkEnvelope.Target.valueOf(normalized);
     }
 
+    /**
+     * Parses a raw target string, returning null instead of throwing on failure.
+     *
+     * @param raw the raw target string
+     * @return the parsed target, or null
+     */
     private static NetworkEnvelope.Target parseTargetOrNull(String raw) {
         try {
             return parseTarget(raw);
@@ -727,6 +1071,15 @@ public final class DbQueuedMessenger implements Messenger, AutoCloseable {
         }
     }
 
+    /**
+     * Creates a {@link NetworkSendRequest} from its components.
+     *
+     * @param target       the delivery target
+     * @param targetServer the target server name
+     * @param channel      the message channel
+     * @param data         the message payload
+     * @return the send request, or null if target or channel is null
+     */
     private NetworkSendRequest request(NetworkEnvelope.Target target, String targetServer, String channel, String data) {
         if (target == null || channel == null) {
             return null;

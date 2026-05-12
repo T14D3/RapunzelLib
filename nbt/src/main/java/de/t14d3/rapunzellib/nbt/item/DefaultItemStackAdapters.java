@@ -10,10 +10,20 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Default, thread-safe implementation of {@link ItemStackAdapters} backed by a {@link LinkedHashMap}.
+ * <p>
+ * Adapter lookups first check for an exact class match, then fall back to assignable type matching.</p>
+ */
 public final class DefaultItemStackAdapters implements ItemStackAdapters {
     private final PlatformId platformId;
     private final Map<Class<?>, ItemStackAdapter<?>> adapters = new LinkedHashMap<>();
 
+    /**
+     * Creates a new adapter collection for the given platform.
+     *
+     * @param platformId the platform ID
+     */
     public DefaultItemStackAdapters(@NotNull PlatformId platformId) {
         this.platformId = Objects.requireNonNull(platformId, "platformId");
     }
@@ -23,6 +33,14 @@ public final class DefaultItemStackAdapters implements ItemStackAdapters {
         return platformId;
     }
 
+    /**
+     * Registers an adapter for the given handle type.
+     *
+     * @param <T>        the handle type
+     * @param handleType the handle class
+     * @param adapter    the adapter
+     * @return this registry for chaining
+     */
     public <T> @NotNull DefaultItemStackAdapters register(
         @NotNull Class<T> handleType,
         @NotNull ItemStackAdapter<? extends T> adapter
@@ -35,6 +53,13 @@ public final class DefaultItemStackAdapters implements ItemStackAdapters {
         return this;
     }
 
+    /**
+     * Finds an adapter by handle class, checking exact match first then assignable types.
+     *
+     * @param <T>        the handle type
+     * @param handleType the handle class
+     * @return an Optional containing the adapter, or empty
+     */
     @Override
     public <T> @NotNull Optional<ItemStackAdapter<T>> find(@NotNull Class<T> handleType) {
         Objects.requireNonNull(handleType, "handleType");
@@ -52,11 +77,25 @@ public final class DefaultItemStackAdapters implements ItemStackAdapters {
         }
     }
 
+    /**
+     * Requires an adapter by handle class, throwing if not found.
+     *
+     * @param <T>        the handle type
+     * @param handleType the handle class
+     * @return the adapter
+     * @throws IllegalStateException if no adapter is registered
+     */
     @Override
     public <T> @NotNull ItemStackAdapter<T> require(@NotNull Class<T> handleType) {
         return find(handleType).orElseThrow(() -> new IllegalStateException(missingHandleTypeMessage(handleType)));
     }
 
+    /**
+     * Finds an adapter for the given native item stack object.
+     *
+     * @param handle the native item stack
+     * @return an Optional containing the adapter, or empty
+     */
     @Override
     public @NotNull Optional<ItemStackAdapter<Object>> find(@NotNull Object handle) {
         Objects.requireNonNull(handle, "handle");
@@ -76,6 +115,13 @@ public final class DefaultItemStackAdapters implements ItemStackAdapters {
         }
     }
 
+    /**
+     * Requires an adapter for the given native item stack object, throwing if not found.
+     *
+     * @param handle the native item stack
+     * @return the adapter
+     * @throws IllegalStateException if no suitable adapter is registered
+     */
     @Override
     public @NotNull ItemStackAdapter<Object> require(@NotNull Object handle) {
         Objects.requireNonNull(handle, "handle");
@@ -85,6 +131,11 @@ public final class DefaultItemStackAdapters implements ItemStackAdapters {
         ));
     }
 
+    /**
+     * Returns an immutable list of all registered handle type classes.
+     *
+     * @return the handle types
+     */
     @Override
     public @NotNull List<Class<?>> handleTypes() {
         synchronized (adapters) {

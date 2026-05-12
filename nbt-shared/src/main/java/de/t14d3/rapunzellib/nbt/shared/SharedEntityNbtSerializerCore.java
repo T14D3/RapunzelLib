@@ -22,6 +22,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Shared serializer for Minecraft entities.
+ * <p>
+ * Serializes entity NBT data (stripping location fields) and deserializes
+ * it back, re-injecting position and rotation from the
+ * {@link SharedEntityLocation}. Supports passenger entities recursively.
+ *
+ * @param <L> the entity location type
+ */
 public final class SharedEntityNbtSerializerCore<L extends SharedEntityLocation> implements NbtSerializer<Entity, L> {
     @Override
     public final @NotNull SerializedEntity serialize(@NotNull Entity entity) {
@@ -76,6 +85,12 @@ public final class SharedEntityNbtSerializerCore<L extends SharedEntityLocation>
         }
     }
 
+    /**
+     * Removes location-related fields from the NBT tree.
+     *
+     * @param nbt the NBT compound
+     * @return the stripped compound
+     */
     private @NotNull RNbtCompound stripLocationData(@NotNull RNbtCompound nbt) {
         return Objects.requireNonNull(nbt, "nbt")
             .remove(EntityRootNbt.Paths.POS)
@@ -89,10 +104,22 @@ public final class SharedEntityNbtSerializerCore<L extends SharedEntityLocation>
             .remove(EntityRootNbt.Paths.WORLD_UUID_MOST);
     }
 
+    /**
+     * Creates a position list from a location.
+     *
+     * @param location the entity location
+     * @return the position as [x, y, z]
+     */
     private static @NotNull List<Double> position(@NotNull SharedEntityLocation location) {
         return List.of(location.x(), location.y(), location.z());
     }
 
+    /**
+     * Creates a rotation list from a location.
+     *
+     * @param location the entity location
+     * @return the rotation as [yaw, pitch]
+     */
     private static @NotNull List<Float> rotation(@NotNull SharedEntityLocation location) {
         return List.of(location.yaw(), location.pitch());
     }

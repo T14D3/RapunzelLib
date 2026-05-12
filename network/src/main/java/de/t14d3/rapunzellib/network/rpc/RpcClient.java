@@ -25,6 +25,9 @@ import java.util.concurrent.TimeoutException;
  * Simple RPC client for cross-server communication.
  * Underlying transport is determined by the {@link Messenger} instance.
  */
+/**
+ * Client for making RPC calls to remote services.
+ */
 public final class RpcClient implements AutoCloseable {
     private final NetworkRuntimeGateway gateway;
     private final Scheduler scheduler;

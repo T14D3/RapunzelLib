@@ -98,17 +98,33 @@ import java.util.Set;
  * @see MiniMessage
  */
 public final class YamlMessageFormatService implements MessageFormatService {
+    /** YAML config key for the prefix template */
     private static final String PREFIX_KEY = "prefix";
+    /** Maximum entries in the string render LRU cache per template */
     private static final int STRING_RENDER_CACHE_MAX_ENTRIES = 64;
 
+    /** MiniMessage instance for template deserialization */
     private final MiniMessage miniMessage;
+    /** Config service for loading the YAML file */
     private final ConfigService configService;
+    /** Logger for parsing warnings */
     private final Logger logger;
+    /** Path to the messages YAML file */
     private final Path file;
+    /** Classpath resource path for default messages */
     private final String defaultResourcePath;
 
+    /** Current immutable state atomically replaced on reload */
     private volatile State state = new State(Map.of(), Set.of(), Component.empty());
 
+    /**
+     * Creates a new YAML message format service and loads templates immediately.
+     *
+     * @param configService       the config service for loading the YAML file
+     * @param logger              the logger
+     * @param file                the path to the messages YAML file
+     * @param defaultResourcePath the classpath resource path for default messages
+     */
     public YamlMessageFormatService(ConfigService configService, Logger logger, Path file, String defaultResourcePath) {
         this.miniMessage = MiniMessage.miniMessage();
         this.configService = Objects.requireNonNull(configService, "configService");
@@ -118,6 +134,9 @@ public final class YamlMessageFormatService implements MessageFormatService {
         reload();
     }
 
+    /**
+     * Reloads all message templates from the YAML file, rebuilding the state atomically.
+     */
     @Override
     public void reload() {
         YamlConfig config = (defaultResourcePath == null || defaultResourcePath.isBlank())
@@ -145,16 +164,33 @@ public final class YamlMessageFormatService implements MessageFormatService {
         );
     }
 
+    /**
+     * Checks whether the given message key exists.
+     *
+     * @param key the message key
+     * @return true if the key exists
+     */
     @Override
     public boolean contains(@NotNull String key) {
         return state.templates.containsKey(key);
     }
 
+    /**
+     * Returns all message keys.
+     *
+     * @return an immutable set of keys
+     */
     @Override
     public @NotNull Set<String> keys() {
         return state.keys;
     }
 
+    /**
+     * Returns the raw template string for the given key.
+     *
+     * @param key the message key
+     * @return the raw template, or the key itself if not found
+     */
     @Override
     public @NotNull String raw(@NotNull String key) {
         Template t = state.templates.get(key);
@@ -162,11 +198,24 @@ public final class YamlMessageFormatService implements MessageFormatService {
         return t.raw;
     }
 
+    /**
+     * Renders a message component without placeholders.
+     *
+     * @param key the message key
+     * @return the rendered component
+     */
     @Override
     public @NotNull Component component(@NotNull String key) {
         return component(key, Placeholders.empty());
     }
 
+    /**
+     * Renders a message component with the given placeholders.
+     *
+     * @param key          the message key
+     * @param placeholders the placeholder values
+     * @return the rendered component
+     */
     @Override
     public @NotNull Component component(@NotNull String key, @NotNull Placeholders placeholders) {
         State state = this.state;
@@ -196,6 +245,14 @@ public final class YamlMessageFormatService implements MessageFormatService {
         return rendered;
     }
 
+    /**
+     * Renders a template with placeholders, using caching for empty and string-only placeholders.
+     *
+     * @param template    the template to render
+     * @param placeholders the placeholder values
+     * @param prefix      the prefix component to use for {@code <prefix>} substitution
+     * @return the rendered component
+     */
     private Component render(Template template, Placeholders placeholders, Component prefix) {
         if (template.placeholderOrder.length == 0) return template.component;
 
@@ -221,6 +278,14 @@ public final class YamlMessageFormatService implements MessageFormatService {
         return renderUncached(template, placeholders, prefix);
     }
 
+    /**
+     * Performs placeholder substitution without caching.
+     *
+     * @param template    the template to render
+     * @param placeholders the placeholder values
+     * @param prefix      the prefix component for {@code <prefix>} substitution
+     * @return the rendered component
+     */
     private Component renderUncached(Template template, Placeholders placeholders, Component prefix) {
         Component out = template.component;
 
@@ -242,6 +307,13 @@ public final class YamlMessageFormatService implements MessageFormatService {
         return out;
     }
 
+    /**
+     * Builds a cache key string from template placeholder order and string values.
+     *
+     * @param template    the template
+     * @param placeholders the placeholder values
+     * @return a cache key string, or null if the prefix placeholder requires dynamic resolution
+     */
     private static String stringCacheKey(Template template, Placeholders placeholders) {
         StringBuilder sb = new StringBuilder(template.placeholderOrder.length * 16);
         for (String name : template.placeholderOrder) {
@@ -260,6 +332,12 @@ public final class YamlMessageFormatService implements MessageFormatService {
         return sb.toString();
     }
 
+    /**
+     * Parses a raw MiniMessage template string into a {@link Template} with extracted placeholders.
+     *
+     * @param raw the raw template string
+     * @return the compiled template
+     */
     private Template parseTemplate(String raw) {
         Set<String> placeholderNames = new LinkedHashSet<>();
 
@@ -275,6 +353,12 @@ public final class YamlMessageFormatService implements MessageFormatService {
         return new Template(raw, parsed, Collections.unmodifiableSet(placeholderNames));
     }
 
+    /**
+     * Recursively extracts placeholder names from a component tree.
+     *
+     * @param root the root component
+     * @param out  the set to collect placeholder names into
+     */
     private static void extractPlaceholders(Component root, Set<String> out) {
         if (root instanceof TextComponent text) {
             extractPlaceholdersFromText(text.content(), out);
@@ -284,6 +368,12 @@ public final class YamlMessageFormatService implements MessageFormatService {
         }
     }
 
+    /**
+     * Extracts placeholder names from text content by finding {@code <name>} patterns.
+     *
+     * @param text the text content
+     * @param out  the set to collect placeholder names into
+     */
     private static void extractPlaceholdersFromText(String text, Set<String> out) {
         if (text == null || text.isEmpty()) return;
         int i = 0;
@@ -307,6 +397,12 @@ public final class YamlMessageFormatService implements MessageFormatService {
         }
     }
 
+    /**
+     * Checks whether a string is a valid placeholder name (alphanumeric, underscore, hyphen, dot).
+     *
+     * @param name the candidate name
+     * @return true if valid
+     */
     private static boolean isPlaceholderName(String name) {
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
@@ -322,15 +418,35 @@ public final class YamlMessageFormatService implements MessageFormatService {
         return true;
     }
 
+    /**
+     * Compiled message template with parsed MiniMessage component and placeholder metadata.
+     * <p>
+     * Maintains thread-safe caches for empty renders and string-only placeholder combinations.
+     * The {@code cachedEmpty} and {@code cachedEmptyWithPrefix} fields are volatile for
+     * lock-free publication across threads.
+     */
     private static final class Template {
+        /** The raw template string */
         private final String raw;
+        /** The parsed MiniMessage component */
         private final Component component;
+        /** Ordered array of placeholder names as they appear in the template */
         private final String[] placeholderOrder;
+        /** LRU cache for string-based placeholder combinations (null if no placeholders) */
         private final Map<String, Component> stringRenderCache;
 
+        /** Cached render result for empty placeholders (volatile for visibility) */
         private volatile Component cachedEmpty;
+        /** Cached render result for empty placeholders with prefix (volatile for visibility) */
         private volatile Component cachedEmptyWithPrefix;
 
+        /**
+         * Creates a compiled template.
+         *
+         * @param raw          the raw template string
+         * @param component    the parsed MiniMessage component
+         * @param placeholders the set of extracted placeholder names
+         */
         private Template(String raw, Component component, Set<String> placeholders) {
             this.raw = raw;
             this.component = component;
@@ -346,6 +462,10 @@ public final class YamlMessageFormatService implements MessageFormatService {
         }
     }
 
+    /**
+     * Immutable snapshot of all templates, keys, and the resolved prefix component.
+     * Atomically replaced on reload for consistent reads.
+     */
     private record State(Map<String, Template> templates, Set<String> keys, Component prefix) {
     }
 }

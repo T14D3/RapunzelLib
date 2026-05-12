@@ -5,9 +5,17 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Arrays;
 import java.util.Objects;
 
+/**
+ * An immutable NBT int array value wrapping an {@code int[]}.
+ */
 public final class RNbtIntArray implements RNbtValue {
     private final int @NotNull [] value;
 
+    /**
+     * Creates an int array NBT value from a defensive copy of the given array.
+     *
+     * @param value the int array (will be cloned)
+     */
     public RNbtIntArray(int @NotNull [] value) {
         this.value = Objects.requireNonNull(value, "value").clone();
     }
@@ -17,6 +25,11 @@ public final class RNbtIntArray implements RNbtValue {
         return RNbtType.INT_ARRAY;
     }
 
+    /**
+     * Returns a defensive copy of the underlying int array.
+     *
+     * @return the int array
+     */
     public int @NotNull [] value() {
         return value.clone();
     }

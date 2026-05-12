@@ -11,6 +11,11 @@ import java.util.ServiceLoader;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * A registry that discovers platform-specific installers via {@link ServiceLoader}.
+ *
+ * @param <T> the installer type
+ */
 public final class FeatureInstallerRegistry<T> {
     private final Class<T> installerType;
     private final Function<? super PlatformId, String> dependencyHintFactory;
@@ -34,11 +39,20 @@ public final class FeatureInstallerRegistry<T> {
         this.installersByPlatform = Map.copyOf(resolvedInstallers);
     }
 
-    public static <T> @NotNull FeatureInstallerRegistry<T> create(
-        @NotNull Class<T> installerType,
-        @NotNull Function<? super T, PlatformId> platformExtractor,
-        @NotNull String moduleHintPrefix
-    ) {
+/**
+ * Creates a feature installer registry with a module-hint-based dependency message factory.
+ *
+ * @param installerType       the installer type class
+ * @param platformExtractor   function to extract the platform ID from an installer
+ * @param moduleHintPrefix    prefix for dependency error hints
+ * @param <T>                 the installer type
+ * @return the registry
+ */
+public static <T> @NotNull FeatureInstallerRegistry<T> create(
+    @NotNull Class<T> installerType,
+    @NotNull Function<? super T, PlatformId> platformExtractor,
+    @NotNull String moduleHintPrefix
+) {
         Objects.requireNonNull(moduleHintPrefix, "moduleHintPrefix");
         return create(
             installerType,
@@ -47,14 +61,30 @@ public final class FeatureInstallerRegistry<T> {
         );
     }
 
-    public static <T> @NotNull FeatureInstallerRegistry<T> create(
-        @NotNull Class<T> installerType,
-        @NotNull Function<? super T, PlatformId> platformExtractor,
-        @NotNull Function<? super PlatformId, String> dependencyHintFactory
-    ) {
+/**
+ * Creates a feature installer registry with a custom dependency message factory.
+ *
+ * @param installerType           the installer type class
+ * @param platformExtractor       function to extract the platform ID from an installer
+ * @param dependencyHintFactory   function to create dependency error hints per platform
+ * @param <T>                     the installer type
+ * @return the registry
+ */
+public static <T> @NotNull FeatureInstallerRegistry<T> create(
+    @NotNull Class<T> installerType,
+    @NotNull Function<? super T, PlatformId> platformExtractor,
+    @NotNull Function<? super PlatformId, String> dependencyHintFactory
+) {
         return new FeatureInstallerRegistry<>(installerType, platformExtractor, dependencyHintFactory);
     }
 
+    /**
+     * Resolves the installer for the given platform.
+     *
+     * @param platformId the target platform
+     * @return the installer instance
+     * @throws IllegalStateException if no installer is found for the platform
+     */
     public @NotNull T resolve(@NotNull PlatformId platformId) {
         Objects.requireNonNull(platformId, "platformId");
 

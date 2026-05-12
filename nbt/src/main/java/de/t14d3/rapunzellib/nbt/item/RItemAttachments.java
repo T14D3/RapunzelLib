@@ -11,20 +11,46 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Internal utility for reading/writing attachment data on {@link RItem} instances.
+ * <p>
+ * Attachments are stored within the item's custom data compound under a reserved root key.
+ * Only persistent attachments are supported for items.</p>
+ */
 final class RItemAttachments {
+    /** Key used to store attachments within the custom data compound. */
     static final String ROOT_KEY = "rapunzellib:attachments";
 
     private RItemAttachments() {
     }
 
+    /**
+     * Returns the attachment storage support level for items (persistent only).
+     *
+     * @return persistent-only support
+     */
     static @NotNull AttachmentStorageSupport support() {
         return AttachmentStorageSupport.PERSISTENT_ONLY;
     }
 
+    /**
+     * Whether the given attachment key is supported by items.
+     *
+     * @param key the attachment key
+     * @return true if supported
+     */
     static boolean supports(@NotNull RAttachmentKey<?> key) {
         return support().supports(Objects.requireNonNull(key, "key").scope());
     }
 
+    /**
+     * Reads an attachment from an item.
+     *
+     * @param <T> the value type
+     * @param item the item
+     * @param key the attachment key
+     * @return an Optional containing the value, or empty
+     */
     static <T> @NotNull Optional<T> get(@NotNull RItem item, @NotNull RAttachmentKey<T> key) {
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(key, "key");
@@ -42,6 +68,16 @@ final class RItemAttachments {
         }
     }
 
+    /**
+     * Returns a copy of the item with an attachment added.
+     *
+     * @param <T>   the value type
+     * @param item  the item
+     * @param key   the attachment key
+     * @param value the value
+     * @return the new item
+     * @throws UnsupportedOperationException if the attachment scope is not persistent
+     */
     static <T> @NotNull RItem with(@NotNull RItem item, @NotNull RAttachmentKey<T> key, @NotNull T value) {
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(key, "key");
@@ -52,6 +88,13 @@ final class RItemAttachments {
         return item.withCustomData(write(item.customData(), attachments));
     }
 
+    /**
+     * Returns a copy of the item with an attachment removed.
+     *
+     * @param item the item
+     * @param key  the attachment key
+     * @return the new item
+     */
     static @NotNull RItem without(@NotNull RItem item, @NotNull RAttachmentKey<?> key) {
         Objects.requireNonNull(item, "item");
         Objects.requireNonNull(key, "key");
@@ -62,6 +105,15 @@ final class RItemAttachments {
         return item.withCustomData(write(item.customData(), attachments));
     }
 
+    /**
+     * Adds an attachment to a builder.
+     *
+     * @param <T>     the value type
+     * @param builder the builder
+     * @param key     the attachment key
+     * @param value   the value
+     * @return the builder
+     */
     static <T> @NotNull RItemBuilder with(@NotNull RItemBuilder builder, @NotNull RAttachmentKey<T> key, @NotNull T value) {
         Objects.requireNonNull(builder, "builder");
         Objects.requireNonNull(key, "key");
@@ -73,6 +125,13 @@ final class RItemAttachments {
         return builder;
     }
 
+    /**
+     * Removes an attachment from a builder.
+     *
+     * @param builder the builder
+     * @param key     the attachment key
+     * @return the builder
+     */
     static @NotNull RItemBuilder without(@NotNull RItemBuilder builder, @NotNull RAttachmentKey<?> key) {
         Objects.requireNonNull(builder, "builder");
         Objects.requireNonNull(key, "key");

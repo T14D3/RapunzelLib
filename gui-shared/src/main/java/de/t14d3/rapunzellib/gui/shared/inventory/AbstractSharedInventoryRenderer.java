@@ -49,6 +49,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
+/**
+ * Abstract base for platform-specific inventory GUI renderers.
+ * <p>
+ * Renders a GUI as a Minecraft chest menu with slot-based elements.
+ * Supports child dialogs for dropdown selection and text input using
+ * separate chest menus and anvil menus respectively.
+ */
 public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
     private static final MenuType<?>[] CHEST_MENUS = {
         MenuType.GENERIC_9x1,
@@ -66,6 +73,12 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
     private final GuiSessionStore<InputSession> activeInputs = new GuiSessionStore<>();
     private final GuiChildTransitions childTransitions = new GuiChildTransitions();
 
+    /**
+     * Creates an inventory renderer.
+     *
+     * @param name                 the renderer name
+     * @param itemAdapterSupplier  supplier for the item stack adapter
+     */
     protected AbstractSharedInventoryRenderer(
         @NotNull String name,
         @NotNull Supplier<? extends ItemStackAdapter<ItemStack>> itemAdapterSupplier
@@ -127,8 +140,21 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         clearPlayerState(player.uuid());
     }
 
+    /**
+     * Unwraps an RPlayer to a native ServerPlayer.
+     *
+     * @param player the Rapunzel player
+     * @return the native server player, or {@code null}
+     */
     protected abstract @Nullable ServerPlayer unwrap(@NotNull RPlayer player);
 
+    /**
+     * Builds a SimpleContainer with rendered GUI elements according to the slot plan.
+     *
+     * @param slotPlan the slot plan
+     * @param context  the render context
+     * @return the container with rendered elements
+     */
     private @NotNull SimpleContainer buildContainer(@NotNull GuiSlotPlan slotPlan, @NotNull RenderContext context) {
         SharedInventoryElementRenderer elementRenderer = elementRenderer();
         SimpleContainer container = new SimpleContainer(slotPlan.size());
@@ -144,6 +170,15 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         return container;
     }
 
+    /**
+     * Handles a click on the root menu.
+     *
+     * @param playerId  the player UUID
+     * @param container the container
+     * @param slot      the slot index
+     * @param button    the button index
+     * @param clickType the native click type
+     */
     private void handleRootClick(
         @NotNull UUID playerId,
         @NotNull SimpleContainer container,
@@ -196,6 +231,13 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         }
     }
 
+    /**
+     * Opens a dropdown selection menu as a child of the parent GUI.
+     *
+     * @param playerId the player UUID
+     * @param element  the dropdown element
+     * @param parent   the parent GUI session
+     */
     private void openDropdownSession(
         @NotNull UUID playerId,
         @NotNull DropdownElement element,
@@ -245,6 +287,13 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         InventoryEventBridge.dispatchOpen(parent.context.player(), wrappedContainer);
     }
 
+    /**
+     * Opens an anvil-based text input menu as a child of the parent GUI.
+     *
+     * @param playerId the player UUID
+     * @param element  the input element
+     * @param parent   the parent GUI session
+     */
     private void openInputSession(
         @NotNull UUID playerId,
         @NotNull InputElement element,
@@ -278,6 +327,12 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         InventoryEventBridge.dispatchOpen(parent.context.player(), wrapInventory(serverPlayer.containerMenu));
     }
 
+    /**
+     * Completes a dropdown selection for a player.
+     *
+     * @param playerId the player UUID
+     * @param slot     the selected slot
+     */
     private void completeDropdownSelection(@NotNull UUID playerId, int slot) {
         DropdownSession session = activeDropdowns.get(playerId);
         if (session == null) {
@@ -296,6 +351,12 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         session.completed = true;
     }
 
+    /**
+     * Completes a text input for a player.
+     *
+     * @param playerId the player UUID
+     * @param value    the input value
+     */
     private void completeInput(@NotNull UUID playerId, @NotNull String value) {
         InputSession session = activeInputs.get(playerId);
         if (session == null) {
@@ -310,6 +371,11 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         session.completed = true;
     }
 
+    /**
+     * Re-opens the parent GUI after a child dialog (dropdown or input) is closed.
+     *
+     * @param playerId the player UUID
+     */
     private void reopenParent(@NotNull UUID playerId) {
         OpenGuiSession parent = null;
         DropdownSession dropdownSession = activeDropdowns.remove(playerId);
@@ -331,6 +397,11 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         }
     }
 
+    /**
+     * Clears all session state for a player.
+     *
+     * @param playerId the player UUID
+     */
     private void clearPlayerState(@NotNull UUID playerId) {
         openGuis.remove(playerId);
         activeDropdowns.remove(playerId);
@@ -338,6 +409,9 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         childTransitions.end(playerId);
     }
 
+    /**
+     * Root chest menu that handles element click dispatch.
+     */
     private final class RootMenu extends ChestMenu {
         private final UUID playerId;
         private final SimpleContainer topInventory;
@@ -390,6 +464,9 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         }
     }
 
+    /**
+     * Dropdown selection chest menu.
+     */
     private final class DropdownMenu extends ChestMenu {
         private final UUID playerId;
         private final SimpleContainer topInventory;
@@ -458,6 +535,9 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         }
     }
 
+    /**
+     * Anvil-based text input menu.
+     */
     private final class InputMenu extends AnvilMenu {
         private final UUID playerId;
         private final InputElement element;
@@ -547,14 +627,33 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         }
     }
 
+    /**
+     * Wraps a native inventory object into an RInventory.
+     *
+     * @param nativeInventory the native inventory
+     * @return the wrapped RInventory
+     */
     private static @NotNull RInventory wrapInventory(@NotNull Object nativeInventory) {
         return InventoryFeatures.install().require(nativeInventory);
     }
 
+    /**
+     * Creates a new element renderer using the current item adapter.
+     *
+     * @return the element renderer
+     */
     private @NotNull SharedInventoryElementRenderer elementRenderer() {
         return new SharedInventoryElementRenderer(itemAdapterSupplier.get());
     }
 
+    /**
+     * Holds the state for an open root GUI session.
+     *
+     * @param gui     the GUI
+     * @param context the render context
+     * @param container the container
+     * @param slotPlan the slot plan
+     */
     private record OpenGuiSession(
         @NotNull Gui gui,
         @NotNull RenderContext context,
@@ -563,6 +662,9 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
     ) {
     }
 
+    /**
+     * Holds the state for an active dropdown selection session.
+     */
     private static final class DropdownSession {
         private final OpenGuiSession parent;
         private final DropdownElement element;
@@ -570,6 +672,14 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         private final Map<Integer, Option> slotOptions;
         private boolean completed;
 
+        /**
+         * Creates a dropdown session.
+         *
+         * @param parent      the parent GUI session
+         * @param element     the dropdown element
+         * @param container   the dropdown container
+         * @param slotOptions the slot-to-option mapping
+         */
         private DropdownSession(
             @NotNull OpenGuiSession parent,
             @NotNull DropdownElement element,
@@ -583,11 +693,20 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         }
     }
 
+    /**
+     * Holds the state for an active text input session.
+     */
     private static final class InputSession {
         private final OpenGuiSession parent;
         private final InputElement element;
         private boolean completed;
 
+        /**
+         * Creates an input session.
+         *
+         * @param parent  the parent GUI session
+         * @param element the input element
+         */
         private InputSession(@NotNull OpenGuiSession parent, @NotNull InputElement element) {
             this.parent = parent;
             this.element = element;

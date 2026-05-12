@@ -40,10 +40,26 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+/**
+ * Static bootstrap utility for wiring the default RapunzelLib service implementations.
+ * <p>
+ * Provides factory methods for creating platform runtimes, the application context,
+ * and registering all standard services (config, messaging, native interop, registries,
+ * player/entity/world accessors).
+ * <p>
+ * Designed for use in platform adapter initialisation (Bukkit, Bungee, Velocity, etc.)
+ * during plugin startup. Organised into phases for extensibility.
+ */
 public final class BootstrapServices {
     private BootstrapServices() {
     }
 
+    /**
+     * Holds the result of the first bootstrap phase.
+     *
+     * @param context       the created application context
+     * @param configService the registered config service
+     */
     public record FirstPhaseResult(RapunzelContext context, ConfigService configService) {
         public FirstPhaseResult {
             Objects.requireNonNull(context, "context");
@@ -51,6 +67,17 @@ public final class BootstrapServices {
         }
     }
 
+    /**
+     * Runs the first bootstrap phase: creates the context, registers native interop,
+     * YAML config, and YAML-based message formatting.
+     *
+     * @param runtime   the platform runtime
+     * @param logger    the logger
+     * @param dataDir   the plugin data directory
+     * @param resources the resource provider
+     * @param scheduler the platform scheduler
+     * @return the first phase result containing context and config service
+     */
     public static FirstPhaseResult bootstrapFirstPhase(
         PlatformRuntime runtime,
         Logger logger,
@@ -65,6 +92,15 @@ public final class BootstrapServices {
         return new FirstPhaseResult(context, configService);
     }
 
+    /**
+     * Creates a {@link PlatformRuntime} for a server with a profile.
+     *
+     * @param platformId     the platform identifier
+     * @param engineFamily   the engine family (e.g. PAPER, SPONGE)
+     * @param lifecycleOwner the lifecycle owner object
+     * @param runtimeProfile the runtime profile
+     * @return a new platform runtime
+     */
     public static @NotNull PlatformRuntime serverRuntime(
         PlatformId platformId,
         EngineFamily engineFamily,
@@ -74,6 +110,15 @@ public final class BootstrapServices {
         return runtime(platformId, RuntimeRole.SERVER, engineFamily, lifecycleOwner, runtimeProfile);
     }
 
+    /**
+     * Creates a {@link PlatformRuntime} for a server with capabilities.
+     *
+     * @param platformId     the platform identifier
+     * @param engineFamily   the engine family
+     * @param lifecycleOwner the lifecycle owner object
+     * @param capabilities   the runtime capabilities
+     * @return a new platform runtime
+     */
     public static @NotNull PlatformRuntime serverRuntime(
         PlatformId platformId,
         EngineFamily engineFamily,
@@ -83,6 +128,14 @@ public final class BootstrapServices {
         return runtime(platformId, RuntimeRole.SERVER, engineFamily, lifecycleOwner, capabilities);
     }
 
+    /**
+     * Creates a {@link PlatformRuntime} for a proxy with a profile.
+     *
+     * @param platformId     the platform identifier
+     * @param lifecycleOwner the lifecycle owner object
+     * @param runtimeProfile the runtime profile
+     * @return a new platform runtime
+     */
     public static @NotNull PlatformRuntime proxyRuntime(
         PlatformId platformId,
         Object lifecycleOwner,
@@ -91,6 +144,14 @@ public final class BootstrapServices {
         return runtime(platformId, RuntimeRole.PROXY, EngineFamily.PROXY, lifecycleOwner, runtimeProfile);
     }
 
+    /**
+     * Creates a {@link PlatformRuntime} for a proxy with capabilities.
+     *
+     * @param platformId     the platform identifier
+     * @param lifecycleOwner the lifecycle owner object
+     * @param capabilities   the runtime capabilities
+     * @return a new platform runtime
+     */
     public static @NotNull PlatformRuntime proxyRuntime(
         PlatformId platformId,
         Object lifecycleOwner,
@@ -99,6 +160,16 @@ public final class BootstrapServices {
         return runtime(platformId, RuntimeRole.PROXY, EngineFamily.PROXY, lifecycleOwner, capabilities);
     }
 
+    /**
+     * Creates a {@link PlatformRuntime} from explicit role, family, and profile.
+     *
+     * @param platformId     the platform identifier
+     * @param role           the runtime role (SERVER, PROXY)
+     * @param engineFamily   the engine family
+     * @param lifecycleOwner the lifecycle owner object
+     * @param runtimeProfile the runtime profile
+     * @return a new platform runtime
+     */
     public static @NotNull PlatformRuntime runtime(
         PlatformId platformId,
         RuntimeRole role,
@@ -116,6 +187,16 @@ public final class BootstrapServices {
         );
     }
 
+    /**
+     * Creates a {@link PlatformRuntime} from explicit role, family, and capabilities.
+     *
+     * @param platformId     the platform identifier
+     * @param role           the runtime role
+     * @param engineFamily   the engine family
+     * @param lifecycleOwner the lifecycle owner object
+     * @param capabilities   the runtime capabilities
+     * @return a new platform runtime
+     */
     public static @NotNull PlatformRuntime runtime(
         PlatformId platformId,
         RuntimeRole role,
@@ -126,6 +207,12 @@ public final class BootstrapServices {
         return runtime(platformId, role, engineFamily, lifecycleOwner, profileOf(capabilities));
     }
 
+    /**
+     * Creates a {@link RuntimeProfile} from the given capabilities.
+     *
+     * @param capabilities the runtime capabilities
+     * @return a new runtime profile
+     */
     public static @NotNull RuntimeProfile profileOf(@NotNull RuntimeCapability... capabilities) {
         Objects.requireNonNull(capabilities, "capabilities");
 
@@ -136,6 +223,16 @@ public final class BootstrapServices {
         return RuntimeProfile.of(capabilitySet);
     }
 
+    /**
+     * Creates the default application context.
+     *
+     * @param runtime   the platform runtime
+     * @param logger    the logger
+     * @param dataDir   the plugin data directory
+     * @param resources the resource provider
+     * @param scheduler the platform scheduler
+     * @return a new {@link DefaultRapunzelContext}
+     */
     public static RapunzelContext createContext(
         PlatformRuntime runtime,
         Logger logger,
@@ -152,6 +249,12 @@ public final class BootstrapServices {
         return new DefaultRapunzelContext(runtime, logger, dataDir, resources, scheduler);
     }
 
+    /**
+     * Registers the default native interop service in the context.
+     *
+     * @param context the application context
+     * @return the created interop instance
+     */
     public static DefaultRNativeInterop registerNativeInterop(RapunzelContext context) {
         Objects.requireNonNull(context, "context");
 
@@ -167,6 +270,14 @@ public final class BootstrapServices {
         );
     }
 
+    /**
+     * Registers the SnakeYAML-based config service in the context.
+     *
+     * @param ctx       the application context
+     * @param resources the resource provider
+     * @param logger    the logger
+     * @return the registered config service
+     */
     public static ConfigService registerYamlConfig(RapunzelContext ctx, ResourceProvider resources, Logger logger) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(resources, "resources");
@@ -177,6 +288,14 @@ public final class BootstrapServices {
         return configService;
     }
 
+    /**
+     * Registers player accessors in the context.
+     *
+     * @param context     the application context
+     * @param players     the players accessor
+     * @param playersType the concrete players accessor type
+     * @param <P>         the players accessor type
+     */
     public static <P extends Players> void registerPlayerAccessors(
         RapunzelContext context,
         P players,
@@ -190,6 +309,14 @@ public final class BootstrapServices {
         context.registerLinked(playersType, sharedPlayers, Players.class);
     }
 
+    /**
+     * Registers entity accessors in the context.
+     *
+     * @param context      the application context
+     * @param entities     the entities accessor
+     * @param entitiesType the concrete entities accessor type
+     * @param <E>          the entities accessor type
+     */
     public static <E extends Entities> void registerEntityAccessors(
         RapunzelContext context,
         E entities,
@@ -203,6 +330,17 @@ public final class BootstrapServices {
         context.registerLinked(entitiesType, sharedEntities, Entities.class);
     }
 
+    /**
+     * Registers world and block accessors in the context.
+     *
+     * @param context    the application context
+     * @param worlds     the worlds accessor
+     * @param worldsType the concrete worlds accessor type
+     * @param blocks     the blocks accessor
+     * @param blocksType the concrete blocks accessor type
+     * @param <W>        the worlds accessor type
+     * @param <B>        the blocks accessor type
+     */
     public static <W extends Worlds, B extends Blocks> void registerWorldAccessors(
         RapunzelContext context,
         W worlds,
@@ -222,6 +360,14 @@ public final class BootstrapServices {
         context.registerLinked(blocksType, sharedBlocks, Blocks.class);
     }
 
+    /**
+     * Registers entity, item, and block type registries directly.
+     *
+     * @param context      the application context
+     * @param entityTypes  the entity type registry
+     * @param itemTypes    the item type registry
+     * @param blockTypes   the block type registry
+     */
     public static void registerTypeRegistries(
         RapunzelContext context,
         REntityTypeRegistry entityTypes,
@@ -241,6 +387,16 @@ public final class BootstrapServices {
         registerRegistryAccess(context, DefaultRRegistryAccess.class, registries);
     }
 
+    /**
+     * Registers an {@link RRegistryAccess} in the context and creates registry-backed
+     * type registries for entities, items, and blocks.
+     *
+     * @param context            the application context
+     * @param registryAccessType the registry access type
+     * @param registries         the registry access instance
+     * @param <A>                the registry access type
+     * @return the shared registry access instance
+     */
     public static <A extends RRegistryAccess> @NotNull A registerRegistryAccess(
         RapunzelContext context,
         Class<A> registryAccessType,
@@ -262,6 +418,22 @@ public final class BootstrapServices {
         return sharedRegistries;
     }
 
+    /**
+     * Registers player, entity, world, and block accessors for a server.
+     *
+     * @param context      the application context
+     * @param players      the players accessor
+     * @param playersType  the concrete players accessor type
+     * @param entities     the entities accessor
+     * @param entitiesType the concrete entities accessor type
+     * @param worlds       the worlds accessor
+     * @param worldsType   the concrete worlds accessor type
+     * @param blocks       the blocks accessor
+     * @param blocksType   the concrete blocks accessor type
+     * @param <P>          the players accessor type
+     * @param <W>          the worlds accessor type
+     * @param <B>          the blocks accessor type
+     */
     public static <P extends Players, W extends Worlds, B extends Blocks> void registerServerAccessors(
         RapunzelContext context,
         P players,
@@ -278,6 +450,26 @@ public final class BootstrapServices {
         registerWorldAccessors(context, worlds, worldsType, blocks, blocksType);
     }
 
+    /**
+     * Registers all server platform services including accessors, native interop,
+     * and registry access.
+     *
+     * @param context              the application context
+     * @param players              the players accessor
+     * @param playersType          the concrete players accessor type
+     * @param entities             the entities accessor
+     * @param entitiesType         the concrete entities accessor type
+     * @param worlds               the worlds accessor
+     * @param worldsType           the concrete worlds accessor type
+     * @param blocks               the blocks accessor
+     * @param blocksType           the concrete blocks accessor type
+     * @param nativeInteropRegistrar consumer to register native interop adapters
+     * @param registryAccessFactory supplier for the registry access implementation
+     * @param <P>                  the players accessor type
+     * @param <E>                  the entities accessor type
+     * @param <W>                  the worlds accessor type
+     * @param <B>                  the blocks accessor type
+     */
     public static <P extends Players, E extends Entities, W extends Worlds, B extends Blocks> void registerServerPlatformServices(
         RapunzelContext context,
         P players,
@@ -309,6 +501,22 @@ public final class BootstrapServices {
         registerRegistryAccess(context, RRegistryAccess.class, registries);
     }
 
+    /**
+     * Registers world accessors (deprecated convenience overload).
+     *
+     * @param context      the application context
+     * @param players      the players accessor
+     * @param playersType  the concrete players accessor type
+     * @param entities     the entities accessor
+     * @param entitiesType the concrete entities accessor type
+     * @param worlds       the worlds accessor
+     * @param worldsType   the concrete worlds accessor type
+     * @param blocks       the blocks accessor
+     * @param blocksType   the concrete blocks accessor type
+     * @param <P>          the players accessor type
+     * @param <W>          the worlds accessor type
+     * @param <B>          the blocks accessor type
+     */
     public static <P extends Players, W extends Worlds, B extends Blocks> void registerWorldAccessors(
         RapunzelContext context,
         P players,
@@ -328,6 +536,15 @@ public final class BootstrapServices {
         return (Class<E>) entitiesType;
     }
 
+    /**
+     * Registers the YAML-based message format service in the context.
+     *
+     * @param ctx          the application context
+     * @param configService the config service
+     * @param logger       the logger
+     * @param dataDir      the plugin data directory
+     * @return the registered message format service
+     */
     @SuppressWarnings("UnusedReturnValue")
     public static MessageFormatService registerYamlMessages(
         RapunzelContext ctx,

@@ -19,10 +19,24 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Utility for parsing {@link BlockState} from string representations.
+ * <p>
+ * Supports standard Minecraft block state strings (e.g. {@code minecraft:oak_log[axis=y]})
+ * as well as fallback parsing for expressions that the standard parser rejects.
+ * </p>
+ */
 final class SharedBlockStateSupport {
     private SharedBlockStateSupport() {
     }
 
+    /**
+     * Parses a string into a {@link BlockState}, trying the standard Minecraft parser first,
+     * then falling back to a manual property-based parser.
+     *
+     * @param value the block state string to parse
+     * @return an Optional containing the parsed BlockState, or empty if parsing failed
+     */
     static @NotNull Optional<BlockState> parse(@NotNull String value) {
         Objects.requireNonNull(value, "value");
         String trimmed = value.trim();
@@ -57,6 +71,13 @@ final class SharedBlockStateSupport {
         return Optional.of(state);
     }
 
+    /**
+     * Applies a single property assignment (e.g. {@code axis=y}) to the given block state.
+     *
+     * @param state      the current block state
+     * @param assignment the property assignment string
+     * @return an Optional containing the updated BlockState, or empty if the property is invalid
+     */
     private static @NotNull Optional<BlockState> applyProperty(@NotNull BlockState state, @NotNull String assignment) {
         int separator = assignment.indexOf('=');
         if (separator <= 0 || separator == assignment.length() - 1) {
@@ -78,6 +99,15 @@ final class SharedBlockStateSupport {
         return Optional.empty();
     }
 
+    /**
+     * Sets a typed property value on a block state.
+     *
+     * @param <T>      the property's value type
+     * @param state    the current block state
+     * @param property the property to set
+     * @param value    the string representation of the property value
+     * @return an Optional containing the updated BlockState, or empty if the value is invalid
+     */
     private static <T extends Comparable<T>> @NotNull Optional<BlockState> setPropertyValue(
         @NotNull BlockState state,
         @NotNull Property<T> property,
@@ -86,6 +116,12 @@ final class SharedBlockStateSupport {
         return property.getValue(value).map(parsed -> state.setValue(property, parsed));
     }
 
+    /**
+     * Parses a block state string into its block identifier and property assignments.
+     *
+     * @param value the raw block state string
+     * @return an Optional containing the parsed state components
+     */
     private static @NotNull Optional<ParsedState> parseState(@NotNull String value) {
         int bracketIndex = value.indexOf('[');
         String id = (bracketIndex >= 0 ? value.substring(0, bracketIndex) : value).trim().toLowerCase(Locale.ROOT);

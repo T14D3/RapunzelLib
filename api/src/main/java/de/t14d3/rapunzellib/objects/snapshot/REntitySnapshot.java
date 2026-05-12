@@ -31,22 +31,49 @@ public record REntitySnapshot(
         typeRef = Objects.requireNonNull(typeRef, "typeRef");
     }
 
+    /**
+     * Returns the entity type key from the type reference.
+     *
+     * @return the entity type key
+     */
     public @NotNull RKey entityTypeKey() {
         return typeRef.key();
     }
 
+    /**
+     * Returns the entity type ID string.
+     *
+     * @return the entity type ID
+     */
     public @NotNull String entityTypeId() {
         return entityTypeKey().asString();
     }
 
+    /**
+     * Returns the precise location, if captured.
+     *
+     * @return an {@link Optional} containing the location, or empty if not captured
+     */
     public @NotNull Optional<RLocation> location() {
         return Optional.ofNullable(preciseLocation);
     }
 
+    /**
+     * Returns the precise location, throwing if not captured.
+     *
+     * @return the location
+     * @throws IllegalStateException if precise location was not captured
+     */
     public @NotNull RLocation requireLocation() {
         return location().orElseThrow(() -> new IllegalStateException("Entity snapshot does not include precise location"));
     }
 
+    /**
+     * Captures a snapshot of the given live entity's current state.
+     *
+     * @param entity the live entity to snapshot
+     * @return the entity snapshot
+     */
     public static @NotNull REntitySnapshot capture(@NotNull REntity entity) {
         Objects.requireNonNull(entity, "entity");
         RLocation location = entity.location().orElse(null);
@@ -61,6 +88,15 @@ public record REntitySnapshot(
         return new REntitySnapshot(entity.uuid(), world, pos, entity.typeRef(), location);
     }
 
+    /**
+     * Creates a snapshot from explicit values without a precise location.
+     *
+     * @param uuid          the entity UUID
+     * @param world         the world reference
+     * @param pos           the block position
+     * @param entityTypeKey the entity type key
+     * @return the entity snapshot
+     */
     public static @NotNull REntitySnapshot of(
         @NotNull UUID uuid,
         @NotNull RWorldRef world,

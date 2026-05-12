@@ -10,10 +10,22 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Classifies the network runtime from a transport bootstrap result.
+ *
+ * <p>Determines the canonical network link, node role, local name, and proxy name
+ * based on the configured transport priority and available messengers.
+ */
 public final class NetworkRuntimeClassifier {
     private NetworkRuntimeClassifier() {
     }
 
+    /**
+     * Classifies the network runtime from a transport bootstrap result.
+     *
+     * @param transport the transport bootstrap result
+     * @return the classified network runtime
+     */
     public static @NotNull NetworkRuntime classify(@NotNull BackendTransportBootstrap.Result transport) {
         Objects.requireNonNull(transport, "transport");
 
@@ -33,6 +45,13 @@ public final class NetworkRuntimeClassifier {
         );
     }
 
+    /**
+     * Creates a fallback network runtime when transport bootstrap fails.
+     *
+     * @param platformId the platform identifier
+     * @param messenger  the fallback messenger
+     * @return the fallback network runtime
+     */
     public static @NotNull NetworkRuntime fallback(
         @NotNull PlatformId platformId,
         @NotNull Messenger messenger

@@ -6,12 +6,21 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * A typed registry for looking up {@link REntityType} values.
+ */
 public interface REntityTypeRegistry extends RTypeRegistry<REntityType> {
     @Override
     default @NotNull RRegistryKey<REntityType> registryKey() {
         return RRegistries.ENTITY_TYPES;
     }
 
+    /**
+     * Creates a new entity type registry backed by the given {@link RRegistryAccess}.
+     *
+     * @param registries the registry access to use
+     * @return the entity type registry
+     */
     static @NotNull REntityTypeRegistry of(@NotNull RRegistryAccess registries) {
         return new REntityTypeRegistry() {
             @Override

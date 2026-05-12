@@ -6,11 +6,21 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A {@link ParticleShape} that samples points along a circle in a given plane.
+ */
 final class CircleParticleShape implements ParticleShape {
     private final RLocation center;
     private final double radius;
     private final Plane plane;
 
+    /**
+     * Creates a circle shape.
+     *
+     * @param center the center of the circle
+     * @param radius the circle radius
+     * @param plane  the plane the circle lies in
+     */
     CircleParticleShape(@NotNull RLocation center, double radius, @NotNull Plane plane) {
         this.center = center;
         this.radius = radius;

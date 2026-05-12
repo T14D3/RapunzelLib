@@ -25,6 +25,9 @@ import java.util.Objects;
  * @since 1.0
  * @see RpcServerMessenger
  */
+/**
+ * Configuration settings for the RPC server.
+ */
 public class RpcServerConfig {
 
  private final String bindHost;

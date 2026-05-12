@@ -16,6 +16,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Defines the attachment support capabilities for a platform, including which target
+ * types are supported and the storage mechanisms available.
+ */
 public final class AttachmentSupport {
     private final PlatformId platformId;
     private final Map<AttachmentTargetType, AttachmentStorageSupport> targetSupport;

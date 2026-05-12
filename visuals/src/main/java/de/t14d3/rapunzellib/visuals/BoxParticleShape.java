@@ -6,11 +6,22 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A {@link ParticleShape} that samples points on the edges of an axis-aligned box.
+ * Only points on the boundary surface (within a small epsilon) are included.
+ */
 final class BoxParticleShape implements ParticleShape {
     private final RLocation min;
     private final RLocation max;
     private final double step;
 
+    /**
+     * Creates a box shape.
+     *
+     * @param min  the minimum corner
+     * @param max  the maximum corner
+     * @param step the step size between sample points
+     */
     BoxParticleShape(@NotNull RLocation min, @NotNull RLocation max, double step) {
         this.min = min;
         this.max = max;

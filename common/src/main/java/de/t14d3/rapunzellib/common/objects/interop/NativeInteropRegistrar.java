@@ -8,17 +8,40 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
+/**
+ * Fluent builder for registering native view adapters on a {@link MutableRNativeInterop}.
+ * <p>
+ * Provides a concise API for registering both required and optional view
+ * transformations between native wrapper types and their projected view types.
+ */
 public final class NativeInteropRegistrar {
+    /** The mutable interop to register adapters on */
     private final MutableRNativeInterop interop;
 
     private NativeInteropRegistrar(@NotNull MutableRNativeInterop interop) {
         this.interop = Objects.requireNonNull(interop, "interop");
     }
 
+    /**
+     * Creates a new registrar backed by the given interop.
+     *
+     * @param interop the mutable interop to register adapters on
+     * @return a new NativeInteropRegistrar
+     */
     public static @NotNull NativeInteropRegistrar create(@NotNull MutableRNativeInterop interop) {
         return new NativeInteropRegistrar(interop);
     }
 
+    /**
+     * Registers a required view adapter that always produces a non-null view.
+     *
+     * @param nativeType the native wrapper class
+     * @param viewType   the view type class
+     * @param adapter    the mapping function from native to view
+     * @param <N>        the native wrapper type
+     * @param <T>        the view type
+     * @return this registrar for chaining
+     */
     public <N extends RNative, T> @NotNull NativeInteropRegistrar view(
         @NotNull Class<N> nativeType,
         @NotNull Class<T> viewType,
@@ -32,6 +55,16 @@ public final class NativeInteropRegistrar {
         return this;
     }
 
+    /**
+     * Registers an optional view adapter that may return empty.
+     *
+     * @param nativeType the native wrapper class
+     * @param viewType   the view type class
+     * @param adapter    the mapping function from native to optional view
+     * @param <N>        the native wrapper type
+     * @param <T>        the view type
+     * @return this registrar for chaining
+     */
     public <N extends RNative, T> @NotNull NativeInteropRegistrar optionalView(
         @NotNull Class<N> nativeType,
         @NotNull Class<T> viewType,

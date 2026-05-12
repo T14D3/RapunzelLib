@@ -29,10 +29,21 @@ public final class StringListArgumentType implements ArgumentType<List<String>> 
         this.suggester = suggester;
     }
 
+    /**
+     * Creates a string list argument type without suggestions.
+     *
+     * @return the argument type
+     */
     public static StringListArgumentType stringList() {
         return new StringListArgumentType(null);
     }
 
+    /**
+     * Creates a string list argument type with a token suggester.
+     *
+     * @param suggester the suggester for token-based suggestions
+     * @return the argument type
+     */
     public static StringListArgumentType stringList(TokenSuggester suggester) {
         return new StringListArgumentType(Objects.requireNonNull(suggester, "suggester"));
     }

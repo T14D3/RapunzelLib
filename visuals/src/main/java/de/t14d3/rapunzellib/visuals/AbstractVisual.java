@@ -7,14 +7,43 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Abstract base implementation of the {@link Visual} interface.
+ * <p>
+ * Manages common visual state: identity, configuration, audience,
+ * visibility flag, and the set of current viewers.
+ *
+ * @param <C> the visual configuration type
+ * @param <P> the platform-specific packet/handle type
+ */
 public abstract class AbstractVisual<C extends VisualConfig, P> implements Visual<C> {
+
+    /** The unique visual identifier. */
     protected final VisualId id;
+
+    /** The visual configuration. */
     protected final C config;
+
+    /** The audience this visual targets. */
     protected final VisualAudience audience;
+
+    /** Whether the visual is currently shown. */
     protected volatile boolean shown = false;
+
+    /** The set of player UUIDs currently viewing this visual. */
     protected final Set<UUID> currentViewers = ConcurrentHashMap.newKeySet();
+
+    /** The manager that registered this visual. */
     private final VisualManager manager;
 
+    /**
+     * Constructs a new abstract visual.
+     *
+     * @param id       the unique visual identifier
+     * @param config   the visual configuration
+     * @param audience the target audience
+     * @param manager  the visual manager responsible for lifecycle tracking
+     */
     protected AbstractVisual(
         @NotNull VisualId id,
         @NotNull C config,
@@ -47,12 +76,20 @@ public abstract class AbstractVisual<C extends VisualConfig, P> implements Visua
         return shown;
     }
 
+    /**
+     * Internal method to mark the visual as shown.
+     * Clears the current viewer set to prepare for fresh tracking.
+     */
     protected synchronized void showInternal() {
         if (shown) return;
         shown = true;
         currentViewers.clear();
     }
 
+    /**
+     * Internal method to mark the visual as hidden.
+     * Clears the current viewer set.
+     */
     protected synchronized void hideInternal() {
         if (!shown) return;
         shown = false;
@@ -65,14 +102,29 @@ public abstract class AbstractVisual<C extends VisualConfig, P> implements Visua
         manager.unregister(this);
     }
 
+    /**
+     * Notifies this visual that a player has quit, removing them from the viewer set.
+     *
+     * @param uuid the UUID of the player that quit
+     */
     public final void onViewerQuit(@NotNull UUID uuid) {
         currentViewers.remove(uuid);
     }
 
+    /**
+     * Returns an unmodifiable view of the current viewer UUIDs.
+     *
+     * @return an unmodifiable set of player UUIDs currently viewing this visual
+     */
     public final Set<UUID> currentViewers() {
         return Collections.unmodifiableSet(currentViewers);
     }
 
+    /**
+     * Returns the visual manager that registered this visual.
+     *
+     * @return the visual manager
+     */
     protected final VisualManager manager() {
         return manager;
     }

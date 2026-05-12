@@ -10,10 +10,26 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
+/**
+ * Shared support for installing NBT features into a {@link RapunzelContext}.
+ * <p>
+ * Registers the primary item stack adapter, the native RItem factory,
+ * entity serializer, and block entity serializer.
+ */
 public final class SharedNbtFeatureInstallerSupport {
     private SharedNbtFeatureInstallerSupport() {
     }
 
+    /**
+     * Installs NBT features: registers the item stack adapter, native factory,
+     * entity serializer, and block entity serializer.
+     *
+     * @param context    the Rapunzel context
+     * @param platformId the platform identifier
+     * @param adapterType the adapter class
+     * @param adapter     the adapter instance
+     * @param <A>         the adapter type
+     */
     public static <A extends ItemStackAdapter<net.minecraft.world.item.ItemStack>> void install(
         @NotNull RapunzelContext context,
         @NotNull de.t14d3.rapunzellib.PlatformId platformId,
@@ -40,12 +56,22 @@ public final class SharedNbtFeatureInstallerSupport {
         registerSerializers(context);
     }
 
+    /**
+     * Registers the entity and block entity serializers.
+     *
+     * @param context the Rapunzel context
+     */
     public static void registerSerializers(@NotNull RapunzelContext context) {
         Objects.requireNonNull(context, "context");
         registerEntitySerializer(context);
         registerBlockEntitySerializer(context);
     }
 
+    /**
+     * Registers the entity NBT serializer.
+     *
+     * @param context the Rapunzel context
+     */
     public static void registerEntitySerializer(@NotNull RapunzelContext context) {
         Objects.requireNonNull(context, "context");
 
@@ -55,6 +81,11 @@ public final class SharedNbtFeatureInstallerSupport {
         );
     }
 
+    /**
+     * Registers the block entity NBT serializer.
+     *
+     * @param context the Rapunzel context
+     */
     public static void registerBlockEntitySerializer(@NotNull RapunzelContext context) {
         Objects.requireNonNull(context, "context");
 

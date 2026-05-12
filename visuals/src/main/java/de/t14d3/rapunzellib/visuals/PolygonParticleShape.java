@@ -6,10 +6,20 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A {@link ParticleShape} that samples points along the edges of a polygon
+ * defined by a list of vertices.
+ */
 final class PolygonParticleShape implements ParticleShape {
     private final List<RLocation> vertices;
     private final boolean closed;
 
+    /**
+     * Creates a polygon shape.
+     *
+     * @param vertices the polygon vertices
+     * @param closed   whether to connect the last vertex back to the first
+     */
     PolygonParticleShape(@NotNull List<RLocation> vertices, boolean closed) {
         this.vertices = List.copyOf(vertices);
         this.closed = closed;

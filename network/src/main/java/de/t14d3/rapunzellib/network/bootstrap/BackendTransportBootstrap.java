@@ -14,6 +14,9 @@ import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+/**
+ * Bootstraps transport layer for backend network communication.
+ */
 public final class BackendTransportBootstrap {
     private BackendTransportBootstrap() {
     }

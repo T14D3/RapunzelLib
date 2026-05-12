@@ -3,10 +3,21 @@ package de.t14d3.rapunzellib.gui.shared;
 import de.t14d3.rapunzellib.events.inventory.InventoryClickType;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Maps Minecraft native container click types and buttons to
+ * platform-independent {@link InventoryClickType} values.
+ */
 public final class SharedGuiClickTypes {
     private SharedGuiClickTypes() {
     }
 
+    /**
+     * Maps a native menu click type and button to an {@link InventoryClickType}.
+     *
+     * @param clickType the native click type
+     * @param button    the button index
+     * @return the mapped inventory click type
+     */
     public static @NotNull InventoryClickType mapMenuClick(
         // #if VERSION >= 26.0.0
         @NotNull net.minecraft.world.inventory.ContainerInput clickType,

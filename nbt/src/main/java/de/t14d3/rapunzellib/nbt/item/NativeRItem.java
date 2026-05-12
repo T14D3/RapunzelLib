@@ -16,20 +16,70 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * A {@link NativeRItem} wraps a native platform item stack handle and provides
+ * {@link RItem} access to it. It extends both {@link RItem} and {@link RNative}.
+ * <p>
+ * Two strategies exist:
+ * <ul>
+ *   <li>{@link DefaultNativeRItem} - uses a {@link NativeRItemAccessor} for direct read/write</li>
+ *   <li>{@link LegacyNativeRItem} - uses a {@link SnapshotReader}/{@link NativeUpdater} pair</li>
+ * </ul>
+ * </p>
+ *
+ * @param <H> the native handle type
+ */
 public interface NativeRItem<H> extends RItem, RNative {
+    /**
+     * Returns the native handle.
+     *
+     * @return the handle
+     */
     @Override
     @NotNull H handle();
 
+    /**
+     * Functional interface for applying mutations to a native handle using a snapshot-based approach.
+     *
+     * @param <H> the handle type
+     */
     @FunctionalInterface
     interface NativeUpdater<H> {
+        /**
+         * Applies mutations from an {@link RItem} to the native handle.
+         *
+         * @param handle   the native handle to update
+         * @param mutation the mutation descriptor
+         */
         void apply(@NotNull H handle, @NotNull RItem mutation);
     }
 
+    /**
+     * Functional interface for reading a snapshot from a native handle.
+     *
+     * @param <H> the handle type
+     */
     @FunctionalInterface
     interface SnapshotReader<H> {
+        /**
+         * Reads an immutable snapshot from the native handle.
+         *
+         * @param handle the native handle
+         * @return the snapshot
+         */
         @NotNull RItem read(@NotNull H handle);
     }
 
+    /**
+     * Creates a {@link NativeRItem} using the legacy snapshot-reader + updater strategy.
+     *
+     * @param <H>            the handle type
+     * @param platformId     the platform ID
+     * @param handle         the native handle
+     * @param snapshotReader the reader for creating snapshots
+     * @param updater        the updater for applying mutations
+     * @return a new NativeRItem
+     */
     static <H> @NotNull NativeRItem<H> of(
         @NotNull PlatformId platformId,
         @NotNull H handle,
@@ -39,6 +89,15 @@ public interface NativeRItem<H> extends RItem, RNative {
         return new LegacyNativeRItem<>(platformId, handle, snapshotReader, updater);
     }
 
+    /**
+     * Creates a {@link NativeRItem} using the direct accessor strategy.
+     *
+     * @param <H>        the handle type
+     * @param platformId the platform ID
+     * @param handle     the native handle
+     * @param accessor   the accessor for direct read/write
+     * @return a new NativeRItem
+     */
     static <H> @NotNull NativeRItem<H> of(
         @NotNull PlatformId platformId,
         @NotNull H handle,
@@ -48,6 +107,11 @@ public interface NativeRItem<H> extends RItem, RNative {
     }
 }
 
+/**
+ * {@link NativeRItem} implementation using the direct {@link NativeRItemAccessor} strategy.
+ *
+ * @param <H> the handle type
+ */
 final class DefaultNativeRItem<H> extends RNativeHandle<H> implements NativeRItem<H> {
     private final @NotNull NativeRItemAccessor<H> accessor;
 
@@ -239,6 +303,11 @@ final class DefaultNativeRItem<H> extends RNativeHandle<H> implements NativeRIte
     }
 }
 
+/**
+ * {@link NativeRItem} implementation using the legacy snapshot-reader + updater strategy.
+ *
+ * @param <H> the handle type
+ */
 final class LegacyNativeRItem<H> extends RNativeHandle<H> implements NativeRItem<H> {
     private final @NotNull SnapshotReader<H> snapshotReader;
     private final @NotNull NativeUpdater<H> updater;

@@ -18,18 +18,48 @@ public final class NetworkInfoClient implements NetworkInfoService, AutoCloseabl
     private volatile String cachedNetworkServerName;
     private volatile CompletableFuture<String> inFlightNetworkServerName;
 
+    /**
+     * Creates a network info client with a messenger and default request timeout.
+     *
+     * @param messenger the messenger for RPC communication
+     * @param scheduler the scheduler for timeout handling
+     * @param logger    the logger
+     */
     public NetworkInfoClient(Messenger messenger, Scheduler scheduler, Logger logger) {
         this(DefaultNetworkRuntimeGateway.compatibility(messenger), scheduler, logger, Duration.ofSeconds(3));
     }
 
+    /**
+     * Creates a network info client with a messenger and custom request timeout.
+     *
+     * @param messenger      the messenger for RPC communication
+     * @param scheduler      the scheduler for timeout handling
+     * @param logger         the logger
+     * @param requestTimeout the RPC request timeout
+     */
     public NetworkInfoClient(Messenger messenger, Scheduler scheduler, Logger logger, Duration requestTimeout) {
         this(DefaultNetworkRuntimeGateway.compatibility(messenger), scheduler, logger, requestTimeout);
     }
 
+    /**
+     * Creates a network info client with a gateway and default request timeout.
+     *
+     * @param gateway   the network runtime gateway
+     * @param scheduler the scheduler for timeout handling
+     * @param logger    the logger
+     */
     public NetworkInfoClient(NetworkRuntimeGateway gateway, Scheduler scheduler, Logger logger) {
         this(gateway, scheduler, logger, Duration.ofSeconds(3));
     }
 
+    /**
+     * Creates a fully configured network info client.
+     *
+     * @param gateway        the network runtime gateway
+     * @param scheduler      the scheduler for timeout handling
+     * @param logger         the logger
+     * @param requestTimeout the RPC request timeout
+     */
     public NetworkInfoClient(NetworkRuntimeGateway gateway, Scheduler scheduler, Logger logger, Duration requestTimeout) {
         Objects.requireNonNull(requestTimeout, "requestTimeout");
         this.rpc = new RpcClient(Objects.requireNonNull(gateway, "gateway"), scheduler, logger, requestTimeout);
@@ -75,11 +105,21 @@ public final class NetworkInfoClient implements NetworkInfoService, AutoCloseabl
         }
     }
 
+    /**
+     * Returns the list of all server names registered on the proxy.
+     *
+     * @return future of the server name list
+     */
     @Override
     public CompletableFuture<List<String>> servers() {
         return rpc.callProxy(NetworkInfoRpc.LIST_SERVERS_METHOD, null);
     }
 
+    /**
+     * Returns information about all currently online players.
+     *
+     * @return future of the player info list
+     */
     @Override
     public CompletableFuture<List<NetworkPlayerInfo>> players() {
         return rpc.callProxy(NetworkInfoRpc.LIST_PLAYERS_METHOD, null);

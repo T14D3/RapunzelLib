@@ -7,6 +7,15 @@ import de.t14d3.rapunzellib.network.outbox.NetworkOutboxPolicy;
 import java.time.Duration;
 import java.util.Objects;
 
+/**
+ * Configuration record for the network outbox queue.
+ *
+ * @param enabled      whether queuing is enabled
+ * @param outboxPolicy the outbox policy governing store-and-forward decisions
+ * @param flushPeriod  the period between flush cycles
+ * @param maxBatchSize the maximum number of messages processed per flush
+ * @param maxAge       the maximum age of messages before they expire
+ */
 public record NetworkQueueConfig(
     boolean enabled,
     NetworkOutboxPolicy outboxPolicy,
@@ -14,6 +23,12 @@ public record NetworkQueueConfig(
     int maxBatchSize,
     Duration maxAge
 ) {
+    /**
+     * Reads the network queue configuration from a YAML config.
+     *
+     * @param config the YAML configuration source
+     * @return a new NetworkQueueConfig instance
+     */
     public static NetworkQueueConfig read(YamlConfig config) {
         Objects.requireNonNull(config, "config");
 
@@ -32,6 +47,11 @@ public record NetworkQueueConfig(
         );
     }
 
+    /**
+     * Generates a default owner ID based on the platform name and data directory.
+     *
+     * @return the default owner ID string
+     */
     public static String defaultOwnerId() {
         return Rapunzel.context().platformId().name() + ":" +
             Rapunzel.context().dataDirectory().toAbsolutePath().normalize();

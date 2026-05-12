@@ -35,11 +35,26 @@ import java.util.Map;
 import java.util.UUID;
 
 
+/**
+ * Shared NMS implementation of a glow outline visual.
+ * <p>
+ * Renders a glowing outline around a set of block positions using
+ * {@code minecraft:block_display} entities with a slight scale increase
+ * and negative translation to create an outline effect.
+ */
 public final class SharedNmsGlowOutlineVisual extends SharedNmsVisual<GlowOutlineConfig> implements GlowOutlineVisual {
 
     private final Map<RBlockPos, Integer> entityIds = new HashMap<>();
     private final Map<RBlockPos, UUID> entityUuids = new HashMap<>();
 
+    /**
+     * Creates a new glow outline visual.
+     *
+     * @param id       the visual ID
+     * @param config   the glow outline config
+     * @param audience the visual audience
+     * @param manager  the visual manager
+     */
     public SharedNmsGlowOutlineVisual(
         @NotNull VisualId id,
         @NotNull GlowOutlineConfig config,
@@ -88,6 +103,12 @@ public final class SharedNmsGlowOutlineVisual extends SharedNmsVisual<GlowOutlin
         }
     }
 
+    /**
+     * Resolves a block state from an RBlockType, falling back to glass.
+     *
+     * @param blockType the block type
+     * @return the block state, or glass if not found
+     */
     private static BlockState resolveBlockState(@NotNull RBlockType blockType) {
         // #if VERSION >= 1.21.11
         Identifier id = Identifier.fromNamespaceAndPath(blockType.key().namespace(), blockType.key().path());

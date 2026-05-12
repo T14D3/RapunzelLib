@@ -6,6 +6,16 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Default implementation of {@link NetworkRuntime}.
+ *
+ * @param localRole      the role of this node (PROXY or BACKEND)
+ * @param localName      the name of this node
+ * @param proxyName      the name of the proxy server
+ * @param canonicalLink  the primary network link
+ * @param bootstrapLink  optional bootstrap link for initialization
+ * @param messenger      the effective messenger
+ */
 public record DefaultNetworkRuntime(
     @NotNull NetworkNodeRole localRole,
     @NotNull String localName,

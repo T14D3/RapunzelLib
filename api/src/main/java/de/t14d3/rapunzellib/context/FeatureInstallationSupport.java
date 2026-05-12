@@ -8,10 +8,28 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+/**
+ * Utility for safely installing platform features into a {@link RapunzelContext}.
+ *
+ * <p>Handles idempotency checks, capability requirements, dependency ordering,
+ * and synchronization.</p>
+ */
 public final class FeatureInstallationSupport {
     private FeatureInstallationSupport() {
     }
 
+    /**
+     * Installs a feature and returns a service instance of the given type.
+     *
+     * @param context       the context to install into
+     * @param resultType    the service type to return
+     * @param capability    the required capability, may be null
+     * @param useCase       the use case description for error messages
+     * @param installAction the action to perform the installation
+     * @param dependencies  actions for dependent features
+     * @param <T>           the result type
+     * @return the installed service instance
+     */
     public static <T> @NotNull T install(
         @NotNull RapunzelContext context,
         @NotNull Class<T> resultType,
@@ -32,6 +50,18 @@ public final class FeatureInstallationSupport {
         );
     }
 
+    /**
+     * Installs a feature and registers a marker instance to track installation state.
+     *
+     * @param context       the context to install into
+     * @param markerType    the marker type class
+     * @param marker        the marker instance
+     * @param capability    the required capability, may be null
+     * @param useCase       the use case description
+     * @param installAction the action to perform the installation
+     * @param dependencies  actions for dependent features
+     * @param <M>           the marker type
+     */
     public static <M> void install(
         @NotNull RapunzelContext context,
         @NotNull Class<M> markerType,
@@ -57,15 +87,28 @@ public final class FeatureInstallationSupport {
         );
     }
 
-    public static <T> @NotNull T install(
-        @NotNull RapunzelContext context,
-        @NotNull Predicate<? super RapunzelContext> installed,
-        @NotNull Supplier<? extends T> installedValue,
-        @Nullable RuntimeCapability capability,
-        @NotNull String useCase,
-        @NotNull Runnable installAction,
-        @NotNull Runnable... dependencies
-    ) {
+/**
+ * Core installation method with full control over state checking.
+ *
+ * @param context        the context to install into
+ * @param installed      predicate to check if already installed
+ * @param installedValue supplier for the installed value
+ * @param capability     the required capability, may be null
+ * @param useCase        the use case description
+ * @param installAction  the action to perform the installation
+ * @param dependencies   actions for dependent features
+ * @param <T>            the result type
+ * @return the installed value
+ */
+public static <T> @NotNull T install(
+    @NotNull RapunzelContext context,
+    @NotNull Predicate<? super RapunzelContext> installed,
+    @NotNull Supplier<? extends T> installedValue,
+    @Nullable RuntimeCapability capability,
+    @NotNull String useCase,
+    @NotNull Runnable installAction,
+    @NotNull Runnable... dependencies
+) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(installed, "installed");
         Objects.requireNonNull(installedValue, "installedValue");

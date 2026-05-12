@@ -13,6 +13,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Low-level Redis connection implementing the Redis Serialization Protocol (RESP).
+ */
 final class RedisConnection implements AutoCloseable {
     private final Socket socket;
     private final InputStream in;
@@ -24,6 +27,14 @@ final class RedisConnection implements AutoCloseable {
         this.out = socket.getOutputStream();
     }
 
+    /**
+     * Connects to a Redis server using the given configuration.
+     *
+     * @param config the Redis pub/sub configuration
+     * @param subscribeConnection whether this is a subscription connection (no timeout)
+     * @return the new connection
+     * @throws IOException if connection fails
+     */
     static RedisConnection connect(RedisPubSubConfig config, boolean subscribeConnection) throws IOException {
         Socket socket = config.ssl() ? SSLSocketFactory.getDefault().createSocket() : new Socket();
         socket.connect(new InetSocketAddress(config.host(), config.port()), config.connectTimeoutMillis());
@@ -41,14 +52,32 @@ final class RedisConnection implements AutoCloseable {
         return conn;
     }
 
+    /**
+     * Returns whether the underlying socket is still open.
+     *
+     * @return true if open
+     */
     boolean isOpen() {
         return !socket.isClosed() && socket.isConnected();
     }
 
+    /**
+     * Subscribes to the given Redis channel.
+     *
+     * @param channel the channel name
+     * @throws IOException if the command fails
+     */
     void subscribe(String channel) throws IOException {
         sendCommand("SUBSCRIBE", channel);
     }
 
+    /**
+     * Publishes a message to the given Redis channel.
+     *
+     * @param channel the channel name
+     * @param payload the message payload
+     * @throws IOException if the command fails
+     */
     void publish(String channel, String payload) throws IOException {
         sendCommand("PUBLISH", channel, payload);
         readReply(); // integer reply

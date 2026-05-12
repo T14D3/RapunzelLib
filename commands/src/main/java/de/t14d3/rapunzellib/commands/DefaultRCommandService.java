@@ -13,14 +13,45 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+/**
+ * Default implementation of {@link RCommandService}.
+ * <p>
+ * Manages command registrations, root nodes, and change listeners using a
+ * thread-safe, synchronized approach. Supports both immediate and queued
+ * registration/unregistration of command trees.
+ * </p>
+ */
 final class DefaultRCommandService implements RCommandService {
+    /**
+     * The platform identifier.
+     */
     private final PlatformId platformId;
+    /**
+     * Map of registration ID to registered command tree.
+     */
     private final Map<String, RegisteredCommandTree> registrations = new LinkedHashMap<>();
+    /**
+     * Map of root name to root command node.
+     */
     private final Map<String, RCommandNode<RCommandSource>> roots = new LinkedHashMap<>();
+    /**
+     * List of change listeners.
+     */
     private final List<Consumer<RCommandServiceChange>> listeners = new ArrayList<>();
+    /**
+     * Synchronization lock for thread-safe operations.
+     */
     private final Object lock = new Object();
+    /**
+     * Whether there are queued changes pending.
+     */
     private boolean queuedChanges;
 
+    /**
+     * Creates a new command service for the given platform.
+     *
+     * @param platformId the platform identifier
+     */
     DefaultRCommandService(@NotNull PlatformId platformId) {
         this.platformId = Objects.requireNonNull(platformId, "platformId");
     }
@@ -30,12 +61,25 @@ final class DefaultRCommandService implements RCommandService {
         return platformId;
     }
 
+    /**
+     * Registers a root command node using its own name as the registration ID.
+     *
+     * @param root the root node to register
+     * @return the registered command tree
+     */
     @Override
     public @NotNull RegisteredCommandTree registerRoot(@NotNull RCommandNode<RCommandSource> root) {
         Objects.requireNonNull(root, "root");
         return registerRoot(root.getName(), root);
     }
 
+    /**
+     * Registers a root command node with a specific registration ID.
+     *
+     * @param registrationId the registration ID
+     * @param root           the root node to register
+     * @return the registered command tree
+     */
     @Override
     public @NotNull RegisteredCommandTree registerRoot(
         @NotNull String registrationId,
@@ -44,12 +88,25 @@ final class DefaultRCommandService implements RCommandService {
         return registerRoot(registrationId, root, false);
     }
 
+    /**
+     * Queues a root command node for registration using its own name as the registration ID.
+     *
+     * @param root the root node to queue
+     * @return the registered command tree
+     */
     @Override
     public @NotNull RegisteredCommandTree queueRoot(@NotNull RCommandNode<RCommandSource> root) {
         Objects.requireNonNull(root, "root");
         return queueRoot(root.getName(), root);
     }
 
+    /**
+     * Queues a root command node for registration with a specific registration ID.
+     *
+     * @param registrationId the unique registration identifier
+     * @param root           the root node to queue
+     * @return the registered command tree
+     */
     @Override
     public @NotNull RegisteredCommandTree queueRoot(
         @NotNull String registrationId,
@@ -58,6 +115,14 @@ final class DefaultRCommandService implements RCommandService {
         return registerRoot(registrationId, root, true);
     }
 
+    /**
+     * Internal registration method for a single root node.
+     *
+     * @param registrationId the registration identifier
+     * @param root           the root node
+     * @param queued         whether this is a queued registration
+     * @return the registered command tree
+     */
     private @NotNull RegisteredCommandTree registerRoot(
         @NotNull String registrationId,
         @NotNull RCommandNode<RCommandSource> root,
@@ -69,6 +134,13 @@ final class DefaultRCommandService implements RCommandService {
         return registerTree(registrationId, tree, queued);
     }
 
+    /**
+     * Registers a command tree with a given registration ID.
+     *
+     * @param registrationId the unique registration identifier
+     * @param tree           the command tree to register
+     * @return the registered command tree
+     */
     @Override
     public @NotNull RegisteredCommandTree registerTree(
         @NotNull String registrationId,
@@ -77,6 +149,13 @@ final class DefaultRCommandService implements RCommandService {
         return registerTree(registrationId, tree, false);
     }
 
+    /**
+     * Queues a command tree for registration.
+     *
+     * @param registrationId the unique registration identifier
+     * @param tree           the command tree to queue
+     * @return the registered command tree
+     */
     @Override
     public @NotNull RegisteredCommandTree queueTree(
         @NotNull String registrationId,
@@ -85,6 +164,14 @@ final class DefaultRCommandService implements RCommandService {
         return registerTree(registrationId, tree, true);
     }
 
+    /**
+     * Internal registration method for command trees.
+     *
+     * @param registrationId the unique registration identifier
+     * @param tree           the command tree to register
+     * @param queued         whether this is a queued registration
+     * @return the registered command tree
+     */
     private @NotNull RegisteredCommandTree registerTree(
         @NotNull String registrationId,
         @NotNull RCommandTree<RCommandSource> tree,
@@ -123,16 +210,35 @@ final class DefaultRCommandService implements RCommandService {
         return registration;
     }
 
+    /**
+     * Unregisters a previously registered command tree.
+     *
+     * @param registrationId the registration identifier to remove
+     * @return true if the registration existed and was removed
+     */
     @Override
     public boolean unregister(@NotNull String registrationId) {
         return unregister(registrationId, false);
     }
 
+    /**
+     * Queues unregistration of a command tree.
+     *
+     * @param registrationId the registration identifier to queue for removal
+     * @return true if the registration existed and was queued for removal
+     */
     @Override
     public boolean queueUnregister(@NotNull String registrationId) {
         return unregister(registrationId, true);
     }
 
+    /**
+     * Internal unregistration method.
+     *
+     * @param registrationId the registration identifier to remove
+     * @param queued         whether this is a queued operation
+     * @return true if the registration existed and was removed
+     */
     private boolean unregister(@NotNull String registrationId, boolean queued) {
         Objects.requireNonNull(registrationId, "registrationId");
         RegisteredCommandTree removed;
@@ -150,6 +256,11 @@ final class DefaultRCommandService implements RCommandService {
         return true;
     }
 
+    /**
+     * Checks if there are any queued changes pending.
+     *
+     * @return true if changes are queued
+     */
     @Override
     public boolean hasQueuedChanges() {
         synchronized (lock) {
@@ -157,6 +268,11 @@ final class DefaultRCommandService implements RCommandService {
         }
     }
 
+    /**
+     * Flushes all queued changes, notifying listeners.
+     *
+     * @return true if there were queued changes to flush
+     */
     @Override
     public boolean flush() {
         synchronized (lock) {
@@ -169,6 +285,12 @@ final class DefaultRCommandService implements RCommandService {
         return true;
     }
 
+    /**
+     * Finds a registered command tree by its registration ID.
+     *
+     * @param registrationId the registration identifier
+     * @return the registered tree, or empty if not found
+     */
     @Override
     public @NotNull Optional<RegisteredCommandTree> find(@NotNull String registrationId) {
         Objects.requireNonNull(registrationId, "registrationId");
@@ -177,6 +299,12 @@ final class DefaultRCommandService implements RCommandService {
         }
     }
 
+    /**
+     * Finds a root command node by its root name.
+     *
+     * @param rootName the root command name
+     * @return the root node, or empty if not found
+     */
     @Override
     public @NotNull Optional<RCommandNode<RCommandSource>> findRoot(@NotNull String rootName) {
         Objects.requireNonNull(rootName, "rootName");
@@ -185,6 +313,11 @@ final class DefaultRCommandService implements RCommandService {
         }
     }
 
+    /**
+     * Gets a snapshot of all registered command trees.
+     *
+     * @return an unmodifiable list of registrations
+     */
     @Override
     public @NotNull List<RegisteredCommandTree> registrations() {
         synchronized (lock) {
@@ -192,6 +325,11 @@ final class DefaultRCommandService implements RCommandService {
         }
     }
 
+    /**
+     * Gets a snapshot of all registered root nodes.
+     *
+     * @return an unmodifiable list of roots
+     */
     @Override
     public @NotNull List<RCommandNode<RCommandSource>> roots() {
         synchronized (lock) {
@@ -199,6 +337,11 @@ final class DefaultRCommandService implements RCommandService {
         }
     }
 
+    /**
+     * Builds a shared tree containing all registered roots.
+     *
+     * @return a new command tree with all roots
+     */
     @Override
     public @NotNull RCommandTree<RCommandSource> sharedTree() {
         List<RCommandNode<RCommandSource>> sharedRoots;
@@ -213,6 +356,12 @@ final class DefaultRCommandService implements RCommandService {
         return shared;
     }
 
+    /**
+     * Subscribes a listener for command service changes.
+     *
+     * @param listener the change listener
+     * @return a subscription that can be closed to unregister the listener
+     */
     @Override
     public @NotNull Subscription subscribe(@NotNull Consumer<RCommandServiceChange> listener) {
         Objects.requireNonNull(listener, "listener");
@@ -226,12 +375,23 @@ final class DefaultRCommandService implements RCommandService {
         };
     }
 
+    /**
+     * Validates that the given node is a root node.
+     *
+     * @param root the node to validate
+     * @throws IllegalArgumentException if the node is not a root
+     */
     private static void requireRoot(@NotNull RCommandNode<RCommandSource> root) {
         if (!root.isRoot()) {
             throw new IllegalArgumentException("Cannot register non-root node: " + root.getPath());
         }
     }
 
+    /**
+     * Notifies all registered listeners of a change event.
+     *
+     * @param change the change event to broadcast
+     */
     private void notifyListeners(@NotNull RCommandServiceChange change) {
         List<Consumer<RCommandServiceChange>> snapshot;
         synchronized (lock) {

@@ -17,13 +17,26 @@ import org.slf4j.Logger;
 import java.util.Locale;
 import java.util.Objects;
 
+/**
+ * Bootstraps transport-level messengers (Redis, RPC server/client, plugin messaging).
+ *
+ * <p>Parses configuration YAML and environment variables, applies transport priority
+ * logic, and creates the appropriate {@link Messenger} implementation.
+ */
 @SuppressWarnings("SameParameterValue")
 public final class MessengerTransportBootstrap {
+    /** Environment variable for overriding the server name. */
     public static final String ENV_SERVER_NAME = "RAPUNZEL_SERVER_NAME";
+    /** Environment variable for overriding the proxy server name. */
     public static final String ENV_PROXY_SERVER_NAME = "RAPUNZEL_PROXY_SERVER_NAME";
+    /** Environment variable for overriding the RPC host address. */
     public static final String ENV_RPC_HOST = "RAPUNZEL_RPC_HOST";
+    /** Environment variable for overriding the RPC port. */
     public static final String ENV_RPC_PORT = "RAPUNZEL_RPC_PORT";
 
+    /**
+     * Transport priority selection for messenger initialization.
+     */
     public enum TransportPriority {
         REDIS_FIRST,
         PLUGIN_FIRST,
@@ -32,6 +45,12 @@ public final class MessengerTransportBootstrap {
         RPC_SERVER_FIRST,
         RPC_SERVER_ONLY;
 
+        /**
+         * Parses a transport priority from a configuration value.
+         *
+         * @param raw the raw config string (case-insensitive)
+         * @return the parsed priority, or null if unrecognized
+         */
         public static TransportPriority fromConfigValue(String raw) {
             if (raw == null) {
                 return null;
@@ -51,15 +70,36 @@ public final class MessengerTransportBootstrap {
         }
     }
 
+    /**
+     * Result of a transport bootstrap operation.
+     *
+     * @param messenger  the initialized messenger
+     * @param usingRedis whether the messenger uses Redis transport
+     * @param closeable  a closeable to clean up resources, or a no-op
+     */
     public record Result(Messenger messenger, boolean usingRedis, AutoCloseable closeable) {
     }
 
+    /**
+     * Resolved server and proxy names.
+     *
+     * @param serverName     the resolved server name
+     * @param proxyServerName the resolved proxy server name
+     */
     public record ResolvedNames(String serverName, String proxyServerName) {
     }
 
     private MessengerTransportBootstrap() {
     }
 
+    /**
+     * Bootstraps a transport messenger using the global Rapunzel context services.
+     *
+     * @param config     the YAML configuration
+     * @param platformId the platform identifier
+     * @param logger     the logger
+     * @return the transport bootstrap result
+     */
     public static Result bootstrap(YamlConfig config, PlatformId platformId, Logger logger) {
         return bootstrap(config, platformId, logger, Rapunzel.context().services());
     }
@@ -146,6 +186,13 @@ public final class MessengerTransportBootstrap {
         return new Result(current, false, NOOP_CLOSEABLE);
     }
 
+    /**
+     * Resolves resolved names from configuration, environment variables, and defaults.
+     *
+     * @param config     the YAML configuration
+     * @param platformId the platform identifier
+     * @return resolved server and proxy names
+     */
     public static ResolvedNames resolveNames(YamlConfig config, PlatformId platformId) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(platformId, "platformId");
@@ -358,6 +405,12 @@ public final class MessengerTransportBootstrap {
         return raw.trim().toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Resolves the transport priority from configuration.
+     *
+     * @param config the YAML configuration
+     * @return the resolved transport priority
+     */
     public static TransportPriority resolvePriority(YamlConfig config) {
         if (config == null) {
             return TransportPriority.PLUGIN_ONLY;

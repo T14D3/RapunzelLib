@@ -8,12 +8,23 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A {@link BlockStructureShape} that produces the 12 edges of an
+ * axis-aligned box as thin rectangular faces.
+ */
 final class BoxStructureShape implements BlockStructureShape {
     private final int minX, minY, minZ;
     private final int maxX, maxY, maxZ;
     private final RWorldRef world;
     private final float thickness;
 
+    /**
+     * Creates a box structure shape from two corner positions.
+     *
+     * @param corner1       the first corner
+     * @param corner2       the second corner
+     * @param worldLocation a reference location to derive the world
+     */
     BoxStructureShape(@NotNull RBlockPos corner1, @NotNull RBlockPos corner2, @NotNull RLocation worldLocation) {
         this.world = worldLocation.world();
         this.minX = Math.min(corner1.x(), corner2.x());

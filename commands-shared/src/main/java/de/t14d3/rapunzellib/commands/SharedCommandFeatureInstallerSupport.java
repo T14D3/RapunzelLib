@@ -17,6 +17,13 @@ import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 
+/**
+ * Support utility for installing shared command source stack support.
+ * <p>
+ * Provides factory methods for creating {@link CommandSourceStackAdapterSpec}
+ * instances, wiring them into the context, and resolving permissions through
+ * either modern or legacy API paths.
+ */
 public final class SharedCommandFeatureInstallerSupport {
     private static final int OPERATOR_PERMISSION_LEVEL = 4;
     private static final @Nullable Method COMMAND_SOURCE_STACK_PERMISSIONS_METHOD = optionalMethod(CommandSourceStack.class, "permissions");
@@ -35,6 +42,11 @@ public final class SharedCommandFeatureInstallerSupport {
     private SharedCommandFeatureInstallerSupport() {
     }
 
+    /**
+     * Specification for adapting a command source type into an {@link RCommandSource}.
+     *
+     * @param <T> the native command source type
+     */
     public record CommandSourceStackAdapterSpec<T>(
         @NotNull PlatformId platformId,
         @NotNull Class<T> sourceType,
@@ -42,6 +54,15 @@ public final class SharedCommandFeatureInstallerSupport {
         @NotNull BiPredicate<? super T, ? super String> permissionChecker,
         @NotNull Function<? super T, Optional<RPlayer>> playerExtractor
     ) {
+        /**
+         * Creates an adapter spec with non-null validation.
+         *
+         * @param platformId             the platform identifier
+         * @param sourceType             the native source class
+         * @param replyChannelsExtractor extracts reply channels from the source
+         * @param permissionChecker      checks permissions on the source
+         * @param playerExtractor        extracts an optional RPlayer from the source
+         */
         public CommandSourceStackAdapterSpec {
             Objects.requireNonNull(platformId, "platformId");
             Objects.requireNonNull(sourceType, "sourceType");
@@ -51,6 +72,12 @@ public final class SharedCommandFeatureInstallerSupport {
         }
     }
 
+    /**
+     * Creates a default adapter spec for {@link CommandSourceStack}.
+     *
+     * @param platformId the platform identifier
+     * @return the default adapter spec
+     */
     public static @NotNull CommandSourceStackAdapterSpec<CommandSourceStack> defaultCommandSourceStackAdapterSpec(
         @NotNull PlatformId platformId
     ) {
@@ -65,6 +92,12 @@ public final class SharedCommandFeatureInstallerSupport {
         );
     }
 
+    /**
+     * Installs command source stack support using the default spec.
+     *
+     * @param context    the Rapunzel context
+     * @param platformId the platform identifier
+     */
     public static void installCommandSourceStackSupport(
         @NotNull RapunzelContext context,
         @NotNull PlatformId platformId
@@ -72,6 +105,13 @@ public final class SharedCommandFeatureInstallerSupport {
         installCommandSourceStackSupport(context, defaultCommandSourceStackAdapterSpec(platformId));
     }
 
+    /**
+     * Installs command source stack support using a custom spec.
+     *
+     * @param context the Rapunzel context
+     * @param spec    the adapter specification
+     * @param <T>     the native command source type
+     */
     public static <T> void installCommandSourceStackSupport(
         @NotNull RapunzelContext context,
         @NotNull CommandSourceStackAdapterSpec<T> spec
@@ -79,6 +119,13 @@ public final class SharedCommandFeatureInstallerSupport {
         registerCommandSourceStackAdapter(context, spec);
     }
 
+    /**
+     * Registers a command source stack adapter from the given spec.
+     *
+     * @param context the Rapunzel context
+     * @param spec    the adapter specification
+     * @param <T>     the native command source type
+     */
     public static <T> void registerCommandSourceStackAdapter(
         @NotNull RapunzelContext context,
         @NotNull CommandSourceStackAdapterSpec<T> spec
@@ -95,6 +142,17 @@ public final class SharedCommandFeatureInstallerSupport {
         );
     }
 
+    /**
+     * Registers a command source stack adapter from individual components.
+     *
+     * @param context                the Rapunzel context
+     * @param platformId             the platform identifier
+     * @param sourceType             the native source class
+     * @param replyChannelsExtractor extracts reply channels
+     * @param permissionChecker      checks permissions
+     * @param playerExtractor        extracts an optional RPlayer
+     * @param <T>                    the native command source type
+     */
     public static <T> void registerCommandSourceStackAdapter(
         @NotNull RapunzelContext context,
         @NotNull PlatformId platformId,
@@ -131,6 +189,16 @@ public final class SharedCommandFeatureInstallerSupport {
         installRuntimeCommandRegistrationSupport(context);
     }
 
+    /**
+     * Registers a command source stack adapter using a throwing function for player extraction.
+     *
+     * @param context           the Rapunzel context
+     * @param platformId        the platform identifier
+     * @param sourceType        the native source class
+     * @param permissionChecker checks permissions
+     * @param playerExtractor   a throwing function that extracts the native player
+     * @param <T>               the native command source type
+     */
     public static <T> void registerCommandSourceStackAdapter(
         @NotNull RapunzelContext context,
         @NotNull PlatformId platformId,
@@ -148,6 +216,12 @@ public final class SharedCommandFeatureInstallerSupport {
         );
     }
 
+    /**
+     * Installs and returns a {@link SharedRuntimeCommandRegistrationSupport} for the context.
+     *
+     * @param context the Rapunzel context
+     * @return the registration support instance
+     */
     public static @NotNull SharedRuntimeCommandRegistrationSupport installRuntimeCommandRegistrationSupport(
         @NotNull RapunzelContext context
     ) {
@@ -163,6 +237,12 @@ public final class SharedCommandFeatureInstallerSupport {
         );
     }
 
+    /**
+     * Extracts a player from a CommandSourceStack.
+     *
+     * @param source the command source
+     * @return an optional RPlayer
+     */
     private static @NotNull Optional<RPlayer> defaultPlayerExtractor(@NotNull CommandSourceStack source) {
         Objects.requireNonNull(source, "source");
         if (!(source.getEntity() instanceof ServerPlayer player)) {
@@ -171,6 +251,13 @@ public final class SharedCommandFeatureInstallerSupport {
         return Rapunzel.players().wrap(player);
     }
 
+    /**
+     * Default permission checker for CommandSourceStack.
+     *
+     * @param source     the command source
+     * @param permission the permission to check
+     * @return {@code true} if the source has the permission
+     */
     private static boolean defaultPermissionChecker(@NotNull CommandSourceStack source, @NotNull String permission) {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(permission, "permission");
@@ -183,6 +270,12 @@ public final class SharedCommandFeatureInstallerSupport {
             .orElseGet(() -> hasOperatorPermission(source));
     }
 
+    /**
+     * Checks if the source has operator-level permission.
+     *
+     * @param source the command source
+     * @return {@code true} if operator
+     */
     private static boolean hasOperatorPermission(@NotNull CommandSourceStack source) {
         Boolean modernPermission = invokeModernPermission(source);
         if (modernPermission != null) {
@@ -193,6 +286,14 @@ public final class SharedCommandFeatureInstallerSupport {
         return legacyPermission != null && legacyPermission;
     }
 
+    /**
+     * Extracts reply channels using a throwing player extractor.
+     *
+     * @param source          the command source
+     * @param playerExtractor the throwing player extractor
+     * @param <T>             the native source type
+     * @return the reply channels
+     */
     private static <T> @NotNull RCommandSources.ReplyChannels sharedReplyChannelsExtractor(
         @NotNull T source,
         @NotNull SharedCommandSourceAdapterCore.ThrowingFunction<? super T, ?> playerExtractor
@@ -203,6 +304,14 @@ public final class SharedCommandFeatureInstallerSupport {
             .orElseGet(() -> RCommandSources.replyChannels(net.kyori.adventure.audience.Audience.empty()));
     }
 
+    /**
+     * Extracts a player using a throwing extractor.
+     *
+     * @param source          the command source
+     * @param playerExtractor the throwing player extractor
+     * @param <T>             the native source type
+     * @return an optional RPlayer
+     */
     private static <T> @NotNull Optional<RPlayer> sharedPlayerExtractor(
         @NotNull T source,
         @NotNull SharedCommandSourceAdapterCore.ThrowingFunction<? super T, ?> playerExtractor
@@ -218,6 +327,12 @@ public final class SharedCommandFeatureInstallerSupport {
         }
     }
 
+    /**
+     * Invokes the modern permission check (1.21.x+) on the command source.
+     *
+     * @param source the command source
+     * @return the permission result, or {@code null} if unavailable
+     */
     private static @Nullable Boolean invokeModernPermission(@NotNull CommandSourceStack source) {
         if (COMMAND_SOURCE_STACK_PERMISSIONS_METHOD == null
             || PERMISSION_SET_HAS_PERMISSION_METHOD == null
@@ -236,6 +351,11 @@ public final class SharedCommandFeatureInstallerSupport {
         }
     }
 
+    /**
+     * Resolves the PermissionSet#hasPermission method via reflection.
+     *
+     * @return the method, or {@code null} if unavailable
+     */
     private static @Nullable Method permissionSetHasPermissionMethod() {
         if (COMMAND_SOURCE_STACK_PERMISSIONS_METHOD == null || PERMISSION_CLASS == null) {
             return null;
@@ -244,6 +364,12 @@ public final class SharedCommandFeatureInstallerSupport {
         return optionalMethod(COMMAND_SOURCE_STACK_PERMISSIONS_METHOD.getReturnType(), "hasPermission", PERMISSION_CLASS);
     }
 
+    /**
+     * Tries to load a class by name.
+     *
+     * @param className the fully qualified class name
+     * @return the class, or {@code null} if not found
+     */
     private static @Nullable Class<?> optionalClass(@NotNull String className) {
         try {
             return Class.forName(className);
@@ -252,6 +378,13 @@ public final class SharedCommandFeatureInstallerSupport {
         }
     }
 
+    /**
+     * Tries to read a static field value.
+     *
+     * @param ownerClassName the owning class name
+     * @param fieldName      the field name
+     * @return the field value, or {@code null} on failure
+     */
     private static @Nullable Object optionalStaticField(@NotNull String ownerClassName, @NotNull String fieldName) {
         Class<?> owner = optionalClass(ownerClassName);
         if (owner == null) {
@@ -265,6 +398,14 @@ public final class SharedCommandFeatureInstallerSupport {
         }
     }
 
+    /**
+     * Tries to resolve a method by name and parameter types.
+     *
+     * @param owner          the owning class
+     * @param methodName     the method name
+     * @param parameterTypes the parameter types
+     * @return the method, or {@code null} on failure
+     */
     private static @Nullable Method optionalMethod(
         @NotNull Class<?> owner,
         @NotNull String methodName,
@@ -277,6 +418,15 @@ public final class SharedCommandFeatureInstallerSupport {
         }
     }
 
+    /**
+     * Invokes a method with a boolean return type.
+     *
+     * @param method    the method (may be null)
+     * @param target    the target object
+     * @param arguments the arguments
+     * @return the boolean result, or {@code null} if method is null
+     * @throws IllegalStateException if invocation fails
+     */
     private static @Nullable Boolean invokeBoolean(@Nullable Method method, @NotNull Object target, Object... arguments) {
         if (method == null) {
             return null;

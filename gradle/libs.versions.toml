@@ -3,6 +3,7 @@
 #
 # Keep target-independent library versions here. Minecraft-sensitive versions
 # belong in gradle/minecraft-targets.properties.
+dokka = "2.2.0"
 junit-jupiter = "5.10.3"
 junit-platform = "1.10.3"
 jetbrains-annotations = "26.0.1"
@@ -35,6 +36,7 @@ mixin-plugin = "0.8-SNAPSHOT"
 [plugins]
 shadow = { id = "com.gradleup.shadow" }
 idea-ext = { id = "org.jetbrains.gradle.plugin.idea-ext", version.ref = "idea-ext" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
 userdev = { id = "io.papermc.paperweight.userdev" }
 vanilla-gradle = { id = "org.spongepowered.gradle.vanilla" }

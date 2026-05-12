@@ -4,7 +4,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Exception thrown when entity serialization or deserialization fails.
+ * Exception thrown when NBT serialization or deserialization fails.
+ * <p>
+ * This is a runtime exception used by {@link SerializedEntity}, {@link SerializedBlockEntity},
+ * and related serialization utilities.</p>
  */
 public class SerializationException extends RuntimeException {
     

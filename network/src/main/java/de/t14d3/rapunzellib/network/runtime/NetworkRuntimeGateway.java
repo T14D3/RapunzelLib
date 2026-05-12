@@ -6,6 +6,9 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Gateway for network runtime operations.
+ */
 public interface NetworkRuntimeGateway extends AutoCloseable {
     @NotNull NetworkRuntime runtime();
 

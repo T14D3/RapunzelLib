@@ -21,10 +21,21 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Factory for creating {@link SharedDialogPayload} instances from
+ * {@link GuiDialogModel} and render context.
+ */
 public final class SharedDialogPayloads {
     private SharedDialogPayloads() {
     }
 
+    /**
+     * Creates a shared dialog payload from a dialog model and context.
+     *
+     * @param model   the dialog model
+     * @param context the render context
+     * @return the shared dialog payload
+     */
     public static @NotNull SharedDialogPayload create(
         @NotNull GuiDialogModel model,
         @NotNull de.t14d3.rapunzellib.gui.RenderContext context
@@ -36,6 +47,12 @@ public final class SharedDialogPayloads {
         );
     }
 
+    /**
+     * Creates the body elements list from the model.
+     *
+     * @param model the dialog model
+     * @return the list of body elements
+     */
     private static @NotNull List<SharedDialogPayload.Body> createBodies(@NotNull GuiDialogModel model) {
         List<SharedDialogPayload.Body> bodies = new ArrayList<>();
         for (GuiElement element : model.elements()) {
@@ -56,6 +73,12 @@ public final class SharedDialogPayloads {
         return bodies;
     }
 
+    /**
+     * Creates a button body from a button element.
+     *
+     * @param button the button element
+     * @return the button body
+     */
     private static @NotNull SharedDialogPayload.ButtonBody createButton(@NotNull ButtonElement button) {
         return new SharedDialogPayload.ButtonBody(
             plain(button.label()),
@@ -65,6 +88,13 @@ public final class SharedDialogPayloads {
         );
     }
 
+    /**
+     * Creates the input fields list from the model.
+     *
+     * @param model   the dialog model
+     * @param context the render context
+     * @return the list of input fields
+     */
     private static @NotNull List<SharedDialogPayload.Input> createInputs(
         @NotNull GuiDialogModel model,
         @NotNull de.t14d3.rapunzellib.gui.RenderContext context
@@ -85,6 +115,13 @@ public final class SharedDialogPayloads {
         return inputs;
     }
 
+    /**
+     * Creates a text input payload from an input field.
+     *
+     * @param input   the input field
+     * @param context the render context
+     * @return the text input payload
+     */
     private static @NotNull SharedDialogPayload.TextInput createInput(
         @NotNull GuiDialogField.InputField input,
         @NotNull de.t14d3.rapunzellib.gui.RenderContext context
@@ -99,6 +136,13 @@ public final class SharedDialogPayloads {
         );
     }
 
+    /**
+     * Creates a toggle input payload from a toggle field.
+     *
+     * @param toggle  the toggle field
+     * @param context the render context
+     * @return the toggle input payload
+     */
     private static @NotNull SharedDialogPayload.ToggleInput createToggle(
         @NotNull GuiDialogField.ToggleField toggle,
         @NotNull de.t14d3.rapunzellib.gui.RenderContext context
@@ -111,6 +155,13 @@ public final class SharedDialogPayloads {
         );
     }
 
+    /**
+     * Creates a slider input payload from a slider field.
+     *
+     * @param slider  the slider field
+     * @param context the render context
+     * @return the slider input payload
+     */
     private static @NotNull SharedDialogPayload.SliderInput createSlider(
         @NotNull GuiDialogField.SliderField slider,
         @NotNull de.t14d3.rapunzellib.gui.RenderContext context
@@ -126,6 +177,13 @@ public final class SharedDialogPayloads {
         );
     }
 
+    /**
+     * Creates a dropdown input payload from a dropdown field.
+     *
+     * @param dropdown the dropdown field
+     * @param context  the render context
+     * @return the dropdown input payload
+     */
     private static @NotNull SharedDialogPayload.DropdownInput createDropdown(
         @NotNull GuiDialogField.DropdownField dropdown,
         @NotNull de.t14d3.rapunzellib.gui.RenderContext context
@@ -144,6 +202,12 @@ public final class SharedDialogPayloads {
         );
     }
 
+    /**
+     * Extracts the icon identifier from an Icon.
+     *
+     * @param icon the icon
+     * @return the icon id, or {@code null}
+     */
     private static @Nullable String iconId(@Nullable Icon icon) {
         return switch (icon) {
             case Icon.ItemIcon itemIcon -> GuiInventoryPresentation.normalizeItemKey(itemIcon.item().material(), "minecraft:stone");
@@ -153,14 +217,33 @@ public final class SharedDialogPayloads {
         };
     }
 
+    /**
+     * Returns the label or falls back to the key if label is null.
+     *
+     * @param key   the field key
+     * @param label the component label
+     * @return the plain text label
+     */
     private static @NotNull String labelOrKey(@NotNull String key, Component label) {
         return label != null ? plain(label) : key;
     }
 
+    /**
+     * Converts a component to plain text.
+     *
+     * @param component the component
+     * @return the plain text
+     */
     private static @NotNull String plain(@NotNull Component component) {
         return PlainTextComponentSerializer.plainText().serialize(component);
     }
 
+    /**
+     * Converts an array of components to plain text strings.
+     *
+     * @param components the component array
+     * @return the plain text array
+     */
     private static @NotNull String[] plain(@NotNull Component[] components) {
         String[] strings = new String[components.length];
         for (int i = 0; i < components.length; i++) {

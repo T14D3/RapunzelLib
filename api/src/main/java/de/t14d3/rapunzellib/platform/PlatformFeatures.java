@@ -5,6 +5,9 @@ import de.t14d3.rapunzellib.context.FeatureInstallationSupport;
 import de.t14d3.rapunzellib.context.FeatureInstallerRegistry;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 
+/**
+ * Entry point for installing platform-specific services into a RapunzelLib context.
+ */
 public final class PlatformFeatures {
     private static final FeatureInstallerRegistry<PlatformFeatureInstaller> INSTALLER_REGISTRY = FeatureInstallerRegistry.create(
         PlatformFeatureInstaller.class,
@@ -15,10 +18,18 @@ public final class PlatformFeatures {
     private PlatformFeatures() {
     }
 
+    /**
+     * Installs platform services using the current context.
+     */
     public static void install() {
         install(Rapunzel.context());
     }
 
+    /**
+     * Installs platform services into the given context.
+     *
+     * @param context the context to install into
+     */
     public static void install(RapunzelContext context) {
         FeatureInstallationSupport.install(
             context,

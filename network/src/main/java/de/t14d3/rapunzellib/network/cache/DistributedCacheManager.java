@@ -62,6 +62,11 @@ public class DistributedCacheManager implements AutoCloseable {
         this(messenger, LoggerFactory.getLogger(DistributedCacheManager.class));
     }
 
+    /**
+     * Creates a new DistributedCacheManager with the specified gateway.
+     *
+     * @param gateway the network runtime gateway
+     */
     public DistributedCacheManager(@NotNull NetworkRuntimeGateway gateway) {
         this(gateway, LoggerFactory.getLogger(DistributedCacheManager.class));
     }
@@ -76,6 +81,12 @@ public class DistributedCacheManager implements AutoCloseable {
         this(DefaultNetworkRuntimeGateway.compatibility(messenger), logger);
     }
 
+    /**
+     * Creates a new DistributedCacheManager with the specified gateway and logger.
+     *
+     * @param gateway the network runtime gateway
+     * @param logger  the logger
+     */
     public DistributedCacheManager(@NotNull NetworkRuntimeGateway gateway, @NotNull Logger logger) {
         this.gateway = Objects.requireNonNull(gateway, "gateway");
         this.logger = Objects.requireNonNull(logger, "logger");
@@ -206,6 +217,9 @@ public class DistributedCacheManager implements AutoCloseable {
         return active;
     }
 
+    /**
+     * Handles an incoming cache invalidation message from another server.
+     */
     private void handleInvalidation(CacheInvalidationMessage invalidationMessage, String sourceServer) {
         if (invalidationMessage == null) {
             return;

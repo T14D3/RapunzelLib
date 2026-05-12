@@ -57,6 +57,14 @@ public class RCommandNode<S extends RCommandSource> {
         return new RCommandNode<>(name, null, null);
     }
 
+    /**
+     * Creates a new argument command node.
+     *
+     * @param argument the argument definition
+     * @param <S>      the command source type
+     * @param <T>      the argument value type
+     * @return a new argument node
+     */
     public static <S extends RCommandSource, T> RCommandNode<S> argument(@NotNull RArgument<S, T> argument) {
         return new RCommandNode<>(argument.getName(), null, argument);
     }
@@ -90,6 +98,13 @@ public class RCommandNode<S extends RCommandSource> {
         return child;
     }
 
+    /**
+     * Adds an argument child node from an {@link RArgument} definition.
+     *
+     * @param argument the argument definition
+     * @param <T>      the argument value type
+     * @return the child node
+     */
     @NotNull
     public <T> RCommandNode<S> then(@NotNull RArgument<S, T> argument) {
         String argumentName = argument.getName();
@@ -173,14 +188,29 @@ public class RCommandNode<S extends RCommandSource> {
         return name;
     }
 
+    /**
+     * Checks if this node is a literal (non-argument) node.
+     *
+     * @return true if this is a literal node
+     */
     public boolean isLiteral() {
         return argument == null;
     }
 
+    /**
+     * Checks if this node is an argument node.
+     *
+     * @return true if this is an argument node
+     */
     public boolean isArgument() {
         return argument != null;
     }
 
+    /**
+     * Gets the argument definition for this node.
+     *
+     * @return the argument, or null if this is a literal node
+     */
     public @Nullable RArgument<S, ?> getArgument() {
         return argument;
     }
@@ -205,6 +235,11 @@ public class RCommandNode<S extends RCommandSource> {
         return executor;
     }
 
+    /**
+     * Gets the execution delegate node.
+     *
+     * @return the execution delegate, or null if not set
+     */
     @Nullable
     public RCommandNode<S> getExecutionDelegate() {
         return executionDelegate;
@@ -234,17 +269,34 @@ public class RCommandNode<S extends RCommandSource> {
         return this;
     }
 
+    /**
+     * Gets the suggestion provider for this node.
+     *
+     * @return the suggestion provider, or null if not set
+     */
     @Nullable
     public RCommandSuggestionProvider<S> getSuggestionProvider() {
         return suggestionProvider;
     }
 
+    /**
+     * Sets the suggestion provider for this node.
+     *
+     * @param suggestionProvider the suggestion provider
+     * @return this node for chaining
+     */
     @NotNull
     public RCommandNode<S> setSuggestionProvider(@NotNull RCommandSuggestionProvider<S> suggestionProvider) {
         this.suggestionProvider = suggestionProvider;
         return this;
     }
 
+    /**
+     * Sets the suggestion provider using a fluent method name.
+     *
+     * @param suggestionProvider the suggestion provider
+     * @return this node for chaining
+     */
     @NotNull
     public RCommandNode<S> suggests(@NotNull RCommandSuggestionProvider<S> suggestionProvider) {
         this.suggestionProvider = suggestionProvider;
@@ -426,6 +478,14 @@ public class RCommandNode<S extends RCommandSource> {
         return attachedChild;
     }
 
+    /**
+     * Copies a subtree and attaches it to a new parent.
+     *
+     * @param source the source node to copy
+     * @param parent the new parent for the copy
+     * @param copies map of original to copy for redirect resolution
+     * @return the copied node
+     */
     private static <S extends RCommandSource> @NotNull RCommandNode<S> copySubtree(
         @NotNull RCommandNode<S> source,
         @Nullable RCommandNode<S> parent,
@@ -447,6 +507,13 @@ public class RCommandNode<S extends RCommandSource> {
         return copy;
     }
 
+    /**
+     * Copies redirect references from the source subtree to the copied subtree.
+     *
+     * @param source the source node
+     * @param copy   the copied node
+     * @param copies map of original to copy for redirect resolution
+     */
     private static <S extends RCommandSource> void copyRedirects(
         @NotNull RCommandNode<S> source,
         @NotNull RCommandNode<S> copy,
@@ -467,11 +534,22 @@ public class RCommandNode<S extends RCommandSource> {
         }
     }
 
+    /**
+     * Registers this node as a command root with the command service.
+     *
+     * @return the registered command tree
+     */
     @SuppressWarnings("unchecked")
     public @NotNull RegisteredCommandTree register() {
         return register(name);
     }
 
+    /**
+     * Registers this node with a specific registration ID.
+     *
+     * @param registrationId the unique registration identifier
+     * @return the registered command tree
+     */
     @SuppressWarnings("unchecked")
     public @NotNull RegisteredCommandTree register(@NotNull String registrationId) {
         return CommandFeatures.commands().registerRoot(
@@ -480,11 +558,22 @@ public class RCommandNode<S extends RCommandSource> {
         );
     }
 
+    /**
+     * Queues this node for registration using its own name as the registration ID.
+     *
+     * @return the registered command tree
+     */
     @SuppressWarnings("unchecked")
     public @NotNull RegisteredCommandTree queue() {
         return queue(name);
     }
 
+    /**
+     * Queues this node for registration with a specific registration ID.
+     *
+     * @param registrationId the unique registration identifier
+     * @return the registered command tree
+     */
     @SuppressWarnings("unchecked")
     public @NotNull RegisteredCommandTree queue(@NotNull String registrationId) {
         return CommandFeatures.commands().queueRoot(

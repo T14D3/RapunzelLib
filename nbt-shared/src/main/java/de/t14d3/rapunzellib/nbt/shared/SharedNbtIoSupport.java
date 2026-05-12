@@ -32,10 +32,24 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 
+/**
+ * I/O support for converting between Minecraft NBT tags and
+ * Rapunzel's platform-independent {@link RNbtValue} tree representation.
+ * <p>
+ * Supports compressed binary serialization and recursive tree conversion
+ * for all standard NBT types.
+ */
 public final class SharedNbtIoSupport {
     private SharedNbtIoSupport() {
     }
 
+    /**
+     * Serializes an {@link RNbtCompound} to a compressed byte array.
+     *
+     * @param nbt the compound to serialize
+     * @return the compressed bytes
+     * @throws SerializationException if serialization fails
+     */
     public static byte[] serializeCompressed(@NotNull RNbtCompound nbt) {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
              DataOutputStream dos = new DataOutputStream(baos)) {
@@ -46,6 +60,13 @@ public final class SharedNbtIoSupport {
         }
     }
 
+    /**
+     * Deserializes a compressed byte array to an {@link RNbtCompound}.
+     *
+     * @param bytes the compressed bytes
+     * @return the deserialized compound
+     * @throws SerializationException if deserialization fails
+     */
     public static @NotNull RNbtCompound deserializeCompressed(byte[] bytes) {
         try (ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
              DataInputStream dis = new DataInputStream(bais)) {
@@ -55,14 +76,32 @@ public final class SharedNbtIoSupport {
         }
     }
 
+    /**
+     * Converts a Minecraft {@link CompoundTag} to an {@link RNbtCompound}.
+     *
+     * @param nbt the native compound
+     * @return the shared compound
+     */
     public static @NotNull RNbtCompound toTree(@NotNull CompoundTag nbt) {
         return toTreeValue(nbt).asCompound();
     }
 
+    /**
+     * Converts an {@link RNbtCompound} to a Minecraft {@link CompoundTag}.
+     *
+     * @param nbt the shared compound
+     * @return the native compound
+     */
     public static @NotNull CompoundTag fromTree(@NotNull RNbtCompound nbt) {
         return (CompoundTag) toNativeTag(nbt);
     }
 
+    /**
+     * Converts any Minecraft {@link Tag} to the shared tree representation.
+     *
+     * @param tag the native tag
+     * @return the shared value
+     */
     public static @NotNull RNbtValue toTreeValue(@NotNull Tag tag) {
         return switch (tag.getId()) {
             case Tag.TAG_BYTE -> RNbtPrimitive.ofByte(((ByteTag) tag).value());
@@ -81,6 +120,12 @@ public final class SharedNbtIoSupport {
         };
     }
 
+    /**
+     * Converts any shared {@link RNbtValue} to a Minecraft {@link Tag}.
+     *
+     * @param value the shared value
+     * @return the native tag
+     */
     public static @NotNull Tag toNativeTag(@NotNull RNbtValue value) {
         return switch (value) {
             case RNbtPrimitive primitive -> toNativePrimitive(primitive);
@@ -92,6 +137,12 @@ public final class SharedNbtIoSupport {
         };
     }
 
+    /**
+     * Converts a native CompoundTag to an RNbtCompound.
+     *
+     * @param tag the native compound
+     * @return the shared compound
+     */
     private static @NotNull RNbtCompound toTreeCompound(@NotNull CompoundTag tag) {
         LinkedHashMap<String, RNbtValue> entries = new LinkedHashMap<>();
         for (String key : tag.keySet()) {
@@ -103,6 +154,12 @@ public final class SharedNbtIoSupport {
         return RNbtCompound.of(entries);
     }
 
+    /**
+     * Converts a native ListTag to an RNbtList.
+     *
+     * @param tag the native list
+     * @return the shared list
+     */
     private static @NotNull RNbtList toTreeList(@NotNull ListTag tag) {
         if (tag.isEmpty()) {
             return RNbtList.empty();
@@ -115,6 +172,12 @@ public final class SharedNbtIoSupport {
         return list;
     }
 
+    /**
+     * Converts a shared primitive to a native NBT primitive tag.
+     *
+     * @param primitive the shared primitive
+     * @return the native tag
+     */
     private static @NotNull Tag toNativePrimitive(@NotNull RNbtPrimitive primitive) {
         return switch (primitive.type()) {
             case BYTE -> ByteTag.valueOf(primitive.byteValue());
@@ -128,12 +191,24 @@ public final class SharedNbtIoSupport {
         };
     }
 
+    /**
+     * Converts a shared compound to a native CompoundTag.
+     *
+     * @param compound the shared compound
+     * @return the native compound
+     */
     private static @NotNull CompoundTag toNativeCompound(@NotNull RNbtCompound compound) {
         CompoundTag tag = new CompoundTag();
         compound.asMap().forEach((key, value) -> tag.put(key, toNativeTag(value)));
         return tag;
     }
 
+    /**
+     * Converts a shared list to a native ListTag.
+     *
+     * @param list the shared list
+     * @return the native list
+     */
     private static @NotNull ListTag toNativeList(@NotNull RNbtList list) {
         ListTag tag = new ListTag();
         for (RNbtValue element : list.values()) {

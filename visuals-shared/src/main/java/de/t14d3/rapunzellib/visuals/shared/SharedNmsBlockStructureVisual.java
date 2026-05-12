@@ -37,10 +37,24 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Shared NMS implementation of a block structure visual.
+ * <p>
+ * Renders a multi-face block structure using multiple {@code minecraft:block_display}
+ * entities, one per face of the configured shape.
+ */
 public final class SharedNmsBlockStructureVisual extends SharedNmsVisual<BlockStructureConfig> implements BlockStructureVisual {
     private final List<FaceEntity> faces = new ArrayList<>();
     private RBlockType currentBlock;
 
+    /**
+     * Creates a new block structure visual.
+     *
+     * @param id       the visual ID
+     * @param config   the block structure config
+     * @param audience the visual audience
+     * @param manager  the visual manager
+     */
     public SharedNmsBlockStructureVisual(
         @NotNull VisualId id,
         @NotNull BlockStructureConfig config,
@@ -61,6 +75,9 @@ public final class SharedNmsBlockStructureVisual extends SharedNmsVisual<BlockSt
         sendDataToAll(List.of(BlockDisplayMetadata.blockStateData(state)));
     }
 
+    /**
+     * Builds the face entities from the configured shape.
+     */
     private void buildFaces() {
         faces.clear();
         for (BlockStructureShape.Face face : config.shape().faces()) {
@@ -130,6 +147,11 @@ public final class SharedNmsBlockStructureVisual extends SharedNmsVisual<BlockSt
         }
     }
 
+    /**
+     * Sends entity data updates to all current viewers for all faces.
+     *
+     * @param data the data values to send
+     */
     private void sendDataToAll(@NotNull List<SynchedEntityData.DataValue<?>> data) {
         for (UUID uuid : Set.copyOf(currentViewers)) {
             de.t14d3.rapunzellib.objects.RPlayer player = de.t14d3.rapunzellib.objects.RPlayer.get(uuid).orElse(null);
@@ -142,6 +164,12 @@ public final class SharedNmsBlockStructureVisual extends SharedNmsVisual<BlockSt
         }
     }
 
+    /**
+     * Resolves a block state from an RBlockType.
+     *
+     * @param blockType the block type
+     * @return the block state, or air if not found
+     */
     private static BlockState resolveBlockState(@NotNull RBlockType blockType) {
         // #if VERSION >= 1.21.11
         Identifier id = Identifier.fromNamespaceAndPath(blockType.key().namespace(), blockType.key().path());
@@ -152,6 +180,13 @@ public final class SharedNmsBlockStructureVisual extends SharedNmsVisual<BlockSt
         return block != null ? block.defaultBlockState() : Blocks.AIR.defaultBlockState();
     }
 
+    /**
+     * Internal record linking a face with its entity ID and UUID.
+     *
+     * @param entityId the entity ID
+     * @param uuid     the entity UUID
+     * @param face     the shape face
+     */
     private record FaceEntity(int entityId, @NotNull UUID uuid, @NotNull BlockStructureShape.Face face) {
     }
 }

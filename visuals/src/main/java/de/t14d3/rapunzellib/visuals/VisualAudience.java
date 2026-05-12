@@ -8,21 +8,58 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 
+/**
+ * Defines the target audience for a visual.
+ * <p>
+ * Implementations resolve to a collection of {@link RPlayer players}
+ * that should receive the visual's packets. Static factory methods
+ * provide common audience types.
+ */
 public interface VisualAudience {
+
+    /**
+     * Resolves this audience to the collection of target players.
+     *
+     * @return the collection of players in this audience
+     */
     @NotNull Collection<RPlayer> resolve();
 
+    /**
+     * Returns an empty audience (no players).
+     *
+     * @return an empty audience
+     */
     static @NotNull VisualAudience empty() {
         return Collections::emptyList;
     }
 
+    /**
+     * Returns an audience targeting a single player.
+     *
+     * @param player the target player
+     * @return a single-player audience
+     */
     static @NotNull VisualAudience player(@NotNull RPlayer player) {
         return () -> Collections.singletonList(player);
     }
 
+    /**
+     * Returns an audience targeting a specific collection of players.
+     *
+     * @param players the target players
+     * @return a multi-player audience
+     */
     static @NotNull VisualAudience players(@NotNull Collection<? extends RPlayer> players) {
         return () -> Collections.unmodifiableCollection(new ArrayList<>(players));
     }
 
+    /**
+     * Returns an audience targeting all online players within range of a center location.
+     *
+     * @param center the center location
+     * @param radius the search radius in blocks
+     * @return a range-based audience
+     */
     static @NotNull VisualAudience allInRange(@NotNull RLocation center, double radius) {
         return new RangeVisualAudience(center, radius);
     }

@@ -12,6 +12,11 @@ public final class RapunzelLibVersion {
     private RapunzelLibVersion() {
     }
 
+    /**
+     * Returns the current RapunzelLib version string.
+     *
+     * @return the version, or {@code "unknown"} if it cannot be determined
+     */
     public static @NotNull String current() {
         Package pkg = RapunzelLibVersion.class.getPackage();
         String version = (pkg != null) ? pkg.getImplementationVersion() : null;

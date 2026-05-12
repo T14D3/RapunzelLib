@@ -21,20 +21,50 @@ import java.util.Optional;
  * immutable async-safe data.</p>
  */
 public interface RBlock extends RNative {
+    /**
+     * Returns the world this block belongs to.
+     *
+     * @return the world
+     */
     @NotNull RWorld world();
 
+    /**
+     * Returns the position of this block.
+     *
+     * @return the block position
+     */
     @NotNull RBlockPos pos();
 
+    /**
+     * Returns the registry reference for this block's type.
+     *
+     * @return the block type reference
+     */
     @NotNull RRegistryRef<RBlockType> typeRef();
 
+    /**
+     * Returns the key of this block's type.
+     *
+     * @return the type key
+     */
     default @NotNull RKey typeKey() {
         return typeRef().key();
     }
 
+    /**
+     * Returns the string representation of this block's type key.
+     *
+     * @return the type ID string
+     */
     default @NotNull String typeId() {
         return typeKey().asString();
     }
 
+    /**
+     * Resolves the block type from the type reference or registry.
+     *
+     * @return an {@link Optional} containing the block type, or empty if not found
+     */
     default @NotNull Optional<RBlockType> type() {
         try {
             return typeRef().find();
@@ -43,6 +73,11 @@ public interface RBlock extends RNative {
         }
     }
 
+    /**
+     * Resolves the block type, throwing if not found.
+     *
+     * @return the block type
+     */
     default @NotNull RBlockType requireType() {
         try {
             return typeRef().require();
@@ -51,6 +86,16 @@ public interface RBlock extends RNative {
         }
     }
 
+    /**
+     * Returns the current block data for this block.
+     *
+     * @return the block data
+     */
+    /**
+     * Returns the current block data for this block.
+     *
+     * @return the block data
+     */
     @NotNull RBlockData data();
 
     /**
@@ -60,6 +105,11 @@ public interface RBlock extends RNative {
         return RBlockSnapshot.capture(this);
     }
 
+    /**
+     * Checks whether setting block data is supported for this block.
+     *
+     * @return true if setData is available
+     */
     default boolean canSetData() {
         return false;
     }
@@ -106,10 +156,23 @@ public interface RBlock extends RNative {
         ));
     }
 
+    /**
+     * Wraps a native platform block object into an RBlock, if supported.
+     *
+     * @param nativeBlock the native block object
+     * @return an {@link Optional} containing the wrapped block, or empty if not supported
+     */
     static @NotNull Optional<RBlock> wrap(@NotNull Object nativeBlock) {
         return Rapunzel.blocks().wrap(nativeBlock);
     }
 
+    /**
+     * Returns the block at the given position in the given world.
+     *
+     * @param world the world
+     * @param pos   the block position
+     * @return the block at the position
+     */
     static @NotNull RBlock at(@NotNull RWorld world, @NotNull RBlockPos pos) {
         return Rapunzel.blocks().at(world, pos);
     }

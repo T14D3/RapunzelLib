@@ -8,13 +8,46 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * A container for typed attachment values associated with a native object.
+ *
+ * <p>Supports transient (in-memory) attachments by default. Platform implementations
+ * may also support persistent (disk-backed) attachments.</p>
+ */
 public interface RAttachmentContainer {
+    /**
+     * Retrieves an attachment value by its key.
+     *
+     * @param key the attachment key
+     * @param <T> the value type
+     * @return an {@link Optional} containing the value, or empty if not set
+     */
     <T> @NotNull Optional<T> get(@NotNull RAttachmentKey<T> key);
 
+    /**
+     * Stores an attachment value by its key.
+     *
+     * @param key   the attachment key
+     * @param value the value to store
+     * @param <T>   the value type
+     */
     <T> void put(@NotNull RAttachmentKey<T> key, @NotNull T value);
 
+    /**
+     * Removes an attachment by its key.
+     *
+     * @param key the attachment key
+     * @param <T> the value type
+     * @return an {@link Optional} containing the removed value, or empty if not set
+     */
     <T> @NotNull Optional<T> remove(@NotNull RAttachmentKey<T> key);
 
+    /**
+     * Checks whether this container supports the given scope.
+     *
+     * @param scope the scope to check
+     * @return true if the scope is supported
+     */
     default boolean supports(@NotNull RAttachmentScope scope) {
         Objects.requireNonNull(scope, "scope");
         return scope == RAttachmentScope.TRANSIENT;
@@ -31,14 +64,29 @@ public interface RAttachmentContainer {
         );
     }
 
+    /**
+     * Returns an empty, immutable attachment container.
+     *
+     * @return an empty container
+     */
     static @NotNull RAttachmentContainer empty() {
         return EmptyAttachmentContainer.INSTANCE;
     }
 
+    /**
+     * Creates a new mutable attachment container backed by a concurrent map.
+     *
+     * @return a mutable container
+     */
     static @NotNull RAttachmentContainer mutable() {
         return new MapAttachmentContainer();
     }
 
+    /**
+     * Creates a new lazy-initialized mutable attachment container.
+     *
+     * @return a lazy mutable container
+     */
     static @NotNull RAttachmentContainer lazyMutable() {
         return new LazyAttachmentContainer();
     }

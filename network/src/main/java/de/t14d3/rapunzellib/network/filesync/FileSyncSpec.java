@@ -48,18 +48,40 @@ public final class FileSyncSpec {
         this.deleteExtraneous = deleteExtraneous;
     }
 
+    /**
+     * Creates a new builder for the given root directory.
+     *
+     * @param rootDirectory the root directory for file sync
+     * @return a new builder
+     */
     public static Builder builder(Path rootDirectory) {
         return new Builder(rootDirectory);
     }
 
+    /**
+     * Returns the root directory for this sync spec.
+     *
+     * @return the root directory
+     */
     public Path rootDirectory() {
         return rootDirectory;
     }
 
+    /**
+     * Returns whether extraneous files should be deleted.
+     *
+     * @return true if extraneous files are deleted
+     */
     public boolean deleteExtraneous() {
         return deleteExtraneous;
     }
 
+    /**
+     * Checks whether the given relative path matches this spec's include/exclude rules.
+     *
+     * @param relativePath the relative path to check
+     * @return true if the path should be synced
+     */
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public boolean matches(Path relativePath) {
         Objects.requireNonNull(relativePath, "relativePath");
@@ -80,6 +102,12 @@ public final class FileSyncSpec {
         return true;
     }
 
+    /**
+     * Computes a manifest of file paths to their SHA-256 hashes.
+     *
+     * @return map of file paths to hex-encoded SHA-256 hashes
+     * @throws IOException if an I/O error occurs
+     */
     public Map<String, String> computeManifest() throws IOException {
         if (!Files.exists(rootDirectory)) return Collections.emptyMap();
 
@@ -94,6 +122,13 @@ public final class FileSyncSpec {
         return Collections.unmodifiableMap(out);
     }
 
+    /**
+     * Builds a ZIP archive containing the specified relative paths.
+     *
+     * @param relativePaths set of relative paths to include
+     * @return the ZIP archive as a byte array
+     * @throws IOException if an I/O error occurs
+     */
     public byte[] buildZip(Set<String> relativePaths) throws IOException {
         Objects.requireNonNull(relativePaths, "relativePaths");
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -118,6 +153,14 @@ public final class FileSyncSpec {
         return bytes.toByteArray();
     }
 
+    /**
+     * Applies a ZIP archive to the root directory, writing and deleting files as specified.
+     *
+     * @param zipBytes the ZIP archive bytes
+     * @param deletePaths list of paths to delete
+     * @return the result of the application
+     * @throws IOException if an I/O error occurs
+     */
     public ApplyResult applyZip(byte[] zipBytes, List<String> deletePaths) throws IOException {
         Objects.requireNonNull(zipBytes, "zipBytes");
         Objects.requireNonNull(deletePaths, "deletePaths");
@@ -212,9 +255,18 @@ public final class FileSyncSpec {
         return Path.of(normalized).normalize();
     }
 
+    /**
+     * Result of applying a ZIP archive.
+     *
+     * @param writtenPaths paths that were written
+     * @param deletedPaths paths that were deleted
+     */
     public record ApplyResult(List<String> writtenPaths, List<String> deletedPaths) {
     }
 
+    /**
+     * Builder for {@link FileSyncSpec}.
+     */
     public static final class Builder {
         private final Path rootDirectory;
         private final List<String> includes = new ArrayList<>();
@@ -225,6 +277,12 @@ public final class FileSyncSpec {
             this.rootDirectory = Objects.requireNonNull(rootDirectory, "rootDirectory");
         }
 
+        /**
+         * Adds a glob pattern for files to include.
+         *
+         * @param glob the glob pattern
+         * @return this builder
+         */
         public Builder includeGlob(String glob) {
             if (glob != null && !glob.isBlank()) {
                 includes.add(glob);
@@ -232,6 +290,12 @@ public final class FileSyncSpec {
             return this;
         }
 
+        /**
+         * Adds a glob pattern for files to exclude.
+         *
+         * @param glob the glob pattern
+         * @return this builder
+         */
         public Builder excludeGlob(String glob) {
             if (glob != null && !glob.isBlank()) {
                 excludes.add(glob);
@@ -239,11 +303,22 @@ public final class FileSyncSpec {
             return this;
         }
 
+        /**
+         * Sets whether extraneous files should be deleted.
+         *
+         * @param deleteExtraneous true to delete extraneous files
+         * @return this builder
+         */
         public Builder deleteExtraneous(boolean deleteExtraneous) {
             this.deleteExtraneous = deleteExtraneous;
             return this;
         }
 
+        /**
+         * Builds a new {@link FileSyncSpec}.
+         *
+         * @return the constructed spec
+         */
         public FileSyncSpec build() {
             FileSystem fs = FileSystems.getDefault();
             List<PathMatcher> includeMatchers = new ArrayList<>();

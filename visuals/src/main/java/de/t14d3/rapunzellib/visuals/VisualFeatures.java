@@ -7,7 +7,15 @@ import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.runtime.RuntimeCapability;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Entry point for installing and accessing the visuals feature.
+ * <p>
+ * Uses a {@link FeatureInstallerRegistry} to resolve the platform-specific
+ * {@link VisualFeatureInstaller}, then delegates to {@link FeatureInstallationSupport}
+ * to perform the actual installation.
+ */
 public final class VisualFeatures {
+
     private static final FeatureInstallerRegistry<VisualFeatureInstaller> INSTALLER_REGISTRY = FeatureInstallerRegistry.create(
         VisualFeatureInstaller.class,
         VisualFeatureInstaller::platformId,
@@ -17,10 +25,21 @@ public final class VisualFeatures {
     private VisualFeatures() {
     }
 
+    /**
+     * Installs the visuals feature using the default {@link Rapunzel} context.
+     *
+     * @return the installed visuals entry point
+     */
     public static @NotNull Visuals install() {
         return install(Rapunzel.context());
     }
 
+    /**
+     * Installs the visuals feature using the given context.
+     *
+     * @param ctx the Rapunzel context
+     * @return the installed visuals entry point
+     */
     public static @NotNull Visuals install(@NotNull RapunzelContext ctx) {
         return FeatureInstallationSupport.install(
             ctx,
@@ -31,6 +50,11 @@ public final class VisualFeatures {
         );
     }
 
+    /**
+     * Convenience method equivalent to {@link #install()}.
+     *
+     * @return the installed visuals entry point
+     */
     public static @NotNull Visuals visuals() {
         return install();
     }

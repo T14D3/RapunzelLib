@@ -13,6 +13,13 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 
+/**
+ * Entry point for installing and accessing the RapunzelLib game event system.
+ *
+ * <p>Provides static factory methods to obtain the {@link GameEventBus}, query platform
+ * {@link GameEventSupportManifest support manifests}, and install platform-specific
+ * event bridges via {@link GameEventBridgeInstaller}.</p>
+ */
 public final class GameEvents {
     private static final FeatureInstallerRegistry<GameEventBridgeInstaller> INSTALLER_REGISTRY = FeatureInstallerRegistry.create(
         GameEventBridgeInstaller.class,
@@ -23,15 +30,31 @@ public final class GameEvents {
     private GameEvents() {
     }
 
+    /**
+     * Returns the installed {@link GameEventBus}, installing it if necessary.
+     *
+     * @return the global game event bus
+     */
     public static @NotNull GameEventBus bus() {
         return install();
     }
 
+    /**
+     * Returns the {@link GameEventSupportManifest} for the current platform.
+     *
+     * @return the support manifest
+     */
     public static @NotNull GameEventSupportManifest support() {
         RapunzelContext context = Rapunzel.context();
         return context.services().find(GameEventSupportManifest.class).orElseGet(() -> support(context.runtime()));
     }
 
+    /**
+     * Returns the {@link GameEventSupportManifest} for the given runtime.
+     *
+     * @param runtime the platform runtime
+     * @return the support manifest
+     */
     public static @NotNull GameEventSupportManifest support(@NotNull PlatformRuntime runtime) {
         Objects.requireNonNull(runtime, "runtime");
         if (!runtime.hasCapability(RuntimeCapability.EVENTS)) {
@@ -40,6 +63,12 @@ public final class GameEvents {
         return support(runtime.platformId());
     }
 
+    /**
+     * Returns the {@link GameEventSupportManifest} for the given platform ID.
+     *
+     * @param platformId the platform identifier
+     * @return the support manifest
+     */
     public static @NotNull GameEventSupportManifest support(@NotNull PlatformId platformId) {
         Objects.requireNonNull(platformId, "platformId");
         GameEventSupportManifest manifest = findInstaller(platformId)
@@ -56,10 +85,21 @@ public final class GameEvents {
         return manifest;
     }
 
+    /**
+     * Installs the game event system using the current {@link RapunzelContext}.
+     *
+     * @return the installed event bus
+     */
     public static @NotNull GameEventBus install() {
         return install(Rapunzel.context());
     }
 
+    /**
+     * Installs the game event system using the given context.
+     *
+     * @param ctx the Rapunzel context
+     * @return the installed event bus
+     */
     public static @NotNull GameEventBus install(@NotNull RapunzelContext ctx) {
         return FeatureInstallationSupport.install(
             ctx,
@@ -81,6 +121,12 @@ public final class GameEvents {
         );
     }
 
+    /**
+     * Finds the {@link GameEventBridgeInstaller} for the given platform ID.
+     *
+     * @param platformId the platform identifier
+     * @return an optional containing the installer, or empty if none is registered
+     */
     private static @NotNull Optional<GameEventBridgeInstaller> findInstaller(@NotNull PlatformId platformId) {
         try {
             return Optional.of(INSTALLER_REGISTRY.resolve(platformId));

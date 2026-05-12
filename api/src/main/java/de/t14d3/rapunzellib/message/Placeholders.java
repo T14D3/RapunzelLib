@@ -35,10 +35,20 @@ public final class Placeholders {
         this.components = components;
     }
 
+    /**
+     * Returns the string placeholders map.
+     *
+     * @return the string placeholders
+     */
     public @NotNull Map<String, String> strings() {
         return strings;
     }
 
+    /**
+     * Returns the component placeholders map.
+     *
+     * @return the component placeholders
+     */
     public @NotNull Map<String, Component> components() {
         return components;
     }
@@ -50,16 +60,35 @@ public final class Placeholders {
         private Builder() {
         }
 
-        public @NotNull Builder string(@NotNull String name, @Nullable String value) {
+    /**
+     * Adds a string placeholder value.
+     *
+     * @param name  the placeholder name
+     * @param value the string value, null treated as empty
+     * @return this builder
+     */
+    public @NotNull Builder string(@NotNull String name, @Nullable String value) {
             strings.put(requireName(name), Objects.toString(value, ""));
             return this;
         }
 
+        /**
+         * Adds a component placeholder value.
+         *
+         * @param name  the placeholder name
+         * @param value the component value
+         * @return this builder
+         */
         public @NotNull Builder component(@NotNull String name, @NotNull Component value) {
             components.put(requireName(name), Objects.requireNonNull(value, "value"));
             return this;
         }
 
+        /**
+         * Builds the {@link Placeholders} instance.
+         *
+         * @return the built placeholders
+         */
         public @NotNull Placeholders build() {
             if (strings.isEmpty() && components.isEmpty()) return EMPTY;
             return new Placeholders(

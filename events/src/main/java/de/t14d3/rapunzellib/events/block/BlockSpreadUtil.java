@@ -1,9 +1,19 @@
 package de.t14d3.rapunzellib.events.block;
 
+/**
+ * Utility for detecting block spread events (fire, mushrooms, vines, bamboo, etc.).
+ */
 public final class BlockSpreadUtil {
     private BlockSpreadUtil() {
     }
 
+    /**
+     * Checks whether a block change is a spread event.
+     *
+     * @param newBlockKey    the key of the spreading block
+     * @param sourceBlockKey the key of the source block
+     * @return true if this is a spread event
+     */
     public static boolean isSpreadEvent(String newBlockKey, String sourceBlockKey) {
         if (newBlockKey.equals("minecraft:fire")) return true;
         if (newBlockKey.equals("minecraft:soul_fire")) return true;

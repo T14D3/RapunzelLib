@@ -10,10 +10,28 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Support utility for registering shared Brigadier commands when the
+ * command feature is available.
+ * <p>
+ * Provides a safe, conditional registration mechanism that checks whether
+ * the Rapunzel framework is bootstrapped and the command capability is
+ * supported before attempting registration.
+ * </p>
+ */
 public final class SharedBrigadierCommandRegistrationSupport {
     private SharedBrigadierCommandRegistrationSupport() {
     }
 
+    /**
+     * Registers shared commands into the dispatcher if the command feature is available.
+     *
+     * @param <S>        the Brigadier source type
+     * @param platformId the platform identifier
+     * @param sourceType the Brigadier source class
+     * @param dispatcher the Brigadier command dispatcher
+     * @return true if commands were registered, false if the feature was unavailable
+     */
     public static <S> boolean registerSharedCommandsIfAvailable(
         @NotNull PlatformId platformId,
         @NotNull Class<S> sourceType,
@@ -48,6 +66,13 @@ public final class SharedBrigadierCommandRegistrationSupport {
         return true;
     }
 
+    /**
+     * Type-safe registration of shared commands.
+     *
+     * @param <S>        the Brigadier source type
+     * @param dispatcher the Brigadier command dispatcher
+     * @param registrar  the shared registrar
+     */
     @SuppressWarnings("unchecked")
     private static <S> void register(
         @NotNull CommandDispatcher<S> dispatcher,

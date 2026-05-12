@@ -14,12 +14,27 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Shared support for registering inventory wrappers for {@link Container}
+ * and {@link AbstractContainerMenu} types.
+ * <p>
+ * Provides factories that wrap native Minecraft inventories into Rapunzel's
+ * {@link de.t14d3.rapunzellib.inventory.RInventory} abstraction.
+ */
 public final class SharedInventoryFeatureInstallerSupport {
     private static final int PLAYER_MENU_SLOT_COUNT = 36;
 
     private SharedInventoryFeatureInstallerSupport() {
     }
 
+    /**
+     * Registers both {@link Container} and {@link AbstractContainerMenu}
+     * inventory wrappers in the context.
+     *
+     * @param context    the Rapunzel context
+     * @param platformId the platform identifier
+     * @param itemAdapter the item stack adapter for slot item conversion
+     */
     public static void registerInventories(
         @NotNull RapunzelContext context,
         @NotNull PlatformId platformId,
@@ -36,6 +51,13 @@ public final class SharedInventoryFeatureInstallerSupport {
         );
     }
 
+    /**
+     * Creates the list of inventory wrapper factories for Container and AbstractContainerMenu.
+     *
+     * @param platformId  the platform identifier
+     * @param itemAdapter the item stack adapter
+     * @return the list of wrapper factories
+     */
     public static @NotNull List<InventoryWrapperFactory<?>> wrapperFactories(
         @NotNull PlatformId platformId,
         @NotNull ItemStackAdapter<ItemStack> itemAdapter
@@ -45,6 +67,13 @@ public final class SharedInventoryFeatureInstallerSupport {
         return List.of(containerFactory(platformId, itemAdapter), menuFactory(platformId, itemAdapter));
     }
 
+    /**
+     * Creates a wrapper factory for {@link Container}.
+     *
+     * @param platformId  the platform identifier
+     * @param itemAdapter the item stack adapter
+     * @return the container wrapper factory
+     */
     private static @NotNull InventoryWrapperFactory<Container> containerFactory(
         @NotNull PlatformId platformId,
         @NotNull ItemStackAdapter<ItemStack> itemAdapter
@@ -65,6 +94,13 @@ public final class SharedInventoryFeatureInstallerSupport {
         );
     }
 
+    /**
+     * Creates a wrapper factory for {@link AbstractContainerMenu}.
+     *
+     * @param platformId  the platform identifier
+     * @param itemAdapter the item stack adapter
+     * @return the menu wrapper factory
+     */
     private static @NotNull InventoryWrapperFactory<AbstractContainerMenu> menuFactory(
         @NotNull PlatformId platformId,
         @NotNull ItemStackAdapter<ItemStack> itemAdapter

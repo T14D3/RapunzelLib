@@ -7,7 +7,21 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Abstract base implementation of {@link GuiFeatureInstaller} and {@link GuiRendererProvider}.
+ * <p>
+ * Provides a default installation flow that creates renderers, registers them in a
+ * {@link GuiRendererRegistry}, and then registers a default renderer in the context.
+ * Subclasses must override {@link #createRenderer(RapunzelContext)} or
+ * {@link #provideRenderers(RapunzelContext)}.
+ * </p>
+ */
 public abstract class AbstractGuiFeatureInstaller implements GuiFeatureInstaller, GuiRendererProvider {
+    /**
+     * Installs GUI features by providing renderers and registering the default one.
+     *
+     * @param context the Rapunzel context
+     */
     @Override
     public final void install(@NotNull RapunzelContext context) {
         Collection<GuiRenderer> renderers = provideRenderers(context);

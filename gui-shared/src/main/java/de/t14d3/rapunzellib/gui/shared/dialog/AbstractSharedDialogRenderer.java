@@ -13,9 +13,20 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
 
+/**
+ * Abstract base for platform-specific dialog renderers.
+ * <p>
+ * Handles dialog capability advertisement, rendering lifecycle (open, close),
+ * and session registration through {@link SharedDialogSessions}.
+ */
 public abstract class AbstractSharedDialogRenderer implements GuiRenderer {
     private final String name;
 
+    /**
+     * Creates a named dialog renderer.
+     *
+     * @param name the renderer name
+     */
     protected AbstractSharedDialogRenderer(@NotNull String name) {
         this.name = name;
     }
@@ -30,6 +41,12 @@ public abstract class AbstractSharedDialogRenderer implements GuiRenderer {
         return isAvailable() ? GuiRendererSelectionSupport.dialogCapabilities() : Set.of();
     }
 
+    /**
+     * Checks whether this renderer is available for a specific player.
+     *
+     * @param player the player
+     * @return {@code true} if available
+     */
     public final boolean availableFor(@NotNull RPlayer player) {
         if (!isAvailable()) {
             return false;
@@ -76,18 +93,47 @@ public abstract class AbstractSharedDialogRenderer implements GuiRenderer {
         closeDialog(serverPlayer);
     }
 
+    /**
+     * Hook to close the dialog for a native player. Subclasses may override.
+     *
+     * @param player the native player
+     */
     protected void closeDialog(@NotNull ServerPlayer player) {
     }
 
+    /**
+     * Checks whether this renderer is globally available.
+     *
+     * @return {@code true} if available
+     */
     protected boolean isAvailable() {
         return true;
     }
 
+    /**
+     * Checks whether this renderer is available for a specific native player.
+     *
+     * @param player the native player
+     * @return {@code true} if available
+     */
     protected boolean isAvailable(@NotNull ServerPlayer player) {
         return true;
     }
 
+    /**
+     * Opens a dialog for the native player.
+     *
+     * @param player the native player
+     * @param dialog the dialog render data
+     * @return {@code true} if the dialog was successfully opened
+     */
     protected abstract boolean openDialog(@NotNull ServerPlayer player, @NotNull SharedDialogRenderData dialog);
 
+    /**
+     * Unwraps a Rapunzel player to a native server player.
+     *
+     * @param player the Rapunzel player
+     * @return the native server player, or {@code null}
+     */
     protected abstract @Nullable ServerPlayer unwrap(@NotNull RPlayer player);
 }

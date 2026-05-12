@@ -10,10 +10,30 @@ import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 
+/**
+ * Utility for wrapping platform command sources into {@link RCommandSource} instances
+ * using {@link net.kyori.adventure.audience.Audience} extraction.
+ * <p>
+ * Provides factory methods that derive {@link RCommandSources.ReplyChannels} from an
+ * {@code Audience} extractor, enabling consistent command source creation across
+ * different platform implementations (Bukkit, Sponge, etc.).
+ * </p>
+ */
 public final class AudienceCommandSourceAdapterCore {
     private AudienceCommandSourceAdapterCore() {
     }
 
+    /**
+     * Wraps a platform source into an {@link RCommandSource} using an audience extractor.
+     *
+     * @param <T>                the platform source type
+     * @param platformId         the platform identifier
+     * @param source             the platform source object
+     * @param audienceExtractor  extracts an {@link Audience} from the platform source
+     * @param permissionChecker  checks permissions for the platform source
+     * @param playerExtractor    extracts an optional {@link RPlayer} from the platform source
+     * @return the wrapped command source
+     */
     public static <T> @NotNull RCommandSource wrap(
         @NotNull PlatformId platformId,
         @NotNull T source,
@@ -30,6 +50,17 @@ public final class AudienceCommandSourceAdapterCore {
         );
     }
 
+    /**
+     * Wraps a platform source into an {@link RCommandSource} using a custom reply channels extractor.
+     *
+     * @param <T>                      the platform source type
+     * @param platformId               the platform identifier
+     * @param source                   the platform source object
+     * @param replyChannelsExtractor   extracts {@link RCommandSources.ReplyChannels} from the platform source
+     * @param permissionChecker        checks permissions for the platform source
+     * @param playerExtractor          extracts an optional {@link RPlayer} from the platform source
+     * @return the wrapped command source
+     */
     public static <T> @NotNull RCommandSource wrapReplyChannels(
         @NotNull PlatformId platformId,
         @NotNull T source,

@@ -15,6 +15,7 @@ plugins {
     alias(libs.plugins.idea.ext)
     alias(libs.plugins.root.subproject.conventions)
     alias(libs.plugins.root.publishing.conventions)
+    alias(libs.plugins.dokka)
     alias(libs.plugins.userdev) apply false
     alias(libs.plugins.vanilla.gradle) apply false
 }
@@ -189,6 +190,26 @@ subprojects {
         }
     }
 
+    plugins.withId("java-base") {
+        apply(plugin = "org.jetbrains.dokka")
+    }
+
+    plugins.withId("org.jetbrains.dokka") {
+        dependencies {
+            add(
+                "dokkaPlugin",
+                "org.jetbrains.dokka:kotlin-as-java-plugin:2.2.0"
+            )
+        }
+    }
+
+    tasks.withType<Javadoc>().configureEach {
+        val opts = options as org.gradle.external.javadoc.StandardJavadocDocletOptions
+        opts.addStringOption("Xdoclint:none", "-quiet")
+        opts.addBooleanOption("quiet", true)
+        isFailOnError = false
+    }
+
     tasks.withType<Jar>().configureEach {
         val jarPrefix = path.removePrefix(":").replace(':', '-')
         collectAllJars.configure {
@@ -293,4 +314,29 @@ gradle.projectsEvaluated {
     project(":api").tasks.matching { it.name == "test" }.configureEach {
         mustRunAfter(gradlePluginTests)
     }
+}
+
+val excludedFromAggregation = setOf(":bom")
+val aggregationProjects = subprojects.filter {
+    it.path !in excludedFromAggregation && !it.name.startsWith("gradle")
+}
+
+dependencies {
+    aggregationProjects.forEach { p ->
+        dokka(project(p.path))
+    }
+}
+
+dokka {
+    dokkaPublications.html {
+        moduleName.set("RapunzelLib")
+        moduleVersion.set(buildVersion)
+        outputDirectory.set(layout.buildDirectory.dir("dokka"))
+    }
+}
+
+tasks.register("javadoc") {
+    group = "documentation"
+    description = "Generates unified HTML documentation via Dokka"
+    dependsOn("dokkaGenerate")
 }

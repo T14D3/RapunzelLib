@@ -196,42 +196,90 @@ public class RpcClientConfig {
  this.serverName = Objects.requireNonNull(serverName, "serverName");
  }
 
- public Builder proxyHost(@NotNull String host) {
+    /**
+     * Sets the proxy host address.
+     *
+     * @param host the proxy hostname or IP
+     * @return this builder
+     */
+    public Builder proxyHost(@NotNull String host) {
  this.proxyHost = Objects.requireNonNull(host, "host");
  return this;
  }
 
- public Builder proxyPort(int port) {
+    /**
+     * Sets the proxy port.
+     *
+     * @param port the proxy TCP port
+     * @return this builder
+     */
+    public Builder proxyPort(int port) {
  this.proxyPort = port;
  return this;
  }
 
- public Builder protocolVersion(@NotNull String version) {
+    /**
+     * Sets the protocol version string.
+     *
+     * @param version the protocol version
+     * @return this builder
+     */
+    public Builder protocolVersion(@NotNull String version) {
  this.protocolVersion = Objects.requireNonNull(version, "version");
  return this;
  }
 
- public Builder heartbeatIntervalMillis(long millis) {
+    /**
+     * Sets the heartbeat interval.
+     *
+     * @param millis interval in milliseconds
+     * @return this builder
+     */
+    public Builder heartbeatIntervalMillis(long millis) {
  this.heartbeatIntervalMillis = millis;
  return this;
  }
 
- public Builder heartbeatTimeoutMillis(long millis) {
+    /**
+     * Sets the heartbeat timeout.
+     *
+     * @param millis timeout in milliseconds
+     * @return this builder
+     */
+    public Builder heartbeatTimeoutMillis(long millis) {
  this.heartbeatTimeoutMillis = millis;
  return this;
  }
 
- public Builder reconnectDelayMillis(long millis) {
+    /**
+     * Sets the initial reconnection delay.
+     *
+     * @param millis delay in milliseconds
+     * @return this builder
+     */
+    public Builder reconnectDelayMillis(long millis) {
  this.reconnectDelayMillis = millis;
  return this;
  }
 
- public Builder maxReconnectDelayMillis(long millis) {
+    /**
+     * Sets the maximum reconnection delay for exponential backoff.
+     *
+     * @param millis max delay in milliseconds
+     * @return this builder
+     */
+    public Builder maxReconnectDelayMillis(long millis) {
  this.maxReconnectDelayMillis = millis;
  return this;
  }
 
- public Builder reconnectMultiplier(double multiplier) {
+    /**
+     * Sets the exponential backoff reconnect multiplier.
+     *
+     * @param multiplier the multiplier value
+     * @return this builder
+     */
+    public Builder reconnectMultiplier(double multiplier) {
  this.reconnectMultiplier = multiplier;
  return this;
  }

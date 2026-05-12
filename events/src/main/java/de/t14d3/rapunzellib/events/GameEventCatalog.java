@@ -46,6 +46,14 @@ import de.t14d3.rapunzellib.events.world.WorldLoadPost;
 
 import java.util.List;
 
+/**
+ * Central catalog of all shared event types in the RapunzelLib event system.
+ *
+ * <p>This package-private class maintains a definitive list of event types that
+ * are shared across all platform implementations. The list is used by
+ * {@link GameEventSupportManifest.Builder} to ensure all known event types
+ * are accounted for when building support manifests.</p>
+ */
 final class GameEventCatalog {
     private static final List<Class<? extends GameEvent>> SHARED_EVENT_TYPES = List.of(
         BlockBreakPre.class,
@@ -96,6 +104,11 @@ final class GameEventCatalog {
     private GameEventCatalog() {
     }
 
+    /**
+     * Returns the list of all shared event types.
+     *
+     * @return an unmodifiable list of event classes
+     */
     static List<Class<? extends GameEvent>> sharedEventTypes() {
         return SHARED_EVENT_TYPES;
     }

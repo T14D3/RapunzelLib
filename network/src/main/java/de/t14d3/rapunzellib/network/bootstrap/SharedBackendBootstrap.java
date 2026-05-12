@@ -26,6 +26,9 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+/**
+ * Shared bootstrap logic for backend network initialization.
+ */
 public final class SharedBackendBootstrap {
     private SharedBackendBootstrap() {
     }

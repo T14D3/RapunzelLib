@@ -14,10 +14,27 @@ import java.util.function.Supplier;
  * and persist an updated root when the container mutates a persistent attachment.</p>
  */
 public interface PersistentAttachmentSession {
+    /**
+     * Loads the current persistent root compound.
+     *
+     * @return the root NBT compound
+     */
     @NotNull RNbtCompound load();
 
+    /**
+     * Persists an updated root compound.
+     *
+     * @param root the updated root NBT compound
+     */
     void save(@NotNull RNbtCompound root);
 
+    /**
+     * Creates a session from loader and saver callbacks.
+     *
+     * @param loader supplies the current root compound
+     * @param saver  accepts an updated root compound for persistence
+     * @return a new session instance
+     */
     static @NotNull PersistentAttachmentSession of(
         @NotNull Supplier<@NotNull RNbtCompound> loader,
         @NotNull Consumer<@NotNull RNbtCompound> saver

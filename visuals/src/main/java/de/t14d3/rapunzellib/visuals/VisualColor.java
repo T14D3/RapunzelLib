@@ -3,15 +3,42 @@ package de.t14d3.rapunzellib.visuals;
 import net.kyori.adventure.text.format.TextColor;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * A wrapper around Adventure's {@link TextColor} that provides
+ * convenience factory methods and an RGB extraction helper.
+ *
+ * @param textColor the underlying Adventure text color
+ */
 public record VisualColor(@NotNull TextColor textColor) {
+
+    /**
+     * Creates a visual color from a dye color.
+     *
+     * @param dye the dye color
+     * @return the visual color
+     */
     public static @NotNull VisualColor dye(@NotNull DyeColor dye) {
         return new VisualColor(dye.adventureColor());
     }
 
+    /**
+     * Creates a visual color from an RGB integer.
+     *
+     * @param rgb the RGB value (e.g. {@code 0xFF00FF})
+     * @return the visual color
+     */
     public static @NotNull VisualColor hex(int rgb) {
         return new VisualColor(TextColor.color(rgb));
     }
 
+    /**
+     * Returns the RGB integer value of this color.
+     * <p>
+     * Named text colors are mapped to their closest Minecraft
+     * concrete color equivalents.
+     *
+     * @return the RGB value as an int
+     */
     public int rgbValue() {
         if (textColor instanceof net.kyori.adventure.text.format.NamedTextColor named) {
             return switch (named.toString()) {

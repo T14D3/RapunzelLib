@@ -17,17 +17,54 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * A YAML configuration file with typed read access, comments support, and save/reload.
+ */
 public interface YamlConfig {
+    /**
+     * Checks whether a value exists at the given path.
+     *
+     * @param path the path to check
+     * @return true if a value exists
+     */
     boolean contains(@NotNull String path);
 
+    /**
+     * Returns all keys in this config.
+     *
+     * @param deep whether to include nested keys
+     * @return a set of keys
+     */
     @NotNull Set<String> keys(boolean deep);
 
+    /**
+     * Returns the raw value at the given path.
+     *
+     * @param path the path to read
+     * @return the value, or null if not found
+     */
     @Nullable Object get(@NotNull String path);
 
+    /**
+     * Returns the value at the given path coerced to the specified type.
+     *
+     * @param path the path to read
+     * @param type the expected type
+     * @param <T>  the type
+     * @return the value, or null if missing or uncoercible
+     */
     default <T> @Nullable T get(@NotNull String path, @NotNull Class<T> type) {
         return get(path, type, null);
     }
 
+    /**
+     * Returns the value at the given path as an Optional.
+     *
+     * @param path the path to read
+     * @param type the expected type
+     * @param <T>  the type
+     * @return an Optional containing the value, or empty if missing
+     */
     default <T> @NotNull Optional<T> getOptional(@NotNull String path, @NotNull Class<T> type) {
         return Optional.ofNullable(get(path, type, null));
     }
@@ -43,18 +80,51 @@ public interface YamlConfig {
         return def;
     }
 
+    /**
+     * Returns a string value at the given path, with a default fallback.
+     *
+     * @param path the path to read
+     * @param def  the default value
+     * @return the string value, or def if not found
+     */
     @Nullable String getString(@NotNull String path, @Nullable String def);
 
+    /**
+     * Returns a string value at the given path, or null.
+     *
+     * @param path the path to read
+     * @return the string value, or null if not found
+     */
     default @Nullable String getString(@NotNull String path) {
         return getString(path, null);
     }
 
+    /**
+     * Returns an integer value at the given path, with a default fallback.
+     *
+     * @param path the path to read
+     * @param def  the default value
+     * @return the int value, or def if not found
+     */
     int getInt(@NotNull String path, int def);
 
+    /**
+     * Returns an integer value at the given path, defaulting to 0.
+     *
+     * @param path the path to read
+     * @return the int value, or 0 if not found
+     */
     default int getInt(@NotNull String path) {
         return getInt(path, 0);
     }
 
+    /**
+     * Returns a long value at the given path, with a default fallback.
+     *
+     * @param path the path to read
+     * @param def  the default value
+     * @return the long value, or def if not found
+     */
     default long getLong(@NotNull String path, long def) {
         Long v = get(path, Long.class, null);
         if (v != null) return v;
@@ -63,18 +133,50 @@ public interface YamlConfig {
         return def;
     }
 
+    /**
+     * Returns a long value at the given path, defaulting to 0.
+     *
+     * @param path the path to read
+     * @return the long value, or 0 if not found
+     */
     default long getLong(@NotNull String path) {
         return getLong(path, 0L);
     }
 
+    /**
+     * Returns a boolean value at the given path, with a default fallback.
+     *
+     * @param path the path to read
+     * @param def  the default value
+     * @return the boolean value, or def if not found
+     */
     boolean getBoolean(@NotNull String path, boolean def);
 
+    /**
+     * Returns a boolean value at the given path, defaulting to false.
+     *
+     * @param path the path to read
+     * @return the boolean value, or false if not found
+     */
     default boolean getBoolean(@NotNull String path) {
         return getBoolean(path, false);
     }
 
+    /**
+     * Returns a double value at the given path, with a default fallback.
+     *
+     * @param path the path to read
+     * @param def  the default value
+     * @return the double value, or def if not found
+     */
     double getDouble(@NotNull String path, double def);
 
+    /**
+     * Returns a double value at the given path, defaulting to 0.
+     *
+     * @param path the path to read
+     * @return the double value, or 0 if not found
+     */
     default double getDouble(@NotNull String path) {
         return getDouble(path, 0D);
     }
@@ -143,8 +245,19 @@ public interface YamlConfig {
         return get(path, enumType, def);
     }
 
+    /**
+     * Sets a value at the given path.
+     *
+     * @param path  the path to set
+     * @param value the value to set, or null to remove
+     */
     void set(@NotNull String path, @Nullable Object value);
 
+    /**
+     * Removes the value at the given path.
+     *
+     * @param path the path to remove
+     */
     default void remove(@NotNull String path) {
         set(path, null);
     }
@@ -156,12 +269,30 @@ public interface YamlConfig {
         return def;
     }
 
+    /**
+     * Returns the comment at the given path.
+     *
+     * @param path the path to read
+     * @return the comment, or null if not set
+     */
     @Nullable String getComment(@NotNull String path);
 
+    /**
+     * Sets a comment at the given path.
+     *
+     * @param path    the path to comment
+     * @param comment the comment text
+     */
     void setComment(@NotNull String path, @NotNull String comment);
 
+    /**
+     * Saves the config to disk.
+     */
     void save();
 
+    /**
+     * Reloads the config from disk.
+     */
     void reload();
 
     /**

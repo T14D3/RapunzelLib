@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.visuals;
 
-import org.jetbrains.annotations.NotNull;
-
+/**
+ * A visual that renders a glowing outline around a set of block positions.
+ */
 public interface GlowOutlineVisual extends Visual<GlowOutlineConfig> {
 }

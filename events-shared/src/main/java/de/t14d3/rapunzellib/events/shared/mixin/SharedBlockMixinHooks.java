@@ -20,10 +20,25 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
+/**
+ * Shared mixin hooks for dispatching block-related events (form, spread, transform, physics).
+ * <p>
+ * These hooks are called from platform-specific mixins to fire events
+ * through the {@link GameEventBus}.
+ */
 public final class SharedBlockMixinHooks {
     private SharedBlockMixinHooks() {
     }
 
+    /**
+     * Dispatches a block form pre-event.
+     *
+     * @param bus   the game event bus
+     * @param level the server level
+     * @param pos   the block position
+     * @param state the new block state
+     * @return {@code true} if the event was cancelled
+     */
     public static boolean dispatchBlockFormPre(
         @NotNull GameEventBus bus,
         @NotNull ServerLevel level,
@@ -60,6 +75,15 @@ public final class SharedBlockMixinHooks {
         );
     }
 
+    /**
+     * Dispatches a block spread pre-event.
+     *
+     * @param bus   the game event bus
+     * @param level the server level
+     * @param pos   the block position
+     * @param state the new block state
+     * @return {@code true} if the event was cancelled
+     */
     public static boolean dispatchBlockSpreadPre(
         @NotNull GameEventBus bus,
         @NotNull ServerLevel level,
@@ -96,6 +120,15 @@ public final class SharedBlockMixinHooks {
         );
     }
 
+    /**
+     * Dispatches a block transform pre-event.
+     *
+     * @param bus   the game event bus
+     * @param level the server level
+     * @param pos   the block position
+     * @param state the new block state
+     * @return {@code true} if the event was cancelled
+     */
     public static boolean dispatchBlockTransformPre(
         @NotNull GameEventBus bus,
         @NotNull ServerLevel level,
@@ -132,6 +165,15 @@ public final class SharedBlockMixinHooks {
         );
     }
 
+    /**
+     * Dispatches a block physics neighbor pre-event.
+     *
+     * @param bus          the game event bus
+     * @param level        the server level
+     * @param pos          the block position
+     * @param changedBlock the block that changed
+     * @return {@code true} if the event was cancelled
+     */
     public static boolean dispatchBlockPhysicsNeighborPre(
         @NotNull GameEventBus bus,
         @NotNull ServerLevel level,
@@ -162,6 +204,14 @@ public final class SharedBlockMixinHooks {
         );
     }
 
+    /**
+     * Dispatches a block physics neighbor post-event.
+     *
+     * @param bus          the game event bus
+     * @param level        the server level
+     * @param pos          the block position
+     * @param changedBlock the block that changed
+     */
     public static void dispatchBlockPhysicsNeighborPost(
         @NotNull GameEventBus bus,
         @NotNull ServerLevel level,
@@ -189,6 +239,16 @@ public final class SharedBlockMixinHooks {
         );
     }
 
+    /**
+     * Dispatches a block physics state change pre-event (same block type, different state).
+     *
+     * @param bus      the game event bus
+     * @param level    the server level
+     * @param pos      the block position
+     * @param oldState the old block state
+     * @param newState the new block state
+     * @return {@code true} if the event was cancelled
+     */
     public static boolean dispatchBlockPhysicsStateChangePre(
         @NotNull GameEventBus bus,
         @NotNull ServerLevel level,
@@ -224,6 +284,12 @@ public final class SharedBlockMixinHooks {
         );
     }
 
+    /**
+     * Resolves the world key from a server level.
+     *
+     * @param level the server level
+     * @return the world key
+     */
     private static @NotNull RKey worldKey(@NotNull ServerLevel level) {
         // #if VERSION >= 1.21.11
         return RKey.of(level.dimension().identifier().toString());
@@ -232,6 +298,12 @@ public final class SharedBlockMixinHooks {
         // #endif
     }
 
+    /**
+     * Resolves the block key from a block state.
+     *
+     * @param state the block state
+     * @return the block key
+     */
     private static @NotNull RKey blockKey(@NotNull BlockState state) {
         return RKey.of(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
     }

@@ -37,9 +37,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Abstract base for platform-specific {@link ItemStackAdapter} implementations
+ * that bridge between Rapunzel's {@link RItem} and Minecraft's {@link ItemStack}.
+ * <p>
+ * Implements {@link NativeRItemAccessor} to provide read/write access to all
+ * standard item properties via Minecraft's data component system.
+ */
 public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter<ItemStack>, NativeRItemAccessor<ItemStack> {
     private final @NotNull PlatformId platformId;
 
+    /**
+     * Creates an adapter for the given platform.
+     *
+     * @param platformId the platform identifier
+     */
     protected AbstractSharedItemStackAdapter(@NotNull PlatformId platformId) {
         this.platformId = Objects.requireNonNull(platformId, "platformId");
     }
@@ -71,10 +83,21 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
         return object instanceof ItemStack;
     }
 
+    /**
+     * Creates a live {@link NativeRItem} wrapping the given ItemStack handle.
+     *
+     * @param handle the native ItemStack handle
+     * @return the live native RItem
+     */
     public final @NotNull NativeRItem<ItemStack> createLive(@NotNull ItemStack handle) {
         return NativeRItem.of(platformId, handle, this);
     }
 
+    /**
+     * Creates a factory for producing new NativeRItem instances.
+     *
+     * @return the factory
+     */
     public final @NotNull NativeRItemFactory factory() {
         return (typeKey, amount, data) -> {
             ItemStack stack = createNativeShared(RItem.builder().typeKey(typeKey).amount(amount).data(data).build());
@@ -274,6 +297,12 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
 
     // ---- Existing helper methods ----
 
+    /**
+     * Converts a native ItemStack to a shared {@link RItem}.
+     *
+     * @param nativeItem the native item stack
+     * @return the shared RItem
+     */
     protected @NotNull RItem toShared(@NotNull ItemStack nativeItem) {
         net.minecraft.network.chat.Component customName = nativeItem.get(DataComponents.CUSTOM_NAME);
         ItemLore loreComponent = nativeItem.get(DataComponents.LORE);
@@ -322,6 +351,12 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
         return builder.build();
     }
 
+    /**
+     * Creates a new native ItemStack from a shared RItem.
+     *
+     * @param item the shared RItem
+     * @return the native ItemStack
+     */
     protected @NotNull ItemStack createNativeShared(@NotNull RItem item) {
         // #if VERSION >= 1.21.11
         return applySharedState(new ItemStack(resolveItemHolder(item.typeRef()), item.amount()), item);
@@ -330,6 +365,13 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
         // #endif
     }
 
+    /**
+     * Updates an existing native ItemStack to match a shared RItem.
+     *
+     * @param currentHandle the current native handle
+     * @param updatedItem   the updated shared RItem
+     * @return the updated native ItemStack
+     */
     protected @NotNull ItemStack updateNativeShared(@NotNull ItemStack currentHandle, @NotNull RItem updatedItem) {
         Item resolvedItem = resolveItem(updatedItem.typeRef());
         ItemStack working = currentHandle.getItem() == resolvedItem
@@ -338,10 +380,22 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
         return applySharedState(working, updatedItem);
     }
 
+    /**
+     * Resolves a Minecraft Item from a type key.
+     *
+     * @param typeKey the type key
+     * @return the resolved Item
+     */
     protected @NotNull Item resolveItem(@NotNull RKey typeKey) {
         return resolveItem(RItemType.ref(typeKey));
     }
 
+    /**
+     * Resolves a Minecraft Item from a type reference.
+     *
+     * @param typeRef the type reference
+     * @return the resolved Item
+     */
     protected @NotNull Item resolveItem(@NotNull RRegistryRef<RItemType> typeRef) {
         Item resolved = RRegistryHandles.find(typeRef, Item.class).orElse(null);
         if (resolved != null && resolved != Items.AIR) {
@@ -363,6 +417,12 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
     }
 
     // #if VERSION >= 1.21.11
+    /**
+     * Resolves an Item holder from a type reference (1.21.11+).
+     *
+     * @param typeRef the type reference
+     * @return the Item holder
+     */
     protected @NotNull Holder<Item> resolveItemHolder(@NotNull RRegistryRef<RItemType> typeRef) {
         Item resolved = RRegistryHandles.find(typeRef, Item.class).orElse(null);
         if (resolved != null && resolved != Items.AIR) {
@@ -378,6 +438,13 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
     }
     // #endif
 
+    /**
+     * Applies shared RItem state onto a native ItemStack.
+     *
+     * @param stack the native ItemStack
+     * @param item  the shared RItem
+     * @return the modified native ItemStack
+     */
     protected @NotNull ItemStack applySharedState(@NotNull ItemStack stack, @NotNull RItem item) {
         stack.setCount(item.amount());
 
@@ -430,6 +497,12 @@ public abstract class AbstractSharedItemStackAdapter implements ItemStackAdapter
         return stack;
     }
 
+    /**
+     * Reads the custom model data integer from a {@link CustomModelData} component.
+     *
+     * @param customModelData the component, may be null
+     * @return the model data value, or {@code null}
+     */
     protected @Nullable Integer readCustomModelData(@Nullable CustomModelData customModelData) {
         if (customModelData == null || customModelData.colors().isEmpty()) {
             return null;

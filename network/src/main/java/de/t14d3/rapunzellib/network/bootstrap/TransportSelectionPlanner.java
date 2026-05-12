@@ -12,6 +12,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Selects and configures the appropriate network transport.
+ */
 public final class TransportSelectionPlanner {
     private TransportSelectionPlanner() {
     }

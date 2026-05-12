@@ -18,6 +18,14 @@ import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+/**
+ * Support utilities for selecting the best renderer for a GUI and for computing
+ * required capabilities.
+ * <p>
+ * Provides an auto-selecting renderer that chooses between an inventory-based and
+ * a dialog-based renderer depending on the GUI's requirements.
+ * </p>
+ */
 public final class GuiRendererSelectionSupport {
     private static final Set<GuiCapability> INVENTORY_CAPABILITIES = Set.of(
         GuiCapability.GRID_LAYOUT,

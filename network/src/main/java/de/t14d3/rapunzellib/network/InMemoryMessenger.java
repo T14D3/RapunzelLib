@@ -7,11 +7,20 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * An in-memory {@link Messenger} implementation for single-server or testing environments.
+ */
 public final class InMemoryMessenger implements Messenger {
     private final String serverName;
     private final String proxyServerName;
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
 
+    /**
+     * Creates a new in-memory messenger.
+     *
+     * @param serverName the name of this server
+     * @param proxyServerName the proxy server name
+     */
     public InMemoryMessenger(String serverName, String proxyServerName) {
         this.serverName = serverName;
         this.proxyServerName = proxyServerName;
