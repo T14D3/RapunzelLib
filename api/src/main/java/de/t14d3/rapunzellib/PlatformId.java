@@ -8,6 +8,7 @@ public enum PlatformId {
     VELOCITY,
     FABRIC,
     NEOFORGE,
-    SPONGE
+    SPONGE,
+    REMOTE
 }
 

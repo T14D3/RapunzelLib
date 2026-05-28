@@ -89,15 +89,6 @@ public final class Rapunzel {
     }
 
     /**
-     * Alias for {@link #context()}.
-     *
-     * @return the current context
-     */
-    public static @NotNull RapunzelContext currentContext() {
-        return context();
-    }
-
-    /**
      * Finds the current or only active context, if available.
      *
      * @return an {@link Optional} containing the context, or empty if inactive or ambiguous
@@ -110,15 +101,6 @@ public final class Rapunzel {
         synchronized (LOCK) {
             return contexts.size() == 1 ? contexts.values().stream().findFirst() : Optional.empty();
         }
-    }
-
-    /**
-     * Alias for {@link #findContext()}.
-     *
-     * @return an {@link Optional} containing the context, or empty if inactive or ambiguous
-     */
-    public static @NotNull Optional<RapunzelContext> findCurrentContext() {
-        return findContext();
     }
 
     /**
@@ -450,11 +432,6 @@ public final class Rapunzel {
         }
     }
 
-    /**
-     * Bootstraps a context for the default owner.
-     *
-     * @param newContext the context to bootstrap
-     */
     /**
      * Bootstraps a context for the default owner.
      *

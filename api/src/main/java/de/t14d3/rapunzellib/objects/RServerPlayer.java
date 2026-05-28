@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.registry.RRegistryRef;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * A server-side connected player that is also a living entity in the world.
@@ -69,4 +70,35 @@ public interface RServerPlayer extends RPlayer, RLivingEntity {
         return location().orElseThrow(() -> new UnsupportedOperationException("location is not supported for " + getClass().getName()));
     }
 
+    /**
+     * Connects this player to a different server on the network and teleports them
+     * to the specified location on arrival.
+     *
+     * <p>Requires a proxy (e.g. Velocity) and the RapunzelLib network module
+     * to be installed on all servers involved.</p>
+     *
+     * <p>Default implementation throws {@link UnsupportedOperationException}.
+     * Platform implementations (including {@code RemotePlayer}) should override this.</p>
+     *
+     * @param serverName the target server name (as configured in the proxy)
+     * @param location   the location to teleport to on the target server
+     * @return a {@link CompletableFuture} that completes with {@code true} if the
+     *         player was successfully moved and queued for teleport, {@code false} otherwise
+     */
+    default @NotNull CompletableFuture<Boolean> connectToServer(@NotNull String serverName, @NotNull RLocation location) {
+        throw new UnsupportedOperationException("connectToServer is not supported for " + getClass().getName());
+    }
+
+    /**
+     * Connects this player to a different server on the network without a specific location.
+     *
+     * <p>Default implementation throws {@link UnsupportedOperationException}.</p>
+     *
+     * @param serverName the target server name
+     * @return a {@link CompletableFuture} that completes with {@code true} if the
+     *         player was successfully moved
+     */
+    default @NotNull CompletableFuture<Boolean> connectToServer(@NotNull String serverName) {
+        throw new UnsupportedOperationException("connectToServer is not supported for " + getClass().getName());
+    }
 }

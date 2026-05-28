@@ -91,16 +91,12 @@ public final class CompositeMessenger implements Messenger {
 
     @Override
     public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
-        for (Messenger messenger : messengers) {
-            messenger.registerListener(channel, listener);
-        }
+        primary.registerListener(channel, listener);
     }
 
     @Override
     public void unregisterListener(@NotNull String channel, @NotNull MessageListener listener) {
-        for (Messenger messenger : messengers) {
-            messenger.unregisterListener(channel, listener);
-        }
+        primary.unregisterListener(channel, listener);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.platform.paper.network;
 
 import com.google.gson.Gson;
+import de.t14d3.rapunzellib.network.MessageBuffer;
 import de.t14d3.rapunzellib.network.MessageListener;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkConstants;
@@ -8,6 +9,10 @@ import de.t14d3.rapunzellib.network.NetworkEnvelope;
 import de.t14d3.rapunzellib.network.json.JsonCodecs;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 import org.jetbrains.annotations.NotNull;
@@ -16,6 +21,7 @@ import org.slf4j.Logger;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
@@ -28,6 +34,8 @@ public final class PaperPluginMessenger implements Messenger, PluginMessageListe
     private final Gson gson = JsonCodecs.gson();
     private volatile String networkServerName;
     private final AtomicLong lastNoCarrierLog = new AtomicLong(0L);
+    private final MessageBuffer buffer = new MessageBuffer();
+    private final CarrierFlushListener flushListener;
 
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
 
@@ -37,21 +45,23 @@ public final class PaperPluginMessenger implements Messenger, PluginMessageListe
 
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, NetworkConstants.TRANSPORT_CHANNEL, this);
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, NetworkConstants.TRANSPORT_CHANNEL);
+        this.flushListener = new CarrierFlushListener();
+        plugin.getServer().getPluginManager().registerEvents(flushListener, plugin);
     }
 
     @Override
     public void sendToAll(@NotNull String channel, @NotNull String data) {
-        sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.ALL, null, getServerName(), System.currentTimeMillis()));
+        doSend(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.ALL, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
     public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
-        sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.SERVER, serverName, getServerName(), System.currentTimeMillis()));
+        doSend(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.SERVER, serverName, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
     public void sendToProxy(@NotNull String channel, @NotNull String data) {
-        sendEnvelope(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.PROXY, null, getServerName(), System.currentTimeMillis()));
+        doSend(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.PROXY, null, getServerName(), System.currentTimeMillis()));
     }
 
     @Override
@@ -121,28 +131,82 @@ public final class PaperPluginMessenger implements Messenger, PluginMessageListe
         }
     }
 
-    private void sendEnvelope(NetworkEnvelope env) {
+    private void doSend(NetworkEnvelope env) {
+        Objects.requireNonNull(env, "env");
         Player carrier = Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
         if (carrier == null) {
+            buffer.enqueue(env.getChannel(), env.getData(),
+                env.getTargetServer() != null ? env.getTargetServer() : "",
+                toBufferTarget(env.getTarget()));
             long now = System.currentTimeMillis();
             long last = lastNoCarrierLog.get();
             if ((now - last) >= NO_CARRIER_LOG_COOLDOWN_MS && lastNoCarrierLog.compareAndSet(last, now)) {
                 logger.debug(
-                    "Dropping plugin message (no player carrier available): target={}, channel={}",
-                    (env != null) ? env.getTarget() : null,
-                    (env != null) ? env.getChannel() : null
+                    "Buffering plugin message (no player carrier): target={}, channel={}, bufferSize={}",
+                    env.getTarget(), env.getChannel(), buffer.size()
                 );
             }
             return;
         }
 
-        byte[] bytes = gson.toJson(env).getBytes(StandardCharsets.UTF_8);   
+        byte[] bytes = gson.toJson(env).getBytes(StandardCharsets.UTF_8);
         carrier.sendPluginMessage(plugin, NetworkConstants.TRANSPORT_CHANNEL, bytes);
+    }
+
+    private void flushBuffer() {
+        int flushed = buffer.drainTo(new FlushMessenger());
+        if (flushed > 0) {
+            logger.debug("Flushed {} buffered plugin messages", flushed);
+        }
+    }
+
+    private static MessageBuffer.Target toBufferTarget(NetworkEnvelope.Target target) {
+        if (target == null) return MessageBuffer.Target.ALL;
+        return switch (target) {
+            case ALL -> MessageBuffer.Target.ALL;
+            case PROXY -> MessageBuffer.Target.PROXY;
+            case SERVER -> MessageBuffer.Target.SERVER;
+        };
     }
 
     @Override
     public void close() {
+        HandlerList.unregisterAll(flushListener);
         plugin.getServer().getMessenger().unregisterIncomingPluginChannel(plugin, NetworkConstants.TRANSPORT_CHANNEL, this);
         plugin.getServer().getMessenger().unregisterOutgoingPluginChannel(plugin, NetworkConstants.TRANSPORT_CHANNEL);
+    }
+
+    private final class CarrierFlushListener implements Listener {
+        @EventHandler
+        public void onPlayerJoin(PlayerJoinEvent event) {
+            if (buffer.isEmpty()) return;
+            plugin.getServer().getScheduler().runTask(plugin, PaperPluginMessenger.this::flushBuffer);
+        }
+    }
+
+    private final class FlushMessenger implements Messenger {
+        @Override public void sendToAll(String channel, String data) {
+            Player carrier = Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
+            if (carrier == null) throw new IllegalStateException("No carrier available");
+            carrier.sendPluginMessage(plugin, NetworkConstants.TRANSPORT_CHANNEL,
+                gson.toJson(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.ALL, null, getServerName(), System.currentTimeMillis())).getBytes(StandardCharsets.UTF_8));
+        }
+        @Override public void sendToServer(String channel, String serverName, String data) {
+            Player carrier = Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
+            if (carrier == null) throw new IllegalStateException("No carrier available");
+            carrier.sendPluginMessage(plugin, NetworkConstants.TRANSPORT_CHANNEL,
+                gson.toJson(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.SERVER, serverName, getServerName(), System.currentTimeMillis())).getBytes(StandardCharsets.UTF_8));
+        }
+        @Override public void sendToProxy(String channel, String data) {
+            Player carrier = Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
+            if (carrier == null) throw new IllegalStateException("No carrier available");
+            carrier.sendPluginMessage(plugin, NetworkConstants.TRANSPORT_CHANNEL,
+                gson.toJson(new NetworkEnvelope(channel, data, NetworkEnvelope.Target.PROXY, null, getServerName(), System.currentTimeMillis())).getBytes(StandardCharsets.UTF_8));
+        }
+        @Override public void registerListener(String channel, MessageListener listener) {}
+        @Override public void unregisterListener(String channel, MessageListener listener) {}
+        @Override public boolean isConnected() { return !Bukkit.getOnlinePlayers().isEmpty(); }
+        @Override public String getServerName() { return PaperPluginMessenger.this.getServerName(); }
+        @Override public String getProxyServerName() { return PaperPluginMessenger.this.getProxyServerName(); }
     }
 }

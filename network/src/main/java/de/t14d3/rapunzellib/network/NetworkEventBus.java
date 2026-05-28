@@ -128,9 +128,6 @@ public final class NetworkEventBus {
 
     /**
      * Registers a typed listener with synchronous dispatch (default behavior).
-     */
-    /**
-     * Registers a typed listener with synchronous dispatch (default behavior).
      *
      * @param channel     the channel to listen on
      * @param payloadType the type of payload
@@ -184,17 +181,14 @@ public final class NetworkEventBus {
 
         if (asyncDispatch) {
             // Dispatch in parallel using ExecutorService
-            @SuppressWarnings("rawtypes")
-            List<CompletableFuture> futures = regs.stream()
-                .map(reg -> CompletableFuture.runAsync(() -> {
-                    try {
-                        reg.dispatch(json, data, serverName);
-                    } catch (Exception e) {
-                        logger.error("Async listener dispatch failed for channel {} from server {}",
-                                     channel, serverName, e);
-                    }
-                }, dispatcher))
-                .collect(Collectors.toList());
+            regs.forEach(reg -> CompletableFuture.runAsync(() -> {
+                        try {
+                            reg.dispatch(json, data, serverName);
+                        } catch (Exception e) {
+                            logger.error("Async listener dispatch failed for channel {} from server {}",
+                                    channel, serverName, e);
+                        }
+                    }, dispatcher));
         } else {
             // Synchronous dispatch (existing behavior)
             for (TypedRegistration<?> reg : regs) {

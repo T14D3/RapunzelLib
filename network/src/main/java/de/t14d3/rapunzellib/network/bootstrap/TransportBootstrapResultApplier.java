@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.network.bootstrap;
 
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.network.Messenger;
+import de.t14d3.rapunzellib.network.remote.RemoteHandlerRegistrar;
 import de.t14d3.rapunzellib.network.rpcserver.RpcClientMessenger;
 import de.t14d3.rapunzellib.network.runtime.DefaultNetworkRuntimeGateway;
 import de.t14d3.rapunzellib.network.runtime.NetworkRuntime;
@@ -45,11 +46,14 @@ public final class TransportBootstrapResultApplier {
 
         NetworkRuntime networkRuntime = NetworkRuntimeClassifier.classify(transport);
         ctx.register(NetworkRuntime.class, networkRuntime);
+        DefaultNetworkRuntimeGateway gateway = new DefaultNetworkRuntimeGateway(networkRuntime, ctx.scheduler(), logger);
         ctx.registerLinked(
             DefaultNetworkRuntimeGateway.class,
-            new DefaultNetworkRuntimeGateway(networkRuntime, ctx.scheduler(), logger),
+            gateway,
             NetworkRuntimeGateway.class
         );
+
+        RemoteHandlerRegistrar.install(ctx, gateway);
 
         Messenger effective = transport.effectiveMessenger();
         ctx.register(Messenger.class, effective);

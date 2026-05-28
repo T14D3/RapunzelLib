@@ -122,6 +122,8 @@ tasks.named("rapunzellibVerifyVanillaEntityTypesParity") {
 
 dependencies {
     api(libs.adventure.api)
+    api(libs.adventure.serializer.plain)
+    api(libs.adventure.serializer.json)
     api(libs.slf4j.api)
     api(libs.annotations)
 
