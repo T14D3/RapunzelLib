@@ -20,7 +20,7 @@ plugins {
     alias(libs.plugins.vanilla.gradle) apply false
 }
 
-val buildVersion = System.getenv("VERSION")?.takeIf { it.isNotBlank() } ?: "0.3.0-SNAPSHOT"
+val buildVersion = System.getenv("VERSION")?.takeIf { it.isNotBlank() } ?: "0.3.1-SNAPSHOT"
 
 val reposiliteBaseUrl =
     (findProperty("reposiliteBaseUrl") as String?)
@@ -161,6 +161,8 @@ allprojects {
         maven("https://maven.neoforged.net/releases/")
         maven("https://repo.spongepowered.org/repository/maven-public/")
         maven("https://jitpack.io")
+        maven("https://repo.opencollab.dev/maven-snapshots")
+        maven("https://repo.opencollab.dev/maven-releases")
     }
 
     tasks.withType<Zip>().configureEach {
@@ -211,11 +213,11 @@ subprojects {
     }
 
     tasks.withType<Jar>().configureEach {
-        val jarPrefix = path.removePrefix(":").replace(':', '-')
         collectAllJars.configure {
             dependsOn(this@configureEach)
             from(archiveFile) {
-                rename { "$jarPrefix-$it" }
+                // Use the archive's own base name (already CamelCase for platforms, lowercase for libs)
+                rename { archiveFileName.get() }
             }
         }
     }
@@ -224,7 +226,7 @@ subprojects {
 collectAllJars.configure {
     from(layout.projectDirectory.dir("gradle-plugin/build/libs")) {
         include("*.jar")
-        rename { "gradle-plugin-build-$it" }
+        rename { "RapunzelLibGradlePlugin-$it" }
     }
 }
 

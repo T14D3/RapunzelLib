@@ -22,23 +22,10 @@ public final class AttackEntityPre extends BaseCancellablePreEvent {
     private final REntity entity;
     private final REntitySnapshot snapshot;
 
-    /**
-     * Creates a new AttackEntityPre event.
-     *
-     * @param player the attacking player
-     * @param entity the entity being attacked
-     */
     public AttackEntityPre(RPlayer player, REntity entity) {
         this(player, entity, false);
     }
 
-    /**
-     * Creates a new AttackEntityPre event with cancelled state.
-     *
-     * @param player      the attacking player
-     * @param entity      the entity being attacked
-     * @param isCancelled whether the event is initially cancelled
-     */
     public AttackEntityPre(RPlayer player, REntity entity, boolean isCancelled) {
         this.player = Objects.requireNonNull(player, "player");
         this.entity = Objects.requireNonNull(entity, "entity");
@@ -46,29 +33,14 @@ public final class AttackEntityPre extends BaseCancellablePreEvent {
         setCancelled(isCancelled);
     }
 
-    /**
-     * Returns the attacking player.
-     *
-     * @return the player
-     */
     public RPlayer player() {
         return player;
     }
 
-    /**
-     * Returns the entity being attacked.
-     *
-     * @return the entity
-     */
     public REntity entity() {
         return entity;
     }
 
-    /**
-     * Returns the entity as a living entity, if applicable.
-     *
-     * @return an optional containing the living entity
-     */
     public java.util.Optional<RLivingEntity> livingEntity() {
         return entity.asLivingEntity();
     }
@@ -82,29 +54,14 @@ public final class AttackEntityPre extends BaseCancellablePreEvent {
         return snapshot;
     }
 
-    /**
-     * Returns the world where the attack takes place.
-     *
-     * @return the world
-     */
     public RWorldRef world() {
         return snapshot.world();
     }
 
-    /**
-     * Returns the position of the entity.
-     *
-     * @return the position
-     */
     public RBlockPos pos() {
         return snapshot.pos();
     }
 
-    /**
-     * Returns the entity type key.
-     *
-     * @return the entity type key
-     */
     public RKey entityTypeKey() {
         return snapshot.entityTypeKey();
     }

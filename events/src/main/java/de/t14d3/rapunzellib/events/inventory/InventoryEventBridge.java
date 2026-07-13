@@ -88,9 +88,6 @@ public final class InventoryEventBridge {
         support().bus().dispatchPost(InventoryEventPayloads.openPost(player, inventory));
     }
 
-    /**
-     * Returns the inventory support helper, resolving the {@link GameEventBus}.
-     */
     private static @NotNull InventorySupport support() {
         GameEventBus bus = Rapunzel.context().services().find(GameEventBus.class)
             .orElseGet(GameEvents::install);
@@ -133,9 +130,6 @@ public final class InventoryEventBridge {
         }
     }
 
-    /**
-     * Internal helper holding the resolved {@link GameEventBus}.
-     */
     private record InventorySupport(@NotNull GameEventBus bus) {
         private InventorySupport {
             Objects.requireNonNull(bus, "bus");

@@ -12,34 +12,23 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface Visual<C extends VisualConfig> {
 
-    /**
-     * Returns the unique identifier of this visual.
-     *
-     * @return the visual ID
-     */
     @NotNull VisualId id();
 
-    /**
-     * Returns the configuration of this visual.
-     *
-     * @return the visual configuration
-     */
     @NotNull C config();
 
-    /**
-     * Returns the audience specification for this visual.
-     *
-     * @return the visual audience
-     */
     @NotNull VisualAudience audience();
 
     /**
      * Shows this visual to its intended audience.
+     *
+     * <p>If the visual is already shown, this is a no-op.</p>
      */
     void show();
 
     /**
      * Hides this visual without removing it permanently.
+     *
+     * <p>The visual can be shown again via {@link #show()}.</p>
      */
     void hide();
 

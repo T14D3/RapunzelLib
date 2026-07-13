@@ -33,17 +33,8 @@ public abstract class AbstractVisual<C extends VisualConfig, P> implements Visua
     /** The set of player UUIDs currently viewing this visual. */
     protected final Set<UUID> currentViewers = ConcurrentHashMap.newKeySet();
 
-    /** The manager that registered this visual. */
     private final VisualManager manager;
 
-    /**
-     * Constructs a new abstract visual.
-     *
-     * @param id       the unique visual identifier
-     * @param config   the visual configuration
-     * @param audience the target audience
-     * @param manager  the visual manager responsible for lifecycle tracking
-     */
     protected AbstractVisual(
         @NotNull VisualId id,
         @NotNull C config,
@@ -111,20 +102,10 @@ public abstract class AbstractVisual<C extends VisualConfig, P> implements Visua
         currentViewers.remove(uuid);
     }
 
-    /**
-     * Returns an unmodifiable view of the current viewer UUIDs.
-     *
-     * @return an unmodifiable set of player UUIDs currently viewing this visual
-     */
     public final Set<UUID> currentViewers() {
         return Collections.unmodifiableSet(currentViewers);
     }
 
-    /**
-     * Returns the visual manager that registered this visual.
-     *
-     * @return the visual manager
-     */
     protected final VisualManager manager() {
         return manager;
     }

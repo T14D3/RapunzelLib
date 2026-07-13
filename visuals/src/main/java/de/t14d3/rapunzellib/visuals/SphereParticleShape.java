@@ -14,12 +14,6 @@ final class SphereParticleShape implements ParticleShape {
     private final RLocation center;
     private final double radius;
 
-    /**
-     * Creates a sphere shape.
-     *
-     * @param center the sphere center
-     * @param radius the sphere radius
-     */
     SphereParticleShape(@NotNull RLocation center, double radius) {
         this.center = center;
         this.radius = radius;

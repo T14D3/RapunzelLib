@@ -30,13 +30,6 @@ public final class SharedRuntimeCommandRegistrationSupport implements AutoClosea
     private boolean dirty;
     private Set<String> registeredLabels = Set.of();
 
-    /**
-     * Creates a new support instance.
-     *
-     * @param commandService the command service
-     * @param scheduler      the scheduler for async reloads
-     * @param server         the Minecraft server (used for data-pack reloads)
-     */
     public SharedRuntimeCommandRegistrationSupport(
         @NotNull RCommandService commandService,
         @NotNull Scheduler scheduler,
@@ -95,11 +88,6 @@ public final class SharedRuntimeCommandRegistrationSupport implements AutoClosea
         subscription.close();
     }
 
-    /**
-     * Handles command service change notifications.
-     *
-     * @param change the change event
-     */
     private void onCommandServiceChange(@NotNull RCommandServiceChange change) {
         synchronized (stateLock) {
             dirty = true;
@@ -118,9 +106,6 @@ public final class SharedRuntimeCommandRegistrationSupport implements AutoClosea
         scheduleReload();
     }
 
-    /**
-     * Schedules an asynchronous data-pack reload if conditions are met.
-     */
     private void scheduleReload() {
         synchronized (stateLock) {
             if (!dispatcherObserved || reloadScheduled || !dirty) {
@@ -140,11 +125,6 @@ public final class SharedRuntimeCommandRegistrationSupport implements AutoClosea
         });
     }
 
-    /**
-     * Collects the currently registered command labels.
-     *
-     * @return an immutable set of labels
-     */
     private @NotNull Set<String> currentLabels() {
         Set<String> labels = new LinkedHashSet<>();
         for (RCommandNode<RCommandSource> root : commandService.roots()) {

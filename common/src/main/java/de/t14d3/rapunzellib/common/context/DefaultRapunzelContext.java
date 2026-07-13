@@ -24,35 +24,17 @@ import java.util.Objects;
  * cleaned up in reverse registration order when the context is closed.
  */
 public final class DefaultRapunzelContext implements RapunzelContext {
-    /** Shared runtime instance across all contexts */
     private final RapunzelRuntime sharedRuntime;
-    /** Platform runtime descriptor */
     private final PlatformRuntime runtime;
-    /** Logger for this context */
     private final Logger logger;
-    /** Plugin data directory */
     private final Path dataDirectory;
-    /** Resource provider for classpath resources */
     private final ResourceProvider resources;
-    /** Context-bound scheduler */
     private final Scheduler scheduler;
-    /** Service registry */
     private final DefaultServiceRegistry services = new DefaultServiceRegistry();
 
-    /** Ordered list of closeable resources (LIFO order on close) */
     private final List<AutoCloseable> closeables = new ArrayList<>();
-    /** Identity set to prevent duplicate registration of closeables */
     private final IdentityHashMap<AutoCloseable, Boolean> closeableSet = new IdentityHashMap<>();
 
-    /**
-     * Creates a context using the global {@link RapunzelRuntime#getInstance()}.
-     *
-     * @param runtime       the platform runtime descriptor
-     * @param logger        the logger
-     * @param dataDirectory the plugin data directory
-     * @param resources     the resource provider
-     * @param scheduler     the platform scheduler
-     */
     public DefaultRapunzelContext(
         PlatformRuntime runtime,
         Logger logger,
@@ -63,16 +45,6 @@ public final class DefaultRapunzelContext implements RapunzelContext {
         this(RapunzelRuntime.getInstance(), runtime, logger, dataDirectory, resources, scheduler);
     }
 
-    /**
-     * Creates a context with an explicit shared runtime.
-     *
-     * @param sharedRuntime the shared runtime instance
-     * @param runtime       the platform runtime descriptor
-     * @param logger        the logger
-     * @param dataDirectory the plugin data directory
-     * @param resources     the resource provider
-     * @param scheduler     the platform scheduler
-     */
     public DefaultRapunzelContext(
         RapunzelRuntime sharedRuntime,
         PlatformRuntime runtime,
@@ -90,84 +62,48 @@ public final class DefaultRapunzelContext implements RapunzelContext {
         registerCloseable((AutoCloseable) this.scheduler);
     }
 
-    /**
-     * Gets the shared runtime instance.
-     *
-     * @return the shared runtime
-     */
     @Override
     public @NotNull RapunzelRuntime sharedRuntime() {
         return sharedRuntime;
     }
 
-    /**
-     * Gets the platform runtime descriptor.
-     *
-     * @return the platform runtime
-     */
     @Override
     public @NotNull PlatformRuntime runtime() {
         return runtime;
     }
 
-    /**
-     * Gets the logger.
-     *
-     * @return the logger
-     */
     @Override
     public @NotNull Logger logger() {
         return logger;
     }
 
-    /**
-     * Gets the plugin data directory.
-     *
-     * @return the data directory path
-     */
     @Override
     public @NotNull Path dataDirectory() {
         return dataDirectory;
     }
 
-    /**
-     * Gets the resource provider.
-     *
-     * @return the resource provider
-     */
     @Override
     public @NotNull ResourceProvider resources() {
         return resources;
     }
 
-    /**
-     * Gets the context-bound scheduler.
-     *
-     * @return the scheduler
-     */
     @Override
     public @NotNull Scheduler scheduler() {
         return scheduler;
     }
 
-    /**
-     * Gets the service registry.
-     *
-     * @return the service registry
-     */
     @Override
     public @NotNull ServiceRegistry services() {
         return services;
     }
 
     /**
-     * Registers a service instance, also tracking it as a closeable if it implements
-     * {@link AutoCloseable}.
+     * Registers a service and tracks it for automatic cleanup if it is {@link AutoCloseable}.
      *
-     * @param type     the service type class
+     * @param type     the service type
      * @param instance the service instance
      * @param <T>      the service type
-     * @return the registered instance
+     * @return the registered service instance
      */
     @Override
     public <T> @NotNull T register(@NotNull Class<T> type, @NotNull T instance) {
@@ -179,9 +115,11 @@ public final class DefaultRapunzelContext implements RapunzelContext {
     }
 
     /**
-     * Registers an {@link AutoCloseable} to be closed when the context shuts down.
+     * Registers a closeable to be closed when the context shuts down.
      *
-     * @param closeable the closeable resource
+     * <p>Duplicates are ignored (identity-based deduplication).</p>
+     *
+     * @param closeable the closeable resource to track
      */
     @Override
     public void registerCloseable(@NotNull AutoCloseable closeable) {
@@ -193,10 +131,12 @@ public final class DefaultRapunzelContext implements RapunzelContext {
 
     /**
      * Closes all registered closeables in reverse registration order.
-     * Exceptions from individual closeables are collected and the first is re-thrown
-     * with subsequent exceptions suppressed.
      *
-     * @throws Exception if any closeable throws during shutdown
+     * <p>Exceptions from individual closeables are collected and the first is
+     * re-thrown with subsequent exceptions suppressed via
+     * {@link Exception#addSuppressed(Throwable)}.</p>
+     *
+     * @throws Exception if any closeable throws; subsequent errors are suppressed
      */
     @Override
     public void close() throws Exception {

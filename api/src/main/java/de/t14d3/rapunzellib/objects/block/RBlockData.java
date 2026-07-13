@@ -93,4 +93,15 @@ public interface RBlockData extends RNative {
     static @NotNull Optional<RBlockData> parse(@NotNull String value) {
         return Rapunzel.blocks().parseData(value);
     }
+
+    /**
+     * Parses a string representation of block data, throwing if parsing fails.
+     *
+     * @param value the string value to parse
+     * @return the parsed block data
+     * @throws IllegalArgumentException if the value cannot be parsed
+     */
+    static @NotNull RBlockData require(@NotNull String value) {
+        return parse(value).orElseThrow(() -> new IllegalArgumentException("Unknown block data: " + value));
+    }
 }

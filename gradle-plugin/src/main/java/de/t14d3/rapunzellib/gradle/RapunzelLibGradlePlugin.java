@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.gradle;
 
+import de.t14d3.rapunzellib.gradle.tasks.GenerateContextWrapperTask;
 import de.t14d3.rapunzellib.gradle.tasks.GenerateKeyCatalogTask;
 import de.t14d3.rapunzellib.gradle.tasks.GenerateRNbtSchemaTask;
 import de.t14d3.rapunzellib.gradle.tasks.RunServersTask;
@@ -22,8 +23,6 @@ import java.util.Set;
 public final class RapunzelLibGradlePlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
-        RapunzelLibPlatformCompanionWiring.wire(project);
-        
         RunnerGradleProperties runnerProperties = new RunnerGradleProperties(project);
         RapunzelLibExtension extension = project.getExtensions().create("rapunzellib", RapunzelLibExtension.class);
         extension.applyDefaultConventions(project);
@@ -48,20 +47,63 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
         TaskProvider<RunServersTask> runPerfServersTask =
             RapunzelLibTaskRegistrars.registerRunPerfServersTask(project, runnerProperties);
 
+        // DevRunner extension and tasks
+        DevRunnerExtension devRunnerExtension = project.getExtensions().create("devRunner", DevRunnerExtension.class);
+        devRunnerExtension.applyConventions(project);
+        RapunzelLibTaskRegistrars.registerDevRunnerTask(project, devRunnerExtension);
+        RapunzelLibTaskRegistrars.registerDevRunnerPerfTask(project, devRunnerExtension);
+
         RapunzelLibTaskRegistrars.registerInitTemplateTask(project, extension);
         RapunzelLibTaskRegistrars.registerPlatformAdapterScaffoldTask(project, extension);
         RapunzelLibTaskRegistrars.registerInstallerWiringTask(project);
         RapunzelLibTaskRegistrars.registerSharedParityTask(project);
+        // Context wrapper task - register early so it's available in afterEvaluate.
+        project.afterEvaluate(p -> {
+            TaskProvider<GenerateContextWrapperTask> ctxWrapper =
+                RapunzelLibTaskRegistrars.registerContextWrapperTask(p, extension);
+            RapunzelLibTaskRegistrars.configureContextWrapperTask(p, extension, ctxWrapper);
 
-        project.getPlugins().withId("java", ignored ->
+            if (p.getPlugins().hasPlugin("java")) {
+                SourceSet mainSourceSet = p.getExtensions().getByType(SourceSetContainer.class)
+                    .getByName(SourceSet.MAIN_SOURCE_SET_NAME);
+
+                // Find the main source directory (e.g. src/main/java)
+                File sourceDir = mainSourceSet.getAllJava().getSourceDirectories()
+                    .getFiles().stream()
+                    .filter(File::exists)
+                    .filter(f -> f.toPath().endsWith("src/main/java"))
+                    .findFirst()
+                    .orElse(null);
+
+                if (sourceDir != null && extension.getContextWrapper().getTransformSources().get()) {
+                    final File sourceDirFinal = sourceDir;
+                    ctxWrapper.configure(task -> task.getSourceDir().set(sourceDirFinal));
+
+                    // Replace the original source dir with the wrapper output dir
+                    // in the compile task, preserving any other source dirs.
+                    p.getTasks().named(mainSourceSet.getCompileJavaTaskName(), JavaCompile.class)
+                        .configure(compile -> {
+                            compile.dependsOn(ctxWrapper);
+                            compile.setSource(p.files(p.provider(() -> {
+                                Set<File> dirs = new LinkedHashSet<>(mainSourceSet.getJava().getSrcDirs());
+                                dirs.remove(sourceDirFinal);
+                                dirs.add(ctxWrapper.get().getOutputDir().get().getAsFile());
+                                return dirs;
+                            })));
+                        });
+                }
+            }
+        });
+
+        project.getPlugins().withId("java", ignored -> {
             RapunzelLibJavaWiring.wireJavaPlugin(
                 project,
                 generateKeyCatalog,
                 registryCatalogTasks,
                 validateMessages,
                 generateRNbtSchema
-            )
-        );
+            );
+        });
 
         RapunzelLibJavaWiring.wireArchiveTasksAfterEvaluate(project, runServersTask, runPerfServersTask);
     }

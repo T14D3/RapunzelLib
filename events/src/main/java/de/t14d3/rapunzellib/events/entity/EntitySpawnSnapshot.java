@@ -34,29 +34,14 @@ public record EntitySpawnSnapshot(
         this(REntitySnapshot.of(UUID.randomUUID(), world, pos, entityTypeKey), reason, cancelled);
     }
 
-    /**
-     * Returns the world from the entity snapshot.
-     *
-     * @return the world
-     */
     public RWorldRef world() {
         return entity.world();
     }
 
-    /**
-     * Returns the position from the entity snapshot.
-     *
-     * @return the position
-     */
     public RBlockPos pos() {
         return entity.pos();
     }
 
-    /**
-     * Returns the entity type key from the entity snapshot.
-     *
-     * @return the entity type key
-     */
     public RKey entityTypeKey() {
         return entity.entityTypeKey();
     }

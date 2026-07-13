@@ -101,4 +101,44 @@ public interface RServerPlayer extends RPlayer, RLivingEntity {
     default @NotNull CompletableFuture<Boolean> connectToServer(@NotNull String serverName) {
         throw new UnsupportedOperationException("connectToServer is not supported for " + getClass().getName());
     }
+
+    /**
+     * Sets the game mode for this player.
+     *
+     * @param gameMode the game mode to set
+     * @throws UnsupportedOperationException if not supported by this implementation
+     */
+    default void gameMode(@NotNull RGameMode gameMode) {
+        throw new UnsupportedOperationException("gameMode(RGameMode) is not supported for " + getClass().getName());
+    }
+
+    /**
+     * Returns the current game mode of this player.
+     *
+     * @return the current game mode
+     * @throws UnsupportedOperationException if not supported by this implementation
+     */
+    default @NotNull RGameMode gameMode() {
+        throw new UnsupportedOperationException("gameMode() is not supported for " + getClass().getName());
+    }
+
+    /**
+     * Sets the operator status for this player.
+     *
+     * @param op {@code true} to op, {@code false} to deop
+     * @throws UnsupportedOperationException if not supported by this implementation
+     */
+    default void op(boolean op) {
+        throw new UnsupportedOperationException("op(boolean) is not supported for " + getClass().getName());
+    }
+
+    /**
+     * Checks whether this player is an operator.
+     *
+     * @return {@code true} if the player is an operator
+     * @throws UnsupportedOperationException if not supported by this implementation
+     */
+    default boolean op() {
+        throw new UnsupportedOperationException("op() is not supported for " + getClass().getName());
+    }
 }

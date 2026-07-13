@@ -12,11 +12,7 @@ import org.jetbrains.annotations.NotNull;
  * override the default installer manifest.</p>
  */
 public interface GameEventSupportContributor {
-    /**
-     * Returns the platform ID this contributor applies to.
-     *
-     * @return the platform identifier
-     */
+    
     @NotNull PlatformId platformId();
 
     /**

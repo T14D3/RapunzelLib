@@ -17,17 +17,9 @@ import java.util.function.Function;
  * @param <V> the value type
  */
 public final class KeyedLruCache<K, V> {
-    /** Maximum number of entries before eviction */
     private final int maxSize;
-    /** The underlying access-ordered linked hash map */
     private final Map<K, V> cache;
 
-    /**
-     * Creates a new LRU cache with the given maximum size.
-     *
-     * @param maxSize the maximum number of entries (must be positive)
-     * @throws IllegalArgumentException if maxSize is not positive
-     */
     public KeyedLruCache(int maxSize) {
         if (maxSize <= 0) {
             throw new IllegalArgumentException("maxSize must be positive");
@@ -36,13 +28,6 @@ public final class KeyedLruCache<K, V> {
         this.cache = new LinkedHashMap<>(16, 0.75f, true);
     }
 
-    /**
-     * Retrieves the value for the given key, creating it via the factory if not present.
-     *
-     * @param key     the lookup key
-     * @param factory the function to create a new value if the key is absent
-     * @return the existing or newly created value
-     */
     public @NotNull V getOrCreate(@NotNull K key, @NotNull Function<? super K, ? extends V> factory) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(factory, "factory");

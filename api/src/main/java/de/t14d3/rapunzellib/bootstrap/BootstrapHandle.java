@@ -20,8 +20,6 @@ public final class BootstrapHandle implements AutoCloseable {
     private final AtomicBoolean closed = new AtomicBoolean();
 
     /**
-     * Creates a bootstrap handle.
-     *
      * @param participant the plugin or module that owns or borrows this handle
      * @param context     the associated RapunzelContext
      * @param role        the participant's role
@@ -39,29 +37,17 @@ public final class BootstrapHandle implements AutoCloseable {
         this.closeAction = Objects.requireNonNull(closeAction, "closeAction");
     }
 
-    /**
-     * Returns the participant associated with this handle.
-     *
-     * @return the participant object
-     */
+    /** Returns the participant associated with this handle. */
     public @NotNull Object participant() {
         return participant;
     }
 
-    /**
-     * Returns the context associated with this handle.
-     *
-     * @return the context
-     */
+    /** Returns the context associated with this handle. */
     public @NotNull RapunzelContext context() {
         return context;
     }
 
-    /**
-     * Returns the role of this handle (OWNER or BORROWER).
-     *
-     * @return the role
-     */
+    /** Returns the role of this handle (OWNER or BORROWER). */
     public @NotNull BootstrapOwnerRole role() {
         return role;
     }
@@ -78,6 +64,13 @@ public final class BootstrapHandle implements AutoCloseable {
         return closed.get();
     }
 
+    /**
+     * Closes this handle, triggering the shutdown sequence for the associated participant.
+     *
+     * <p>Idempotent: subsequent calls after the first are no-ops. For owners,
+     * this shuts down the associated context. For borrowers, it releases the
+     * borrowed reference without closing the context.</p>
+     */
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) return;

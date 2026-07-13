@@ -44,14 +44,6 @@ public abstract class SharedNmsVisual<C extends VisualConfig> implements Visual<
     protected final Set<UUID> currentViewers = ConcurrentHashMap.newKeySet();
     private final VisualManager manager;
 
-    /**
-     * Creates a new shared NMS visual.
-     *
-     * @param id       the visual ID
-     * @param config   the visual config
-     * @param audience the visual audience
-     * @param manager  the visual manager
-     */
     protected SharedNmsVisual(
         @NotNull VisualId id,
         @NotNull C config,
@@ -225,11 +217,6 @@ public abstract class SharedNmsVisual<C extends VisualConfig> implements Visual<
         return dx * dx + dy * dy + dz * dz <= maxDistance * maxDistance;
     }
 
-    /**
-     * Returns an immutable copy of the current viewer UUIDs.
-     *
-     * @return the current viewer IDs
-     */
     protected final @NotNull Set<UUID> currentViewerIds() {
         return Set.copyOf(currentViewers);
     }

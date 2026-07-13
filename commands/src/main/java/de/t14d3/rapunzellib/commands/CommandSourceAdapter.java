@@ -12,11 +12,7 @@ import org.jetbrains.annotations.NotNull;
  * </p>
  */
 public interface CommandSourceAdapter {
-    /**
-     * Gets the platform identifier for this adapter.
-     *
-     * @return the platform ID
-     */
+    
     @NotNull PlatformId platformId();
 
     /**

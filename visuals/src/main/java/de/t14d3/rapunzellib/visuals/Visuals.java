@@ -10,11 +10,6 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface Visuals {
 
-    /**
-     * Returns the visual manager instance.
-     *
-     * @return the visual manager
-     */
     @NotNull VisualManager manager();
 
     /**

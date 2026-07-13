@@ -19,6 +19,7 @@ final class FeatureInstallerRegistryTest {
         );
 
         for (PlatformId platformId : PlatformId.values()) {
+            if (platformId == PlatformId.REMOTE) continue;
             TestCompleteFeatureInstaller installer = registry.resolve(platformId);
             assertEquals(platformId, installer.platformId());
         }

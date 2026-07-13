@@ -4,6 +4,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+/**
+ * @deprecated Use {@link de.t14d3.rapunzellib.devrunner.DevRunnerWorkspace} instead.
+ */
+@Deprecated
 record ServerRunnerWorkspace(Path baseDir, Path cacheDir, Path instancesDir) {
     static ServerRunnerWorkspace resolve(ServerRunnerMain.Config cfg) {
         Path baseDir = resolveBaseDir(cfg.baseDir());

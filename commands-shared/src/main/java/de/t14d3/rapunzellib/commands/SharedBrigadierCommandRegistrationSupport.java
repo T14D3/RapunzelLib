@@ -75,12 +75,6 @@ public final class SharedBrigadierCommandRegistrationSupport {
         return true;
     }
 
-    /**
-     * Resolves the {@code CommandSourceStack} class via reflection.
-     *
-     * @return the CommandSourceStack class
-     * @throws IllegalStateException if the class is not found
-     */
     private static @NotNull Class<?> commandSourceStackType() {
         try {
             return Class.forName(MOJANG_COMMAND_SOURCE_STACK_CLASS_NAME);

@@ -18,33 +18,13 @@ import java.util.function.Function;
  * </p>
  */
 public interface RenderContext {
-    /**
-     * Returns the player for whom the GUI is being rendered.
-     *
-     * @return the player
-     */
+    
     @NotNull RPlayer player();
 
-    /**
-     * Returns the GUI being rendered.
-     *
-     * @return the GUI
-     */
     @NotNull Gui gui();
 
-    /**
-     * Returns the current state of the GUI.
-     *
-     * @return the GUI state
-     */
     @NotNull GuiState state();
 
-    /**
-     * Returns the element at the given slot, or null if empty.
-     *
-     * @param slot the slot index
-     * @return the element, or null
-     */
     @Nullable GuiElement elementAt(int slot);
 
     /**

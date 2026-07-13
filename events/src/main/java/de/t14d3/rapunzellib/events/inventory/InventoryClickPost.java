@@ -23,15 +23,6 @@ public final class InventoryClickPost implements GamePostEvent {
     private final RItem currentItem;
     private final boolean cancelled;
 
-    /**
-     * Creates a new InventoryClickPost event.
-     *
-     * @param player    the clicking player
-     * @param inventory the inventory that was clicked
-     * @param slot      the slot index
-     * @param clickType the type of click
-     * @param cancelled whether the click was cancelled
-     */
     public InventoryClickPost(
         @NotNull RPlayer player,
         @NotNull RInventory inventory,
@@ -47,68 +38,30 @@ public final class InventoryClickPost implements GamePostEvent {
         this.cancelled = cancelled;
     }
 
-    /**
-     * Returns the clicking player.
-     *
-     * @return the player
-     */
     public @NotNull RPlayer player() {
         return player;
     }
 
-    /**
-     * Returns the inventory that was clicked.
-     *
-     * @return the inventory
-     */
     public @NotNull RInventory inventory() {
         return inventory;
     }
 
-    /**
-     * Returns the slot that was clicked.
-     *
-     * @return the slot index
-     */
     public int slot() {
         return slot;
     }
 
-    /**
-     * Returns the type of click that was performed.
-     *
-     * @return the click type
-     */
     public @NotNull InventoryClickType clickType() {
         return clickType;
     }
 
-    /**
-     * Returns the current item in the clicked slot, if present.
-     *
-     * @return an optional containing the current item
-     */
     public @NotNull Optional<RItem> currentItem() {
         return Optional.ofNullable(currentItem);
     }
 
-    /**
-     * Returns whether the click was cancelled.
-     *
-     * @return true if cancelled
-     */
     public boolean cancelled() {
         return cancelled;
     }
 
-    /**
-     * Validates that the slot is within bounds for the inventory size.
-     *
-     * @param slot the slot index
-     * @param size the inventory size
-     * @return the validated slot index
-     * @throws IndexOutOfBoundsException if the slot is out of bounds
-     */
     private static int requireSlot(int slot, int size) {
         if (slot < 0 || slot >= size) {
             throw new IndexOutOfBoundsException("Slot " + slot + " out of bounds for inventory size " + size);

@@ -6,6 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * @deprecated Use {@link de.t14d3.rapunzellib.devrunner.DevRunnerOrchestrator} instead.
+ */
+@Deprecated
 final class ServerRunnerOrchestrator {
     private final ServerRunnerMain.Config cfg;
     private final ServerRunnerWorkspace workspace;

@@ -17,31 +17,18 @@ public interface RRegistryAccess {
     /**
      * Finds a registry by its key.
      *
-     * @param registryKey the registry key
-     * @param <T>         the value type of the registry
-     * @return an {@link Optional} containing the registry, or empty if not registered
+     * @param registryKey the key identifying the registry
+     * @param <T>         the value type stored in the registry
+     * @return an {@link Optional} containing the registry, or empty if not found
      */
     <T> @NotNull Optional<RRegistry<T>> findRegistry(@NotNull RRegistryKey<T> registryKey);
 
-    /**
-     * Checks whether a registry with the given key exists.
-     *
-     * @param registryKey the registry key
-     * @param <T>         the value type of the registry
-     * @return true if the registry exists
-     */
+    /** Checks whether a registry with the given key exists. */
     default <T> boolean containsRegistry(@NotNull RRegistryKey<T> registryKey) {
         return findRegistry(registryKey).isPresent();
     }
 
-    /**
-     * Requires a registry by key, throwing if not found.
-     *
-     * @param registryKey the registry key
-     * @param <T>         the value type of the registry
-     * @return the registry
-     * @throws IllegalStateException if the registry is not registered
-     */
+    /** Requires a registry by key, throwing if not found. */
     default <T> @NotNull RRegistry<T> registry(@NotNull RRegistryKey<T> registryKey) {
         RRegistryKey<T> requestedRegistryKey = Objects.requireNonNull(registryKey, "registryKey");
         return findRegistry(requestedRegistryKey).orElseThrow(() -> new IllegalStateException(
@@ -49,62 +36,30 @@ public interface RRegistryAccess {
         ));
     }
 
-    /**
-     * Finds a value in a specific registry by key.
-     *
-     * @param registryKey the registry to search
-     * @param key         the value key
-     * @param <T>         the value type
-     * @return an {@link Optional} containing the value, or empty if not found
-     */
+    /** Finds a value in a specific registry by key. */
     default <T> @NotNull Optional<T> find(@NotNull RRegistryKey<T> registryKey, @NotNull RKey key) {
         Objects.requireNonNull(registryKey, "registryKey");
         Objects.requireNonNull(key, "key");
         return findRegistry(registryKey).flatMap(registry -> registry.find(key));
     }
 
-    /**
-     * Finds a value by registry reference.
-     *
-     * @param ref the registry reference
-     * @param <T> the value type
-     * @return an {@link Optional} containing the value, or empty if not found
-     */
+    /** Finds a value by registry reference. */
     default <T> @NotNull Optional<T> find(@NotNull RRegistryRef<T> ref) {
         RRegistryRef<T> requestedRef = Objects.requireNonNull(ref, "ref");
         return find(requestedRef.registryKey(), requestedRef.key());
     }
 
-    /**
-     * Requires a value in a specific registry by key, throwing if not found.
-     *
-     * @param registryKey the registry to search
-     * @param key         the value key
-     * @param <T>         the value type
-     * @return the value
-     * @throws IllegalStateException if the registry or value is not found
-     */
+    /** Requires a value in a specific registry by key, throwing if not found. */
     default <T> @NotNull T require(@NotNull RRegistryKey<T> registryKey, @NotNull RKey key) {
         return registry(registryKey).require(key);
     }
 
-    /**
-     * Requires a value by registry reference, throwing if not found.
-     *
-     * @param ref the registry reference
-     * @param <T> the value type
-     * @return the value
-     * @throws IllegalStateException if the value is not found
-     */
+    /** Requires a value by registry reference, throwing if not found. */
     default <T> @NotNull T require(@NotNull RRegistryRef<T> ref) {
         RRegistryRef<T> requestedRef = Objects.requireNonNull(ref, "ref");
         return require(requestedRef.registryKey(), requestedRef.key());
     }
 
-    /**
-     * Returns all known registry keys.
-     *
-     * @return a list of all registry keys
-     */
+    /** Returns all known registry keys. */
     @NotNull List<RRegistryKey<?>> registryKeys();
 }

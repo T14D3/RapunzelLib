@@ -3,7 +3,9 @@ package de.t14d3.rapunzellib.platform.sponge;
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.bootstrap.BootstrapHandle;
+import de.t14d3.rapunzellib.commands.ConsoleCommandDispatcher;
 import de.t14d3.rapunzellib.common.bootstrap.BootstrapServices;
+import de.t14d3.rapunzellib.common.context.ConsumerView;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.network.InMemoryMessenger;
@@ -19,6 +21,7 @@ import de.t14d3.rapunzellib.platform.sponge.attachments.SpongeAttachmentService;
 import de.t14d3.rapunzellib.platform.sponge.attachments.SpongePersistentAttachmentsStore;
 import de.t14d3.rapunzellib.platform.sponge.scheduler.SpongeScheduler;
 import de.t14d3.rapunzellib.runtime.EngineFamily;
+import de.t14d3.rapunzellib.runtime.LifecycleOwner;
 import de.t14d3.rapunzellib.runtime.PlatformRuntime;
 import de.t14d3.rapunzellib.runtime.RuntimeProfiles;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
@@ -37,22 +40,37 @@ public final class SpongeRapunzelBootstrap {
     private SpongeRapunzelBootstrap() {
     }
 
-    public static RapunzelContext bootstrap(
-            PluginContainer container,
-            Path dataDirectory,
-            Server server
-    ) {
-        return bootstrapHandle(container, dataDirectory, server).context();
-    }
+    // ── Platform bootstrap (called by SpongePlatformPlugin) ─────────────────
 
-    public static BootstrapHandle bootstrapHandle(
-            PluginContainer container,
-            Path dataDirectory,
-            Server server
-    ) {
+    public static BootstrapHandle bootstrapPlatform(PluginContainer container, Path dataDirectory, Server server) {
         SpongePlatformBootstrapHost.prepareBootstrap(container);
         return Rapunzel.bootstrap(container.instance(), () -> createContext(container, dataDirectory, server));
     }
+
+    // ── Consumer acquire ────────────────────────────────────────────────────
+
+    public static BootstrapHandle acquire(PluginContainer container, Path dataDirectory, Server server) {
+        RapunzelContext platform = Rapunzel.context();
+        Object plugin = container.instance();
+        String pluginId = container.metadata().id();
+        Logger logger = LoggerFactory.getLogger(pluginId);
+        Class<?> resourceAnchor = plugin.getClass();
+        try {
+            Files.createDirectories(dataDirectory);
+        } catch (Exception e) {
+            logger.debug("Failed to create data directory {}", dataDirectory, e);
+        }
+        ConsumerView view = new ConsumerView(
+            platform,
+            logger,
+            dataDirectory,
+            path -> Optional.ofNullable(openResource(resourceAnchor, path)),
+            new LifecycleOwner(container)
+        );
+        return Rapunzel.acquire(plugin, view);
+    }
+
+    // ── Context creation ────────────────────────────────────────────────────
 
     public static RapunzelContext createContext(
             PluginContainer container,
@@ -92,6 +110,7 @@ public final class SpongeRapunzelBootstrap {
                 scheduler,
                 ctx -> {
                     ctx.register(Server.class, server);
+                    ctx.register(ConsoleCommandDispatcher.class, new SpongeConsoleCommandDispatcher(server));
 
                     SpongePersistentAttachmentsStore attachmentStore = ctx.sharedRuntime().getOrCreate(
                         SpongePersistentAttachmentsStore.class,
@@ -136,6 +155,28 @@ public final class SpongeRapunzelBootstrap {
                 false
         );
     }
+
+    // ── Legacy API (deprecated) ─────────────────────────────────────────────
+
+    @Deprecated
+    public static RapunzelContext bootstrap(
+            PluginContainer container,
+            Path dataDirectory,
+            Server server
+    ) {
+        return acquire(container, dataDirectory, server).context();
+    }
+
+    @Deprecated
+    public static BootstrapHandle bootstrapHandle(
+            PluginContainer container,
+            Path dataDirectory,
+            Server server
+    ) {
+        return acquire(container, dataDirectory, server);
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
 
     private static InputStream openResource(Class<?> anchor, String path) {
         if (anchor == null || path == null) return null;

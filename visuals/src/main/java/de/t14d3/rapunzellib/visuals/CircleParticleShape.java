@@ -14,13 +14,6 @@ final class CircleParticleShape implements ParticleShape {
     private final double radius;
     private final Plane plane;
 
-    /**
-     * Creates a circle shape.
-     *
-     * @param center the center of the circle
-     * @param radius the circle radius
-     * @param plane  the plane the circle lies in
-     */
     CircleParticleShape(@NotNull RLocation center, double radius, @NotNull Plane plane) {
         this.center = center;
         this.radius = radius;

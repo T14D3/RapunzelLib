@@ -17,31 +17,15 @@ import java.util.Objects;
  * @param <S> the Brigadier command source type
  */
 final class DefaultSharedBrigadierCommandRegistrar<S> implements SharedBrigadierCommandRegistrar<S> {
-    /**
-     * The platform identifier.
-     */
+    
     private final PlatformId platformId;
-    /**
-     * The Brigadier source type class.
-     */
+    
     private final Class<S> sourceType;
-    /**
-     * The command service providing shared command trees.
-     */
+    
     private final RCommandService commandService;
-    /**
-     * The adapters for wrapping native sources.
-     */
+    
     private final CommandSourceAdapters adapters;
 
-    /**
-     * Creates a new shared Brigadier command registrar.
-     *
-     * @param platformId     the platform identifier
-     * @param sourceType     the Brigadier source type class
-     * @param commandService the command service
-     * @param adapters       the command source adapters
-     */
     DefaultSharedBrigadierCommandRegistrar(
         @NotNull PlatformId platformId,
         @NotNull Class<S> sourceType,
@@ -54,21 +38,11 @@ final class DefaultSharedBrigadierCommandRegistrar<S> implements SharedBrigadier
         this.adapters = Objects.requireNonNull(adapters, "adapters");
     }
 
-    /**
-     * Gets the platform identifier.
-     *
-     * @return the platform ID
-     */
     @Override
     public @NotNull PlatformId platformId() {
         return platformId;
     }
 
-    /**
-     * Gets the Brigadier source type.
-     *
-     * @return the source type class
-     */
     @Override
     public @NotNull Class<S> sourceType() {
         return sourceType;

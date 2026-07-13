@@ -26,11 +26,6 @@ public interface RCommandService {
         void close();
     }
 
-    /**
-     * Gets the platform identifier for this service.
-     *
-     * @return the platform ID
-     */
     @NotNull PlatformId platformId();
 
     /**
@@ -131,18 +126,8 @@ public interface RCommandService {
      */
     @NotNull Optional<RCommandNode<RCommandSource>> findRoot(@NotNull String rootName);
 
-    /**
-     * Gets a snapshot of all registered command trees.
-     *
-     * @return an unmodifiable list of registrations
-     */
     @NotNull List<RegisteredCommandTree> registrations();
 
-    /**
-     * Gets a snapshot of all registered root nodes.
-     *
-     * @return an unmodifiable list of roots
-     */
     @NotNull List<RCommandNode<RCommandSource>> roots();
 
     /**

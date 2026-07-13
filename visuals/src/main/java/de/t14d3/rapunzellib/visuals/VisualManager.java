@@ -28,11 +28,6 @@ public interface VisualManager {
      */
     void unregister(@NotNull Visual<?> visual);
 
-    /**
-     * Returns all registered visuals.
-     *
-     * @return a collection of all registered visuals
-     */
     @NotNull Collection<Visual<?>> all();
 
     /**
@@ -58,7 +53,7 @@ public interface VisualManager {
     @NotNull ParticleVisual createParticle(@NotNull ParticleConfig config, @NotNull VisualAudience audience);
 
     /**
-     * Creates a new block display visual at the given location.
+     * Creates a new block display visual with the given configuration, location, and audience.
      *
      * @param config   the block display configuration
      * @param location the location for the block display
@@ -72,7 +67,7 @@ public interface VisualManager {
     );
 
     /**
-     * Creates a new glow outline visual.
+     * Creates a new glow outline visual with the given configuration and audience.
      *
      * @param config   the glow outline configuration
      * @param audience the target audience
@@ -81,7 +76,7 @@ public interface VisualManager {
     @NotNull GlowOutlineVisual createGlowOutline(@NotNull GlowOutlineConfig config, @NotNull VisualAudience audience);
 
     /**
-     * Creates a new beacon beam visual.
+     * Creates a new beacon beam visual with the given configuration and audience.
      *
      * @param config   the beacon beam configuration
      * @param audience the target audience
@@ -90,7 +85,7 @@ public interface VisualManager {
     @NotNull BeaconBeamVisual createBeaconBeam(@NotNull BeaconBeamConfig config, @NotNull VisualAudience audience);
 
     /**
-     * Creates a new block structure visual.
+     * Creates a new block structure visual with the given configuration and audience.
      *
      * @param config   the block structure configuration
      * @param audience the target audience

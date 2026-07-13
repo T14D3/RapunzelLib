@@ -16,21 +16,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
-/**
- * Shared platform implementation of {@link RItemTypeRegistry} backed by Minecraft's {@link BuiltInRegistries#ITEM}.
- * <p>
- * Wraps native {@link Item} handles into {@link SharedItemType} wrappers, delegating to
- * {@link AbstractTypeRegistry} for caching and lookup logic.
- * </p>
- */
+/** Shared platform implementation of {@link RItemTypeRegistry} backed by Minecraft's {@link BuiltInRegistries#ITEM}. */
 public final class SharedItemTypeRegistry extends AbstractTypeRegistry<Item, SharedItemType, RItemType> implements RItemTypeRegistry {
     private final PlatformId platformId;
 
-    /**
-     * Constructs a new item type registry for the given platform.
-     *
-     * @param platformId the platform identifier
-     */
     public SharedItemTypeRegistry(@NotNull PlatformId platformId) {
         super(
             // #if VERSION >= 1.21.11
@@ -45,17 +34,11 @@ public final class SharedItemTypeRegistry extends AbstractTypeRegistry<Item, Sha
         this.platformId = Objects.requireNonNull(platformId, "platformId");
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     protected boolean isSameHandle(@NotNull Item existingHandle, @NotNull Item newHandle) {
         return existingHandle == newHandle;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     protected @NotNull SharedItemType createWrapper(@NotNull RKey key, @NotNull Item handle) {
         return new SharedItemType(platformId, key, handle);

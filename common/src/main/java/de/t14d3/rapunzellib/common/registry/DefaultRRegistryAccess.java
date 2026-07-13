@@ -19,20 +19,9 @@ import java.util.Optional;
  * type-safe lookup.
  */
 public final class DefaultRRegistryAccess implements RRegistryAccess {
-    /** Synchronization lock */
     private final Object lock = new Object();
-    /** Registered registries keyed by their registry key */
     private final LinkedHashMap<RKey, RegisteredRegistry<?>> registries = new LinkedHashMap<>();
 
-    /**
-     * Registers a registry, validating that its reported key matches the requested key.
-     *
-     * @param registryKey the registry key
-     * @param registry    the registry to register
-     * @param <T>         the registry value type
-     * @throws IllegalArgumentException if the registry's key does not match
-     * @throws IllegalStateException    if the key is already registered with a different value type
-     */
     public <T> void register(@NotNull RRegistryKey<T> registryKey, @NotNull RRegistry<T> registry) {
         RRegistryKey<T> requestedRegistryKey = Objects.requireNonNull(registryKey, "registryKey");
         RRegistry<T> requestedRegistry = Objects.requireNonNull(registry, "registry");
@@ -56,14 +45,6 @@ public final class DefaultRRegistryAccess implements RRegistryAccess {
         }
     }
 
-    /**
-     * Registers a registry if no registration exists for the key.
-     *
-     * @param registryKey the registry key
-     * @param registry    the registry to register
-     * @param <T>         the registry value type
-     * @return the existing or newly registered registry
-     */
     public <T> @NotNull RRegistry<T> registerIfAbsent(@NotNull RRegistryKey<T> registryKey, @NotNull RRegistry<T> registry) {
         Objects.requireNonNull(registryKey, "registryKey");
         Objects.requireNonNull(registry, "registry");
@@ -78,14 +59,6 @@ public final class DefaultRRegistryAccess implements RRegistryAccess {
         }
     }
 
-    /**
-     * Finds a registry by its key.
-     *
-     * @param registryKey the registry key
-     * @param <T>         the registry value type
-     * @return an optional containing the registry, or empty if not found
-     * @throws IllegalStateException if the key is found but with a different value type
-     */
     @Override
     public <T> @NotNull Optional<RRegistry<T>> findRegistry(@NotNull RRegistryKey<T> registryKey) {
         RRegistryKey<T> requestedRegistryKey = Objects.requireNonNull(registryKey, "registryKey");
@@ -105,11 +78,6 @@ public final class DefaultRRegistryAccess implements RRegistryAccess {
         }
     }
 
-    /**
-     * Returns all registered registry keys.
-     *
-     * @return an immutable list of registry keys
-     */
     @Override
     public @NotNull List<RRegistryKey<?>> registryKeys() {
         synchronized (lock) {

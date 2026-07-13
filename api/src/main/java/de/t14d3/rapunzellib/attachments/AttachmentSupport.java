@@ -72,6 +72,15 @@ public final class AttachmentSupport {
         return itemSupport;
     }
 
+    /**
+     * Checks whether attachments are supported for the given native target.
+     *
+     * <p>Checks both the platform-level support (via target classification) and
+     * the target's own attachment container capabilities.</p>
+     *
+     * @param target the native object to check
+     * @return true if attachments are supported, false otherwise
+     */
     public boolean supports(@NotNull RNative target) {
         return effectiveSupport(target).supported();
     }
@@ -111,6 +120,15 @@ public final class AttachmentSupport {
         return Optional.empty();
     }
 
+    /**
+     * Returns the attachment container for the given native target.
+     *
+     * <p>Throws if the target is not supported by this platform's attachment system.</p>
+     *
+     * @param target the native object whose attachments to retrieve
+     * @param <T>    the native type
+     * @return the attachment container for the target
+     */
     public <T extends RNative> @NotNull RAttachmentContainer attachments(@NotNull T target) {
         Objects.requireNonNull(target, "target");
         requireSupported(target);

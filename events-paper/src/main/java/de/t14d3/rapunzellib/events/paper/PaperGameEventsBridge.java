@@ -24,6 +24,7 @@ import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.objects.block.RBlock;
 import io.papermc.paper.event.entity.EntityMoveEvent;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
@@ -43,11 +44,15 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
-@SuppressWarnings("deprecation")
+
 final class PaperGameEventsBridge implements Listener, GameEventBridge {
     private final JavaPlugin plugin;
     private final GameEventBus bus;
+
+    /** Cache of Bukkit {@link World} to {@link RWorldRef}, avoiding repeated key resolution. */
+    private final ConcurrentHashMap<World, RWorldRef> worldRefCache = new ConcurrentHashMap<>();
 
     PaperGameEventsBridge(JavaPlugin plugin, GameEventBus bus) {
         this.plugin = plugin;
@@ -61,6 +66,17 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     @Override
     public void close() {
         HandlerList.unregisterAll(this);
+    }
+
+    /** Returns a cached {@link RWorldRef} for the given Bukkit {@link World}. */
+    private RWorldRef worldRef(World world) {
+        return worldRefCache.computeIfAbsent(world, w ->
+            new RWorldRef(w.getName(), RKey.of(w.getKey().toString())));
+    }
+
+    /** Convenience overload extracting the world from a {@link Location}. */
+    private RWorldRef worldRef(Location loc) {
+        return worldRef(loc.getWorld());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -230,7 +246,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.SPAWNER_EGG) return;
 
         Location loc = event.getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         RKey typeKey = RKey.of(event.getEntityType().getKey().toString());
         String reason = event.getSpawnReason().name();
@@ -262,14 +278,14 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onWorldLoadPost(WorldLoadEvent event) {
         if (!bus.hasPostListeners(WorldLoadPost.class)) return;
-        bus.dispatchPost(new WorldLoadPost(new RWorldRef(event.getWorld().getName(), event.getWorld().getKey().toString())));
+        bus.dispatchPost(new WorldLoadPost(worldRef(event.getWorld())));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onChunkUnloadPost(ChunkUnloadEvent event) {
         if (!bus.hasPostListeners(ChunkUnloadPost.class)) return;
         bus.dispatchPost(new ChunkUnloadPost(
-                new RWorldRef(event.getWorld().getName(), event.getWorld().getKey().toString()),
+                worldRef(event.getWorld()),
                 event.getChunk().getX(),
                 event.getChunk().getZ()
         ));
@@ -334,7 +350,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPreListeners(TntPrimePre.class)) return;
 
         Location loc = event.getBlock().getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         RKey blockTypeKey = RKey.of(event.getBlock().getType().getKey().toString());
         String cause = event.getCause().name();
@@ -352,7 +368,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPreListeners(ExplosionPre.class)) return;
 
         Location loc = event.getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos origin = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         String sourceTypeKey = event.getEntityType().getKey().toString();
 
@@ -380,7 +396,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPreListeners(ExplosionPre.class)) return;
 
         Location loc = event.getBlock().getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos origin = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         String sourceTypeKey = event.getExplodedBlockState().getType().getKey().toString();
 
@@ -409,7 +425,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
         Location loc = event.getBlockClicked().getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         RKey blockTypeKey = RKey.of(event.getBlockClicked().getType().getKey().toString());
 
@@ -426,7 +442,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
         Location loc = event.getBlockClicked().getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         String bucketTypeKey = event.getBucket().getKey().toString();
 
@@ -443,7 +459,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
         Location loc = event.getEntity().getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         RKey entityTypeKey = RKey.of(event.getEntity().getType().getKey().toString());
 
@@ -461,7 +477,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
         Location loc = event.getEntity().getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         RKey typeKey = RKey.of(event.getEntity().getType().getKey().toString());
 
@@ -494,7 +510,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
         Location loc = event.getEntity().getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         RKey typeKey = RKey.of(event.getEntityType().getKey().toString());
 
@@ -519,17 +535,33 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBlockPhysicsPre(BlockPhysicsEvent event) {
+        if (!bus.hasPreListeners(BlockPhysicsPre.class)) return;
+
+        Location loc = event.getBlock().getLocation();
+        RWorldRef world = worldRef(loc.getWorld());
+        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+        RKey blockTypeKey = RKey.of(event.getBlock().getType().getKey().toString());
+        // getChangedType() returns the Material (block type) that changed, triggering this physics update
+        RKey changedTypeKey = RKey.of(event.getChangedType().getKey().toString());
+        BlockPhysicsPre pre = new BlockPhysicsPre(world, pos, blockTypeKey, changedTypeKey, event.isCancelled());
+
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onBlockPhysicsPost(BlockPhysicsEvent event) {
         if (!bus.hasPostListeners(BlockPhysicsPost.class)) return;
 
         Location loc = event.getBlock().getLocation();
-        RWorldRef world = new RWorldRef(loc.getWorld().getName(), loc.getWorld().getKey().toString());
+        RWorldRef world = worldRef(loc.getWorld());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         RKey blockTypeKey = RKey.of(event.getBlock().getType().getKey().toString());
-        int changedTypeId = event.getChangedType().getId();
-
-        bus.dispatchPost(new BlockPhysicsPost(world, pos, blockTypeKey, changedTypeId, event.isCancelled()));
+        RKey changedTypeKey = RKey.of(event.getChangedType().getKey().toString());
+        bus.dispatchPost(new BlockPhysicsPost(world, pos, blockTypeKey, changedTypeKey, event.isCancelled()));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)

@@ -5,6 +5,8 @@ plugins {
     `maven-publish`
 }
 
+group = "de.t14d3.rapunzellib.gradle"
+
 fun String.toMinecraftTargetToken(): String =
     replace(Regex("[^A-Za-z0-9]"), "_")
 
@@ -59,10 +61,15 @@ dependencies {
     implementation(libs.asm.tree)
     implementation(libs.asm.analysis)
     implementation(libs.snakeyaml)
-    implementation(pluginDependency("io.papermc.paperweight:paperweight-userdev", "paperweight-userdev"))
-    implementation(pluginDependency("org.spongepowered:vanillagradle", "vanilla-gradle"))
+    //compileOnly(pluginDependency("io.papermc.paperweight:paperweight-userdev", "paperweight-userdev"))
+    compileOnly(pluginDependency("org.spongepowered:vanillagradle", "vanilla-gradle"))
     implementation(pluginDependency("net.fabricmc:fabric-loom", "fabric-loom"))
     implementation(pluginDependency("net.neoforged:moddev-gradle", "neoforge-moddev"))
+
+    // MCProtocolLib for bot clients - needed at runtime by DevRunner
+    implementation("org.geysermc.mcprotocollib:protocol:26.2-SNAPSHOT")
+    // Adventure plain-text serializer for bot chat extraction
+    implementation(libs.adventure.serializer.plain)
 
     testImplementation(gradleTestKit())
     testImplementation(libs.junit.jupiter)

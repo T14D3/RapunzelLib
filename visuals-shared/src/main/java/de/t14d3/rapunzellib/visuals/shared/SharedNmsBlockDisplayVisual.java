@@ -49,15 +49,6 @@ public final class SharedNmsBlockDisplayVisual extends SharedNmsVisual<BlockDisp
     private RBlockType currentBlock;
     private DisplayTransform currentTransform;
 
-    /**
-     * Creates a new block display visual.
-     *
-     * @param id       the visual ID
-     * @param config   the block display config
-     * @param audience the visual audience
-     * @param manager  the visual manager
-     * @param location the world location
-     */
     public SharedNmsBlockDisplayVisual(
         @NotNull VisualId id,
         @NotNull BlockDisplayConfig config,
@@ -140,11 +131,6 @@ public final class SharedNmsBlockDisplayVisual extends SharedNmsVisual<BlockDisp
         player.connection.send(new ClientboundRemoveEntitiesPacket(entityId));
     }
 
-    /**
-     * Sends entity data update packets to all current viewers.
-     *
-     * @param data the data values to send
-     */
     private void sendData(@NotNull List<SynchedEntityData.DataValue<?>> data) {
         for (UUID uuid : Set.copyOf(currentViewers)) {
             de.t14d3.rapunzellib.objects.RPlayer player = de.t14d3.rapunzellib.objects.RPlayer.get(uuid).orElse(null);
@@ -155,12 +141,6 @@ public final class SharedNmsBlockDisplayVisual extends SharedNmsVisual<BlockDisp
         }
     }
 
-    /**
-     * Resolves a block state from an RBlockType.
-     *
-     * @param blockType the block type
-     * @return the block state, or air if not found
-     */
     private static BlockState resolveBlockState(@NotNull RBlockType blockType) {
         // #if VERSION >= 1.21.11
         Identifier id = Identifier.fromNamespaceAndPath(blockType.key().namespace(), blockType.key().path());
@@ -171,22 +151,10 @@ public final class SharedNmsBlockDisplayVisual extends SharedNmsVisual<BlockDisp
         return block != null ? block.defaultBlockState() : Blocks.AIR.defaultBlockState();
     }
 
-    /**
-     * Converts a Rapunzel Vector3f to a JOML Vector3f.
-     *
-     * @param vector the Rapunzel vector
-     * @return the JOML vector
-     */
     private static Vector3f toNms(de.t14d3.rapunzellib.visuals.Vector3f vector) {
         return new Vector3f(vector.x(), vector.y(), vector.z());
     }
 
-    /**
-     * Converts a Rapunzel Quaternionf to a JOML Quaternionf.
-     *
-     * @param quaternion the Rapunzel quaternion
-     * @return the JOML quaternion
-     */
     private static Quaternionf toNms(de.t14d3.rapunzellib.visuals.Quaternionf quaternion) {
         return new Quaternionf(quaternion.x(), quaternion.y(), quaternion.z(), quaternion.w());
     }

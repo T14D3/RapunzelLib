@@ -200,7 +200,7 @@ public final class SharedBlockMixinHooks {
             pos.getY(),
             pos.getZ(),
             blockKey(state),
-            BuiltInRegistries.BLOCK.getId(changedBlock)
+            blockKey(changedBlock)
         );
     }
 
@@ -234,7 +234,7 @@ public final class SharedBlockMixinHooks {
             pos.getY(),
             pos.getZ(),
             blockKey(state),
-            BuiltInRegistries.BLOCK.getId(changedBlock),
+            blockKey(changedBlock),
             false
         );
     }
@@ -280,16 +280,10 @@ public final class SharedBlockMixinHooks {
             pos.getY(),
             pos.getZ(),
             blockKey(newState),
-            BuiltInRegistries.BLOCK.getId(newState.getBlock())
+            blockKey(newState.getBlock())
         );
     }
 
-    /**
-     * Resolves the world key from a server level.
-     *
-     * @param level the server level
-     * @return the world key
-     */
     private static @NotNull RKey worldKey(@NotNull ServerLevel level) {
         // #if VERSION >= 1.21.11
         return RKey.of(level.dimension().identifier().toString());
@@ -298,13 +292,11 @@ public final class SharedBlockMixinHooks {
         // #endif
     }
 
-    /**
-     * Resolves the block key from a block state.
-     *
-     * @param state the block state
-     * @return the block key
-     */
     private static @NotNull RKey blockKey(@NotNull BlockState state) {
         return RKey.of(BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+    }
+
+    private static @NotNull RKey blockKey(@NotNull Block block) {
+        return RKey.of(BuiltInRegistries.BLOCK.getKey(block).toString());
     }
 }

@@ -4,7 +4,11 @@ import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.common.registry.DefaultRRegistryAccess;
+import de.t14d3.rapunzellib.common.registry.RegistryAccessBackedBlockTypeRegistry;
+import de.t14d3.rapunzellib.common.registry.RegistryAccessBackedEntityTypeRegistry;
+import de.t14d3.rapunzellib.common.registry.RegistryAccessBackedItemTypeRegistry;
 import de.t14d3.rapunzellib.context.RapunzelContext;
+import de.t14d3.rapunzellib.runtime.RapunzelRuntime;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.context.ServiceRegistry;
 import de.t14d3.rapunzellib.objects.REntity;
@@ -115,6 +119,14 @@ final class RegistryAccessTest {
         context.registerService(RRegistryAccess.class, registries);
 
         Rapunzel.bootstrap(this, context);
+
+        // Register type registry wrappers in the global runtime (normally done by BootstrapServices).
+        RapunzelRuntime.getInstance().registerIfAbsent(REntityTypeRegistry.class,
+            new RegistryAccessBackedEntityTypeRegistry(Rapunzel.registries()));
+        RapunzelRuntime.getInstance().registerIfAbsent(RItemTypeRegistry.class,
+            new RegistryAccessBackedItemTypeRegistry(Rapunzel.registries()));
+        RapunzelRuntime.getInstance().registerIfAbsent(RBlockTypeRegistry.class,
+            new RegistryAccessBackedBlockTypeRegistry(Rapunzel.registries()));
 
         TestEntity entity = new TestEntity(UUID.fromString("00000000-0000-0000-0000-000000000123"), zombie.key());
         TestBlock block = new TestBlock(stone.key());

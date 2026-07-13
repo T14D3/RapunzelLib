@@ -1,5 +1,3 @@
-import org.gradle.api.tasks.bundling.Jar
-
 plugins {
     alias(libs.plugins.backend.platform.module.conventions)
     alias(libs.plugins.paper.userdev.module.conventions)
@@ -9,24 +7,43 @@ plugins {
 dependencies {
     api(project(":platform-shared"))
     implementation(project(":nbt"))
+    // Include all feature modules so the shadowJar provides a complete RLib plugin
+    implementation(project(":events"))
+    implementation(project(":events-paper"))
+    implementation(project(":commands"))
+    implementation(project(":commands-shared"))
+    implementation(project(":commands-paper"))
+    implementation(project(":gui"))
+    implementation(project(":visuals"))
+    implementation(project(":visuals-paper"))
 }
 
-val companionPluginJar by tasks.registering(Jar::class) {
-    archiveBaseName.set("platform-paper")
-    archiveClassifier.set("plugin")
-    dependsOn(tasks.named("compileJava"))
+// Thin jar (lowercase default name) - published as the main Maven artifact for compile-time consumers
+tasks.jar {
+    // Keep default project artifact naming: platform-paper-<version>.jar
+}
 
-    from(layout.buildDirectory.dir("classes/java/main")) {
-        include("de/t14d3/rapunzellib/platform/paper/PaperPlatformPlugin.class")
+// Full standalone plugin/mod (CamelCase) - the deployable bundle containing all RLib classes
+tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    archiveBaseName.set("RapunzelLibPaper")
+    archiveClassifier.set("standalone")
+    mergeServiceFiles()
+    dependencies {
+        exclude(dependency("io.papermc.paper:paper-api"))
+        exclude(dependency("io.papermc.paper:paper-mojangapi"))
+        exclude(dependency("com.mojang:minecraft"))
+        exclude(dependency("org.jetbrains:annotations"))
     }
-    from(layout.projectDirectory.dir("src/companion/resources")) {
-        expand("version" to project.version.toString())
-    }
+}
+
+tasks.build {
+    dependsOn(tasks.named("shadowJar"))
 }
 
 tasks.processResources {
-    from(companionPluginJar) {
-        into("META-INF/rapunzellib")
-        rename { "platform-paper-plugin.jar" }
+    val props = mapOf("version" to project.version.toString())
+    inputs.properties(props)
+    filesMatching("plugin.yml") {
+        expand(props)
     }
 }

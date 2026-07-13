@@ -15,40 +15,20 @@ import java.util.Objects;
  * </p>
  */
 public final class CommandSourceAdapters {
-    /**
-     * The platform identifier.
-     */
+    
     private final PlatformId platformId;
-    /**
-     * The immutable list of command source adapters.
-     */
+    
     private final List<CommandSourceAdapter> adapters;
 
-    /**
-     * Creates a new adapters holder.
-     *
-     * @param platformId the platform identifier
-     * @param adapters   the list of command source adapters
-     */
     public CommandSourceAdapters(@NotNull PlatformId platformId, @NotNull List<CommandSourceAdapter> adapters) {
         this.platformId = Objects.requireNonNull(platformId, "platformId");
         this.adapters = List.copyOf(Objects.requireNonNull(adapters, "adapters"));
     }
 
-    /**
-     * Gets the platform identifier.
-     *
-     * @return the platform ID
-     */
     public @NotNull PlatformId platformId() {
         return platformId;
     }
 
-    /**
-     * Gets the immutable list of adapters.
-     *
-     * @return the adapters list
-     */
     public @NotNull List<CommandSourceAdapter> adapters() {
         return adapters;
     }

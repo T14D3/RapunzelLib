@@ -46,14 +46,6 @@ final class SharedCommandDataReloader {
         ReloadCommand.reloadPacks(discoveredIds, server.createCommandSourceStack());
     }
 
-    /**
-     * Discovers newly available packs not in the disabled set.
-     *
-     * @param packRepository the pack repository
-     * @param worldData      the world data
-     * @param selectedIds    the currently selected pack IDs
-     * @return the combined set of selected and newly discovered pack IDs
-     */
     private static @NotNull Collection<String> discoverNewPacks(
         @NotNull PackRepository packRepository,
         @NotNull WorldData worldData,

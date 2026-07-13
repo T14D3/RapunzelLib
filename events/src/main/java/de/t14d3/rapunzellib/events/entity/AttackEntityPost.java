@@ -36,38 +36,18 @@ public record AttackEntityPost(
         this(player, entity, entity.snapshot(), cancelled);
     }
 
-    /**
-     * Returns the world from the snapshot.
-     *
-     * @return the world
-     */
     public RWorldRef world() {
         return snapshot.world();
     }
 
-    /**
-     * Returns the position from the snapshot.
-     *
-     * @return the position
-     */
     public RBlockPos pos() {
         return snapshot.pos();
     }
 
-    /**
-     * Returns the entity type key from the snapshot.
-     *
-     * @return the entity type key
-     */
     public RKey entityTypeKey() {
         return snapshot.entityTypeKey();
     }
 
-    /**
-     * Returns the entity as a living entity, if applicable.
-     *
-     * @return an optional containing the living entity
-     */
     public Optional<RLivingEntity> livingEntity() {
         return entity.asLivingEntity();
     }

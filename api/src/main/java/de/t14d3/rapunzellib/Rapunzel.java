@@ -58,11 +58,7 @@ public final class Rapunzel {
     private Rapunzel() {
     }
 
-    /**
-     * Returns the shared {@link RapunzelRuntime} instance.
-     *
-     * @return the shared runtime instance
-     */
+    /** Returns the shared {@link RapunzelRuntime} instance. */
     public static @NotNull RapunzelRuntime sharedRuntime() {
         return RUNTIME;
     }
@@ -106,8 +102,12 @@ public final class Rapunzel {
     /**
      * Executes the given action within the scope of the specified context.
      *
+     * <p>Within the scoped block, {@link #context()} returns the given context,
+     * enabling static accessor methods to resolve correctly when multiple
+     * contexts are active. The previous context is restored afterward.</p>
+     *
      * @param context the context to scope to
-     * @param action  the action to execute
+     * @param action  the action to execute within the scoped context
      */
     public static void withContext(@NotNull RapunzelContext context, @NotNull Runnable action) {
         Objects.requireNonNull(action, "action");
@@ -120,8 +120,11 @@ public final class Rapunzel {
     /**
      * Executes the given supplier within the scope of the specified context and returns its result.
      *
+     * <p>Within the scoped block, {@link #context()} returns the given context.
+     * The previous context is restored in the finally block.</p>
+     *
      * @param context the context to scope to
-     * @param action  the supplier to execute
+     * @param action  the supplier to execute within the scoped context
      * @param <T>     the return type of the supplier
      * @return the value returned by the supplier
      */
@@ -141,233 +144,143 @@ public final class Rapunzel {
         }
     }
 
-    /**
-     * Returns the {@link ServiceRegistry} from the current context.
-     *
-     * @return the service registry
-     */
+    /** Returns the {@link ServiceRegistry} from the current context. */
     public static @NotNull ServiceRegistry services() {
         return context().services();
     }
 
-    /**
-     * Returns a required service of the given type from the current context.
-     *
-     * @param type the service class
-     * @param <T>  the service type
-     * @return the service instance
-     */
+    /** Returns a required service of the given type from the current context. */
     public static <T> @NotNull T service(@NotNull Class<T> type) {
         return services().get(Objects.requireNonNull(type, "type"));
     }
 
-    /**
-     * Finds an optional service of the given type from the current context.
-     *
-     * @param type the service class
-     * @param <T>  the service type
-     * @return an {@link Optional} containing the service, or empty if not registered
-     */
+    /** Finds an optional service of the given type from the current context. */
     public static <T> @NotNull Optional<T> findService(@NotNull Class<T> type) {
         return services().find(Objects.requireNonNull(type, "type"));
     }
 
-    /**
-     * Returns the {@link Scheduler} from the current context.
-     *
-     * @return the scheduler
-     */
+    /** Returns the {@link Scheduler} from the current context. */
     public static @NotNull Scheduler scheduler() {
         return context().scheduler();
     }
 
-    /**
-     * Returns the {@link ConfigService} from the current context.
-     *
-     * @return the config service
-     */
+    /** Returns the {@link ConfigService} from the current context. */
     public static @NotNull ConfigService configs() {
         return context().configs();
     }
 
-    /**
-     * Returns the {@link MessageFormatService} from the current context.
-     *
-     * @return the message format service
-     */
+    /** Returns the {@link MessageFormatService} from the current context. */
     public static @NotNull MessageFormatService messages() {
         return context().messages();
     }
 
-    /**
-     * Returns the {@link Logger} from the current context.
-     *
-     * @return the logger
-     */
+    /** Returns the {@link Logger} from the current context. */
     public static @NotNull Logger logger() {
         return context().logger();
     }
 
-    /**
-     * Returns the data directory path from the current context.
-     *
-     * @return the data directory path
-     */
+    /** Returns the data directory path from the current context. */
     public static @NotNull Path dataDirectory() {
         return context().dataDirectory();
     }
 
-    /**
-     * Returns the {@link PlatformRuntime} from the current context.
-     *
-     * @return the platform runtime
-     */
+    /** Returns the {@link PlatformRuntime} from the current context. */
     public static @NotNull PlatformRuntime runtime() {
         return context().runtime();
     }
 
-    /**
-     * Returns the {@link PlatformId} from the current context.
-     *
-     * @return the platform identifier
-     */
+    /** Returns the {@link PlatformId} from the current context. */
     public static @NotNull PlatformId platformId() {
         return context().platformId();
     }
 
-    /**
-     * Returns the {@link RNativeInterop} from the current context, if available.
-     *
-     * @return an {@link Optional} containing the native interop, or empty if not supported
-     */
+    /** Returns the {@link RNativeInterop} from the current context, if available. */
     public static @NotNull Optional<RNativeInterop> nativeInterop() {
         return findContext().flatMap(RapunzelContext::nativeInterop);
     }
 
-    /**
-     * Returns the {@link RRegistryAccess} from the current context.
-     *
-     * @return the registry access
-     */
+    /** Returns the {@link RRegistryAccess} from the current context. */
     public static @NotNull RRegistryAccess registries() {
         return context().registries();
     }
 
-    /**
-     * Returns the {@link Players} access from the current context.
-     *
-     * @return the players access
-     */
+    /** Returns the {@link Players} access from the current context. */
     public static @NotNull Players players() {
         return context().players();
     }
 
-    /**
-     * Returns the {@link Entities} access from the current context.
-     *
-     * @return the entities access
-     */
+    /** Returns the {@link Entities} access from the current context. */
     public static @NotNull Entities entities() {
         return context().entities();
     }
 
-    /**
-     * Returns the {@link REntityTypeRegistry} from the current context.
-     *
-     * @return the entity type registry
-     */
+    /** Returns the {@link REntityTypeRegistry} from the current context. */
     public static @NotNull REntityTypeRegistry entityTypes() {
         return context().entityTypes();
     }
 
-    /**
-     * Returns the {@link RItemTypeRegistry} from the current context.
-     *
-     * @return the item type registry
-     */
+    /** Returns the {@link RItemTypeRegistry} from the current context. */
     public static @NotNull RItemTypeRegistry itemTypes() {
         return context().itemTypes();
     }
 
-    /**
-     * Returns the {@link RBlockTypeRegistry} from the current context.
-     *
-     * @return the block type registry
-     */
+    /** Returns the {@link RBlockTypeRegistry} from the current context. */
     public static @NotNull RBlockTypeRegistry blockTypes() {
         return context().blockTypes();
     }
 
-    /**
-     * Returns the {@link Worlds} access from the current context.
-     *
-     * @return the worlds access
-     */
+    /** Returns the {@link Worlds} access from the current context. */
     public static @NotNull Worlds worlds() {
         return context().worlds();
     }
 
-    /**
-     * Returns the {@link Blocks} access from the current context.
-     *
-     * @return the blocks access
-     */
+    /** Returns the {@link Blocks} access from the current context. */
     public static @NotNull Blocks blocks() {
         return context().blocks();
     }
 
-    /**
-     * Returns the {@link AttachmentSupport} instance for managing attachments.
-     *
-     * @return the attachment support
-     */
+    /** Returns the {@link AttachmentSupport} instance for managing attachments. */
     public static @NotNull AttachmentSupport attachments() {
         return AttachmentFeatures.install();
     }
 
-    /**
-     * Returns whether the given native object supports attachments.
-     *
-     * @param target the native object to check
-     * @return true if attachments are supported for this target
-     */
+    /** Returns whether the given native object supports attachments. */
     public static boolean supportsAttachments(@NotNull RNative target) {
         return AttachmentFeatures.supports(target);
     }
 
-    /**
-     * Requires that the given native object supports attachments, or throws.
-     *
-     * @param target the native object
-     * @param <T>    the native type
-     * @return the same target if attachment support is available
-     */
+    /** Requires that the given native object supports attachments, or throws. */
     public static <T extends RNative> @NotNull T requireAttachmentSupport(@NotNull T target) {
         return AttachmentFeatures.requireSupported(target);
     }
 
-    /**
-     * Returns the attachment container for the given native object.
-     *
-     * @param target the native object
-     * @return the attachment container
-     */
+    /** Returns the attachment container for the given native object. */
     public static @NotNull RAttachmentContainer attachments(@NotNull RNative target) {
         return AttachmentFeatures.attachments(target);
     }
 
     /**
-     * Bootstraps a new context for the given owner, using the provided context instance.
+     * Bootstraps a new context for the given owner.
      *
-     * @param owner      the owner object
+     * @param owner      the plugin or module that will own the context
      * @param newContext the context to bootstrap
-     * @return a {@link BootstrapHandle} for managing the lifecycle
+     * @return a {@link BootstrapHandle} representing the owner's lifecycle participation
      */
     public static @NotNull BootstrapHandle bootstrap(@NotNull Object owner, @NotNull RapunzelContext newContext) {
         Objects.requireNonNull(newContext, "newContext");
         return bootstrap(owner, () -> newContext);
     }
 
+    /**
+     * Bootstraps a new context for the given owner, created on demand via the supplier.
+     *
+     * <p>If the owner already has an open handle, the existing one is returned
+     * and the supplier is not invoked.</p>
+     *
+     * @param owner          the plugin or module that will own the context
+     * @param contextFactory a supplier that creates the context when needed
+     * @return a {@link BootstrapHandle} representing the owner's lifecycle participation
+     */
     public static @NotNull BootstrapHandle bootstrap(
         @NotNull Object owner,
         @NotNull Supplier<? extends RapunzelContext> contextFactory
@@ -406,7 +319,11 @@ public final class Rapunzel {
     /**
      * Acquires a borrower handle to the single active context.
      *
-     * @param owner the borrower object
+     * <p>Borrowers share the context without owning it. When the borrower's handle
+     * is closed, only the borrower reference is released; the context itself is
+     * not shut down unless the owner closes it.</p>
+     *
+     * @param owner the borrower object (plugin or module)
      * @return a {@link BootstrapHandle} for the borrowed context
      * @throws IllegalStateException if no single active context exists
      */
@@ -433,16 +350,58 @@ public final class Rapunzel {
     }
 
     /**
-     * Bootstraps a context for the default owner.
+     * Acquires a borrower handle backed by the given consumer-level context view.
      *
-     * @param newContext the context to bootstrap
+     * <p>This is the consumer equivalent of {@link #acquire(Object)} - instead of
+     * returning the raw platform context, the caller provides a consumer-specific
+     * view (such as a {@code ConsumerView}) that wraps the shared platform context
+     * with the consumer's own logger, data directory, and resource provider.</p>
+     *
+     * @param owner   the borrower object (plugin or module)
+     * @param view    the consumer-specific context view
+     * @return a {@link BootstrapHandle} for the borrowed view
+     * @throws IllegalStateException if no platform context has been registered
      */
+    public static @NotNull BootstrapHandle acquire(
+        @NotNull Object owner,
+        @NotNull RapunzelContext view
+    ) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(view, "view");
+
+        synchronized (LOCK) {
+            BootstrapHandle owned = ownerHandles.get(owner);
+            if (owned != null) {
+                return owned;
+            }
+            if (contexts.isEmpty()) {
+                throw new IllegalStateException(
+                    "No active RapunzelLib context. "
+                        + "Ensure the platform plugin has been loaded and has bootstrapped.");
+            }
+            BootstrapHandle existing = borrowerHandles.get(owner);
+            if (existing != null) {
+                return existing;
+            }
+            BootstrapHandle borrowed = new BootstrapHandle(
+                owner, view, BootstrapOwnerRole.BORROWER,
+                () -> Rapunzel.shutdown(owner)
+            );
+            borrowerHandles.put(owner, borrowed);
+            return borrowed;
+        }
+    }
+
+    /** Bootstraps a context for the default owner. */
     public static void bootstrap(@NotNull RapunzelContext newContext) {
         bootstrap(DEFAULT_OWNER, newContext);
     }
 
     /**
      * Shuts down the context owned by the given owner.
+     *
+     * <p>Removes the owner's handle and closes the associated context.
+     * If the owner is a borrower, only the borrower reference is removed.</p>
      *
      * @param owner the owner whose context to shut down
      */
@@ -457,15 +416,17 @@ public final class Rapunzel {
         closeContext(toClose);
     }
 
-    /**
-     * Shuts down the context owned by the default owner.
-     */
+    /** Shuts down the context owned by the default owner. */
     public static void shutdown() {
         shutdown(DEFAULT_OWNER);
     }
 
     /**
      * Shuts down all active contexts and the shared runtime.
+     *
+     * <p>Closes every tracked context in order and then shuts down the
+     * shared {@link RapunzelRuntime}. Errors from individual close operations
+     * are logged but do not prevent remaining contexts from closing.</p>
      */
     public static void shutdownAll() {
         RapunzelContext[] toClose;
@@ -486,22 +447,14 @@ public final class Rapunzel {
         }
     }
 
-    /**
-     * Returns the number of registered owners.
-     *
-     * @return the owner count
-     */
+    /** Returns the number of registered owners. */
     public static int ownerCount() {
         synchronized (LOCK) {
             return ownerHandles.size();
         }
     }
 
-    /**
-     * Returns the number of registered borrowers.
-     *
-     * @return the borrower count
-     */
+    /** Returns the number of registered borrowers. */
     public static int borrowerCount() {
         synchronized (LOCK) {
             return borrowerHandles.size();

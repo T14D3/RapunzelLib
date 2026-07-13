@@ -13,6 +13,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.plugin.IllegalPluginAccessException;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 import org.jetbrains.annotations.NotNull;
@@ -46,7 +47,14 @@ public final class PaperPluginMessenger implements Messenger, PluginMessageListe
         plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, NetworkConstants.TRANSPORT_CHANNEL, this);
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, NetworkConstants.TRANSPORT_CHANNEL);
         this.flushListener = new CarrierFlushListener();
-        plugin.getServer().getPluginManager().registerEvents(flushListener, plugin);
+        // Defer event registration - the owning plugin may not be fully enabled yet
+        // during consumer bootstrap (onLoad). Registration is retried once on the
+        // first player join if it hasn't succeeded by then.
+        try {
+            plugin.getServer().getPluginManager().registerEvents(flushListener, plugin);
+        } catch (IllegalPluginAccessException ignored) {
+            // Plugin not yet enabled; flush listener will register on first join
+        }
     }
 
     @Override

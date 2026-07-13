@@ -12,11 +12,7 @@ import org.jetbrains.annotations.NotNull;
  * RapunzelLib {@link GameEvent} instances dispatched via the {@link GameEventBus}.</p>
  */
 public interface GameEventBridgeInstaller {
-    /**
-     * Returns the platform ID this installer targets.
-     *
-     * @return the platform identifier
-     */
+    
     @NotNull PlatformId platformId();
 
     default @NotNull GameEventSupportManifest supportManifest() {

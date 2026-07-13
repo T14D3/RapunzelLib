@@ -20,9 +20,7 @@ import java.util.Optional;
  * @param <T> the registry value type
  */
 public abstract class RegistryAccessBackedRegistry<T> implements RRegistry<T> {
-    /** The backing registry access */
     private final RRegistryAccess registries;
-    /** The registry key identifying this registry */
     private final RRegistryKey<T> registryKey;
 
     /**
@@ -36,52 +34,26 @@ public abstract class RegistryAccessBackedRegistry<T> implements RRegistry<T> {
         this.registryKey = Objects.requireNonNull(registryKey, "registryKey");
     }
 
-    /**
-     * Gets the registry key.
-     *
-     * @return the registry key
-     */
     @Override
     public final @NotNull RRegistryKey<T> registryKey() {
         return registryKey;
     }
 
-    /**
-     * Finds a value by key.
-     *
-     * @param key the lookup key
-     * @return an optional containing the value, or empty if not found
-     */
     @Override
     public final @NotNull Optional<T> find(@NotNull RKey key) {
         return delegate().find(key);
     }
 
-    /**
-     * Returns all entries in this registry.
-     *
-     * @return an immutable list of entries
-     */
     @Override
     public final @NotNull List<T> entries() {
         return delegate().entries();
     }
 
-    /**
-     * Returns all keys in this registry.
-     *
-     * @return an immutable list of keys
-     */
     @Override
     public final @NotNull List<RKey> keys() {
         return delegate().keys();
     }
 
-    /**
-     * Resolves the actual registry from the backing registry access.
-     *
-     * @return the delegate registry
-     */
     protected final @NotNull RRegistry<T> delegate() {
         return registries.registry(registryKey);
     }

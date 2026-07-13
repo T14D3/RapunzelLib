@@ -55,27 +55,12 @@ public class RIntegerArgument<S extends RCommandSource> implements RArgument<S, 
         }
     }
     
-    /**
-     * Creates a required integer argument.
-     * 
-     * @param name the argument name
-     * @param <S> the command source type
-     * @return a new integer argument
-     */
     public static <S extends RCommandSource> RIntegerArgument<S> required(@NotNull String name) {
         return new Builder<S>(name)
             .optional(false)
             .build();
     }
     
-    /**
-     * Creates an optional integer argument with a default value.
-     * 
-     * @param name the argument name
-     * @param defaultValue the default value
-     * @param <S> the command source type
-     * @return a new integer argument
-     */
     public static <S extends RCommandSource> RIntegerArgument<S> optional(@NotNull String name, int defaultValue) {
         return new Builder<S>(name)
             .optional(true)
@@ -126,21 +111,11 @@ public class RIntegerArgument<S extends RCommandSource> implements RArgument<S, 
         return (min == null || value >= min) && (max == null || value <= max);
     }
     
-    /**
-     * Gets the minimum value for this argument.
-     * 
-     * @return the minimum value, or null if not set
-     */
     @Nullable
     public Integer getMin() {
         return min;
     }
     
-    /**
-     * Gets the maximum value for this argument.
-     * 
-     * @return the maximum value, or null if not set
-     */
     @Nullable
     public Integer getMax() {
         return max;

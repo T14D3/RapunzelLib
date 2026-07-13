@@ -38,14 +38,14 @@ public final class RemoteHandlerRegistrar {
             Players localPlayers = context.players();
             NetworkedPlayers networkedPlayers = new NetworkedPlayers(
                 localPlayers, gateway, Optional.ofNullable(networkInfo));
-            context.register(Players.class, networkedPlayers);
+            context.registerIfAbsent(Players.class, networkedPlayers);
             logger.info("[Remote] Replaced Players with NetworkedPlayers (local={}, gateway={})",
                 localPlayers.getClass().getSimpleName(), gateway.runtime().localName());
 
             Entities localEntities = context.entities();
             NetworkedEntities networkedEntities = new NetworkedEntities(
                 localEntities, gateway, Optional.ofNullable(networkInfo));
-            context.register(Entities.class, networkedEntities);
+            context.registerIfAbsent(Entities.class, networkedEntities);
             logger.info("[Remote] Replaced Entities with NetworkedEntities");
         }
 

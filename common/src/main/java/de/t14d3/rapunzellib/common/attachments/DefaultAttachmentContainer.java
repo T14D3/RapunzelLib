@@ -23,42 +23,21 @@ import java.util.Optional;
  * Subclasses must implement {@link #openSession()} to provide persistence.
  */
 public abstract class DefaultAttachmentContainer implements RAttachmentContainer, AttachmentMapAccess {
-    /** Storage support descriptor */
     private final AttachmentStorageSupport support;
-    /** Delegate container for transient (non-persistent) attachments */
     private final RAttachmentContainer transientAttachments;
 
-    /**
-     * Creates a container with full transient and persistent support and a lazy mutable transient container.
-     */
     protected DefaultAttachmentContainer() {
         this(AttachmentStorageSupport.TRANSIENT_AND_PERSISTENT, RAttachmentContainer.lazyMutable());
     }
 
-    /**
-     * Creates a container with the given storage support and a lazy mutable transient container.
-     *
-     * @param support the attachment storage support descriptor
-     */
     protected DefaultAttachmentContainer(@NotNull AttachmentStorageSupport support) {
         this(support, RAttachmentContainer.lazyMutable());
     }
 
-    /**
-     * Creates a container with full storage support and the given transient container.
-     *
-     * @param transientAttachments the delegate for transient attachments
-     */
     protected DefaultAttachmentContainer(@NotNull RAttachmentContainer transientAttachments) {
         this(AttachmentStorageSupport.TRANSIENT_AND_PERSISTENT, transientAttachments);
     }
 
-    /**
-     * Creates a container with the given storage support and transient container.
-     *
-     * @param support              the attachment storage support descriptor
-     * @param transientAttachments the delegate for transient attachments
-     */
     protected DefaultAttachmentContainer(
         @NotNull AttachmentStorageSupport support,
         @NotNull RAttachmentContainer transientAttachments
@@ -75,12 +54,15 @@ public abstract class DefaultAttachmentContainer implements RAttachmentContainer
     }
 
     /**
-     * Gets the value for a key. Transient keys are read from the in-memory container;
-     * persistent keys are loaded from the session's NBT root.
+     * Retrieves an attachment value by its key.
      *
-     * @param key the attachment key
-     * @param <T> the value type
-     * @return an optional containing the value, or empty if not found
+     * <p>Transient keys look up in-memory storage. Persistent keys look up
+     * in the persistent storage session. Returns empty if the scope is not
+     * supported.</p>
+     *
+     * @param key the attachment key (scope determines storage strategy)
+     * @param <T> the expected value type
+     * @return an {@link Optional} containing the value, or empty if absent
      */
     @Override
     public final <T> @NotNull Optional<T> get(@NotNull RAttachmentKey<T> key) {
@@ -104,10 +86,12 @@ public abstract class DefaultAttachmentContainer implements RAttachmentContainer
     }
 
     /**
-     * Sets the value for a key. Transient keys are stored in the in-memory container;
-     * persistent keys are encoded to NBT and saved via the session.
+     * Stores an attachment value by its key.
      *
-     * @param key   the attachment key
+     * <p>Transient keys store in memory. Persistent keys write to the persistent
+     * storage session. Throws if the scope is not supported.</p>
+     *
+     * @param key   the attachment key (scope determines storage strategy)
      * @param value the value to store
      * @param <T>   the value type
      */
@@ -125,11 +109,14 @@ public abstract class DefaultAttachmentContainer implements RAttachmentContainer
     }
 
     /**
-     * Removes the value for a key. Returns the previous value if present.
+     * Removes an attachment by its key and returns the previous value.
+     *
+     * <p>Transient keys remove from memory. Persistent keys remove from the
+     * persistent storage session. Returns empty if absent or scope unsupported.</p>
      *
      * @param key the attachment key
-     * @param <T> the value type
-     * @return an optional containing the removed value, or empty if not found
+     * @param <T> the expected value type
+     * @return an {@link Optional} containing the previous value, or empty
      */
     @Override
     public final <T> @NotNull Optional<T> remove(@NotNull RAttachmentKey<T> key) {
@@ -147,51 +134,24 @@ public abstract class DefaultAttachmentContainer implements RAttachmentContainer
         return existing;
     }
 
-    /**
-     * Checks whether this container supports the given scope.
-     *
-     * @param scope the attachment scope
-     * @return true if the scope is TRANSIENT or if a persistent session is available
-     */
     @Override
     public final boolean supports(@NotNull RAttachmentScope scope) {
         Objects.requireNonNull(scope, "scope");
         return scope == RAttachmentScope.TRANSIENT || openSession() != null;
     }
 
-    /**
-     * Gets the storage support descriptor.
-     *
-     * @return the storage support
-     */
     @Override
     public final @NotNull AttachmentStorageSupport support() {
         return support;
     }
 
-    /**
-     * Returns the transient attachment entries.
-     *
-     * @return a map of transient attachment keys to values
-     */
     @Override
     public final @NotNull Map<RAttachmentKey<?>, Object> transientEntries() {
         return transientAttachments instanceof AttachmentMapAccess access ? access.transientEntries() : Map.of();
     }
 
-    /**
-     * Opens a persistence session for loading and saving persistent attachments.
-     *
-     * @return a session, or null if persistence is not available
-     */
     protected abstract @Nullable PersistentAttachmentSession openSession();
 
-    /**
-     * Opens a persistence session, throwing if persistence is not available.
-     *
-     * @return a session
-     * @throws UnsupportedOperationException if persistence is not supported
-     */
     protected final @NotNull PersistentAttachmentSession requireSession() {
         PersistentAttachmentSession session = openSession();
         if (session == null) {

@@ -11,22 +11,10 @@ import org.jetbrains.annotations.NotNull;
  */
 public record VisualColor(@NotNull TextColor textColor) {
 
-    /**
-     * Creates a visual color from a dye color.
-     *
-     * @param dye the dye color
-     * @return the visual color
-     */
     public static @NotNull VisualColor dye(@NotNull DyeColor dye) {
         return new VisualColor(dye.adventureColor());
     }
 
-    /**
-     * Creates a visual color from an RGB integer.
-     *
-     * @param rgb the RGB value (e.g. {@code 0xFF00FF})
-     * @return the visual color
-     */
     public static @NotNull VisualColor hex(int rgb) {
         return new VisualColor(TextColor.color(rgb));
     }

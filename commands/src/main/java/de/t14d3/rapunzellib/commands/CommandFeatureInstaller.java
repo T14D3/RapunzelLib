@@ -13,11 +13,7 @@ import org.jetbrains.annotations.NotNull;
  * </p>
  */
 public interface CommandFeatureInstaller {
-    /**
-     * Gets the platform identifier for this installer.
-     *
-     * @return the platform ID
-     */
+    
     @NotNull PlatformId platformId();
 
     /**

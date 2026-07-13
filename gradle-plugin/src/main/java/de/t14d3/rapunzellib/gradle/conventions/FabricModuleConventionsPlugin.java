@@ -9,8 +9,8 @@ public final class FabricModuleConventionsPlugin implements Plugin<Project> {
     public void apply(Project target) {
         ConventionPluginSupport.applyBaseJavaModule(target);
         if (ConventionPluginSupport.isFabricLoomEnabled(target)) {
+            target.getPluginManager().apply(ConventionPluginSupport.fabricLoomPluginId(target));
             ConventionPluginSupport.configureFabricLoomProperties(target);
-            target.getPluginManager().apply("net.fabricmc.fabric-loom");
         }
         ConventionPluginSupport.configureFabricDependencyRouting(target);
         ConventionPluginSupport.addFamilyAndSharedDependencies(target);

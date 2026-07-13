@@ -15,11 +15,8 @@ import java.util.Objects;
  * for use as an in-memory snapshot or transfer object.</p>
  */
 final class SimpleRItem implements RItem {
-    /** The item type reference. */
     private final @NotNull RRegistryRef<RItemType> typeRef;
-    /** The stack amount. */
     private final int amount;
-    /** The NBT data compound. */
     private final @NotNull RNbtCompound data;
 
     /**

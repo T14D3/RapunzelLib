@@ -14,18 +14,8 @@ import org.jetbrains.annotations.Nullable;
  */
 public interface InventoryWrapperFactory<H> {
 
-    /**
-     * Returns the platform this factory is associated with.
-     *
-     * @return the platform identifier
-     */
     @NotNull PlatformId platformId();
 
-    /**
-     * Returns the native handle class expected by this factory.
-     *
-     * @return the handle type
-     */
     @NotNull Class<H> handleType();
 
     /**

@@ -12,11 +12,6 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface VisualFeatureInstaller {
 
-    /**
-     * Returns the platform ID this installer supports.
-     *
-     * @return the platform identifier
-     */
     @NotNull PlatformId platformId();
 
     /**

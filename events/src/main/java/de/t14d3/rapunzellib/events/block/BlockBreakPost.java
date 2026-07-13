@@ -13,4 +13,3 @@ import de.t14d3.rapunzellib.objects.block.RBlock;
  */
 public record BlockBreakPost(RPlayer player, RBlock block, boolean cancelled) implements GamePostEvent {
 }
-

@@ -8,6 +8,10 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * @deprecated Use {@link de.t14d3.rapunzellib.devrunner.service.MysqlServiceAdapter} instead.
+ */
+@Deprecated
 final class MysqlDockerSupport {
     private MysqlDockerSupport() {
     }

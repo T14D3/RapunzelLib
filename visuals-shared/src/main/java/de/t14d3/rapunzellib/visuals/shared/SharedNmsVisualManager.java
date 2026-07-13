@@ -21,11 +21,6 @@ public abstract class SharedNmsVisualManager extends AbstractVisualManager {
     private final ScheduledTask tickTask;
     private int beaconTickCounter = 0;
 
-    /**
-     * Creates a shared visual manager and starts the tick task.
-     *
-     * @param context the Rapunzel context for scheduling
-     */
     protected SharedNmsVisualManager(@NotNull RapunzelContext context) {
         this.tickTask = context.scheduler().runRepeating(
             Duration.ZERO,
@@ -47,9 +42,6 @@ public abstract class SharedNmsVisualManager extends AbstractVisualManager {
         }
     }
 
-    /**
-     * Per-tick logic: refreshes viewers, emits particles, and refreshes beacon beams.
-     */
     private void tick() {
         beaconTickCounter++;
         boolean beaconRefresh = beaconTickCounter >= 600;
@@ -64,12 +56,6 @@ public abstract class SharedNmsVisualManager extends AbstractVisualManager {
         }
     }
 
-    /**
-     * Processes a single visual on a tick.
-     *
-     * @param visual       the visual to tick
-     * @param beaconRefresh whether to refresh beacon beam visuals
-     */
     private void tickVisual(@NotNull SharedNmsVisual<?> visual, boolean beaconRefresh) {
         Collection<RPlayer> audience = visual.audience().resolve();
 

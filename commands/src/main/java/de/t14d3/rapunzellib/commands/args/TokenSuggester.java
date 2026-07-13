@@ -9,12 +9,7 @@ import java.util.concurrent.CompletableFuture;
 
 @FunctionalInterface
 public interface TokenSuggester {
-    /**
-     * @param source the command source (must be the dispatcher's source type)
-     * @param tokens fully parsed tokens before the current token
-     * @param partial the current (possibly empty) token to complete
-     * @param builder a suggestions builder offset to the start of {@code partial}
-     */
+    
     CompletableFuture<Suggestions> suggest(
         RCommandSource source,
         List<String> tokens,
@@ -22,4 +17,3 @@ public interface TokenSuggester {
         SuggestionsBuilder builder
     );
 }
-

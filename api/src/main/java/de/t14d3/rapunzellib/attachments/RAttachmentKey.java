@@ -10,11 +10,7 @@ import java.util.UUID;
 /**
  * A typed key for identifying attachment values, with an associated scope and optional codec.
  *
- * @param id    the unique key identifier
- * @param type  the value type class
- * @param scope the attachment scope
- * @param codec the codec for persistence, may be null for transient or directly-persistable types
- * @param <T>   the value type
+ * @param <T> the value type
  */
 @SuppressWarnings("PatternValidation")
 public record RAttachmentKey<T>(
@@ -37,23 +33,16 @@ public record RAttachmentKey<T>(
     /**
      * Creates a transient attachment key from a {@link Key} and type.
      *
-     * @param id   the key identifier
+     * @param id   the unique identifier for this key
      * @param type the value type class
      * @param <T>  the value type
-     * @return the attachment key
+     * @return a new transient attachment key
      */
     public static <T> @NotNull RAttachmentKey<T> of(@NotNull Key id, @NotNull Class<T> type) {
         return transientKey(id, type);
     }
 
-    /**
-     * Creates a transient attachment key from a string and type.
-     *
-     * @param id   the key identifier string
-     * @param type the value type class
-     * @param <T>  the value type
-     * @return the attachment key
-     */
+    /** Creates a transient attachment key from a string and type. */
     public static <T> @NotNull RAttachmentKey<T> of(@NotNull String id, @NotNull Class<T> type) {
         return transientKey(Key.key(id), type);
     }
@@ -66,6 +55,17 @@ public record RAttachmentKey<T>(
         return transientKey(Key.key(id), type);
     }
 
+    /**
+     * Creates a persistent attachment key without a codec.
+     *
+     * <p>Only types that support direct persistence ({@link #supportsDirectPersistence})
+     * can be used without a codec.</p>
+     *
+     * @param id   the unique identifier for this key
+     * @param type the value type class
+     * @param <T>  the value type
+     * @return a new persistent attachment key
+     */
     public static <T> @NotNull RAttachmentKey<T> persistent(@NotNull Key id, @NotNull Class<T> type) {
         return new RAttachmentKey<>(id, type, RAttachmentScope.PERSISTENT, null);
     }
@@ -90,21 +90,12 @@ public record RAttachmentKey<T>(
         return persistent(Key.key(id), type, codec);
     }
 
-    /**
-     * Checks whether this key is persistent.
-     *
-     * @return true if the scope is PERSISTENT
-     */
+    /** Checks whether this key is persistent. */
     public boolean persistent() {
         return scope == RAttachmentScope.PERSISTENT;
     }
 
-    /**
-     * Checks whether the given type can be persisted directly without a codec.
-     *
-     * @param type the type to check
-     * @return true if the type is directly persistable
-     */
+    /** Checks whether the given type can be persisted directly without a codec. */
     public static boolean supportsDirectPersistence(@NotNull Class<?> type) {
         Objects.requireNonNull(type, "type");
         return type == String.class

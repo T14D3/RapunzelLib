@@ -44,16 +44,10 @@ public final class BlockSpreadPre extends BaseCancellablePreEvent {
         return pos;
     }
 
-    /**
-     * The block type that will spread to this position.
-     */
     public RKey newBlockTypeKey() {
         return newBlockTypeKey;
     }
 
-    /**
-     * The block type that is spreading (source of the spread).
-     */
     public RKey sourceBlockTypeKey() {
         return sourceBlockTypeKey;
     }

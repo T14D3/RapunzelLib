@@ -18,35 +18,49 @@ public interface RAttachmentContainer {
     /**
      * Retrieves an attachment value by its key.
      *
-     * @param key the attachment key
-     * @param <T> the value type
-     * @return an {@link Optional} containing the value, or empty if not set
+     * <p>Transient attachments are returned from in-memory storage. Persistent
+     * attachments (if supported by the container) are loaded from disk.</p>
+     *
+     * @param key the attachment key identifying the value (including scope and type)
+     * @param <T> the expected value type
+     * @return an {@link Optional} containing the value, or empty if absent or the scope is unsupported
      */
     <T> @NotNull Optional<T> get(@NotNull RAttachmentKey<T> key);
 
     /**
      * Stores an attachment value by its key.
      *
-     * @param key   the attachment key
-     * @param value the value to store
+     * <p>Transient attachments are stored in memory. If the key specifies a
+     * persistent scope and the container supports it, the value is persisted to disk.
+     * Throws if the given scope is not supported by this container.</p>
+     *
+     * @param key   the attachment key (scope determines storage strategy)
+     * @param value the value to store (must match the key's type)
      * @param <T>   the value type
      */
     <T> void put(@NotNull RAttachmentKey<T> key, @NotNull T value);
 
     /**
-     * Removes an attachment by its key.
+     * Removes an attachment by its key and returns the previous value.
      *
-     * @param key the attachment key
-     * @param <T> the value type
-     * @return an {@link Optional} containing the removed value, or empty if not set
+     * <p>For transient keys, removes from in-memory storage. For persistent keys,
+     * removes from disk-backed storage. Returns empty if the scope is unsupported
+     * or no value was present.</p>
+     *
+     * @param key the attachment key identifying the value to remove
+     * @param <T> the expected value type
+     * @return an {@link Optional} containing the previous value, or empty if absent
      */
     <T> @NotNull Optional<T> remove(@NotNull RAttachmentKey<T> key);
 
     /**
-     * Checks whether this container supports the given scope.
+     * Checks whether this container supports the given attachment scope.
      *
-     * @param scope the scope to check
-     * @return true if the scope is supported
+     * <p>All containers support {@link RAttachmentScope#TRANSIENT}. Persistent
+     * support depends on the platform implementation.</p>
+     *
+     * @param scope the attachment scope to check
+     * @return true if the scope is supported, false otherwise
      */
     default boolean supports(@NotNull RAttachmentScope scope) {
         Objects.requireNonNull(scope, "scope");
@@ -67,16 +81,21 @@ public interface RAttachmentContainer {
     /**
      * Returns an empty, immutable attachment container.
      *
-     * @return an empty container
+     * <p>All {@code put} and {@code remove} operations throw
+     * {@link UnsupportedOperationException}.</p>
+     *
+     * @return an empty, immutable attachment container
      */
     static @NotNull RAttachmentContainer empty() {
         return EmptyAttachmentContainer.INSTANCE;
     }
 
     /**
-     * Creates a new mutable attachment container backed by a concurrent map.
+     * Creates a new mutable attachment container backed by a {@link java.util.concurrent.ConcurrentHashMap}.
      *
-     * @return a mutable container
+     * <p>Supports transient attachments only. Thread-safe for concurrent access.</p>
+     *
+     * @return a new mutable attachment container
      */
     static @NotNull RAttachmentContainer mutable() {
         return new MapAttachmentContainer();
@@ -85,7 +104,10 @@ public interface RAttachmentContainer {
     /**
      * Creates a new lazy-initialized mutable attachment container.
      *
-     * @return a lazy mutable container
+     * <p>The backing storage is allocated only on the first {@code put} operation,
+     * making this suitable for fields that may never receive attachments.</p>
+     *
+     * @return a new lazy-initialized attachment container
      */
     static @NotNull RAttachmentContainer lazyMutable() {
         return new LazyAttachmentContainer();

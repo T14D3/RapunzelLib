@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "rapunzellib_livetest_fabric",
+  "version": "${version}",
+  "name": "RapunzelLib (Fabric LiveTest)",
+  "description": "Fabric LiveTest platform implementation for RapunzelLib.",
+  "authors": [
+    "t14d3"
+  ],
+  "environment": "*",
+  "depends": {
+    "fabricloader": ">=0.16.0"
+  }
+}

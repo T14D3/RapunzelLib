@@ -41,27 +41,12 @@ public class RBooleanArgument<S extends RCommandSource> implements RArgument<S, 
         this.defaultValue = builder.defaultValue;
     }
     
-    /**
-     * Creates a required boolean argument.
-     * 
-     * @param name the argument name
-     * @param <S> the command source type
-     * @return a new boolean argument
-     */
     public static <S extends RCommandSource> RBooleanArgument<S> required(@NotNull String name) {
         return new Builder<S>(name)
             .optional(false)
             .build();
     }
     
-    /**
-     * Creates an optional boolean argument with a default value.
-     * 
-     * @param name the argument name
-     * @param defaultValue the default value
-     * @param <S> the command source type
-     * @return a new boolean argument
-     */
     public static <S extends RCommandSource> RBooleanArgument<S> optional(@NotNull String name, boolean defaultValue) {
         return new Builder<S>(name)
             .optional(true)

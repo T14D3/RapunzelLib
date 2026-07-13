@@ -44,9 +44,6 @@ public final class BlockFormPre extends BaseCancellablePreEvent {
         return pos;
     }
 
-    /**
-     * The block type that will be formed.
-     */
     public RKey newBlockTypeKey() {
         return newBlockTypeKey;
     }

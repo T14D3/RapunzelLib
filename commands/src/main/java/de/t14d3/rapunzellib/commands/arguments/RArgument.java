@@ -33,43 +33,16 @@ import java.util.function.Supplier;
  */
 public interface RArgument<S extends RCommandSource, T> {
     
-    /**
-     * Gets the name of this argument.
-     * 
-     * @return the argument name
-     */
     @NotNull
     String getName();
     
-    /**
-     * Gets the Brigadier argument type for this argument.
-     * 
-     * @return the Brigadier argument type
-     */
     @NotNull
     ArgumentType<T> getArgumentType();
     
-    /**
-     * Gets whether this argument is optional.
-     * 
-     * @return true if optional
-     */
     boolean isOptional();
-    
-    /**
-     * Gets the default value for this argument.
-     * 
-     * @return a supplier for the default value, or null if not set
-     */
     
     Supplier<T> getDefaultValue();
     
-    /**
-     * Gets suggestion providers for tab completion.
-     * 
-     * @param source the command source
-     * @return a list of suggested values
-     */
     @NotNull
     List<String> getSuggestions(@NotNull S source);
 

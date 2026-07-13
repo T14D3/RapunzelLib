@@ -60,12 +60,6 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
         this.duplicateException = new SimpleCommandExceptionType(new LiteralMessage(b.duplicateMessage));
     }
 
-    /**
-     * Creates a new builder for this argument type.
-     *
-     * @param <T> the element type
-     * @return a new builder
-     */
     public static <T> Builder<T> builder() {
         return new Builder<>();
     }
@@ -187,23 +181,11 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
         private Builder() {
         }
 
-        /**
-         * Sets the delimiter between list elements.
-         *
-         * @param delimiter the delimiter string
-         * @return this builder
-         */
         public Builder<T> delimiter(String delimiter) {
             this.delimiter = Objects.requireNonNull(delimiter, "delimiter");
             return this;
         }
 
-        /**
-         * Sets whether duplicate values are allowed.
-         *
-         * @param allowDuplicates true to allow duplicates
-         * @return this builder
-         */
         public Builder<T> allowDuplicates(boolean allowDuplicates) {
             this.allowDuplicates = allowDuplicates;
             return this;
@@ -232,57 +214,27 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
             return this;
         }
 
-        /**
-         * Sets the supplier for allowed values based on context.
-         *
-         * @param supplier the values supplier
-         * @return this builder
-         */
         public Builder<T> values(BiFunction<RCommandSource, CommandContext<?>, Collection<T>> supplier) {
             this.supplier = Objects.requireNonNull(supplier, "supplier");
             return this;
         }
 
-        /**
-         * Sets a fixed collection of allowed values.
-         *
-         * @param values the allowed values
-         * @return this builder
-         */
         public Builder<T> values(Collection<T> values) {
             Objects.requireNonNull(values, "values");
             this.supplier = (src, ctx) -> values;
             return this;
         }
 
-        /**
-         * Sets the function that maps each value to a suggestion.
-         *
-         * @param mapper the mapper function
-         * @return this builder
-         */
         public Builder<T> mapper(Function<T, Suggestion> mapper) {
             this.mapper = Objects.requireNonNull(mapper, "mapper");
             return this;
         }
 
-        /**
-         * Sets the error message for values not in the allowed list.
-         *
-         * @param message the error message
-         * @return this builder
-         */
         public Builder<T> notAllowedMessage(String message) {
             this.notAllowedMessage = Objects.requireNonNull(message, "message");
             return this;
         }
 
-        /**
-         * Sets the error message for duplicate values.
-         *
-         * @param message the error message
-         * @return this builder
-         */
         public Builder<T> duplicateMessage(String message) {
             this.duplicateMessage = Objects.requireNonNull(message, "message");
             return this;
@@ -300,12 +252,6 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
         }
     }
 
-    /**
-     * A suggestion with an optional tooltip.
-     *
-     * @param suggestion the suggestion text
-     * @param tooltip optional tooltip message
-     */
     public record Suggestion(String suggestion, com.mojang.brigadier.Message tooltip) {
         /**
          * Compact canonical constructor that rejects blank suggestions.
@@ -316,15 +262,8 @@ public final class ListArgumentType<T> implements ArgumentType<String> {
             }
         }
 
-        /**
-         * Creates a suggestion without a tooltip.
-         *
-         * @param suggestion the suggestion text
-         * @return a new Suggestion
-         */
         public static Suggestion none(String suggestion) {
             return new Suggestion(suggestion, null);
         }
     }
 }
-

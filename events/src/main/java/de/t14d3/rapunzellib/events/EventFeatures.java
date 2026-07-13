@@ -34,40 +34,18 @@ public final class EventFeatures {
         return GameEvents.install(context);
     }
 
-    /**
-     * Returns the installed {@link GameEventBus}.
-     *
-     * @return the event bus
-     */
     public static @NotNull GameEventBus bus() {
         return GameEvents.bus();
     }
 
-    /**
-     * Returns the support manifest for the current platform.
-     *
-     * @return the support manifest
-     */
     public static @NotNull GameEventSupportManifest support() {
         return GameEvents.support();
     }
 
-    /**
-     * Returns the support manifest for the given runtime.
-     *
-     * @param runtime the platform runtime
-     * @return the support manifest
-     */
     public static @NotNull GameEventSupportManifest support(@NotNull PlatformRuntime runtime) {
         return GameEvents.support(runtime);
     }
 
-    /**
-     * Returns the support manifest for the given platform ID.
-     *
-     * @param platformId the platform identifier
-     * @return the support manifest
-     */
     public static @NotNull GameEventSupportManifest support(@NotNull PlatformId platformId) {
         return GameEvents.support(platformId);
     }

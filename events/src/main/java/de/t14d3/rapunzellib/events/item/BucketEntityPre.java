@@ -19,27 +19,10 @@ public final class BucketEntityPre extends BaseCancellablePreEvent {
     private final RBlockPos pos;
     private final RKey entityTypeKey;
 
-    /**
-     * Creates a new BucketEntityPre event.
-     *
-     * @param player        the player using the bucket
-     * @param world         the world reference
-     * @param pos           the position
-     * @param entityTypeKey the entity type key
-     */
     public BucketEntityPre(RPlayer player, RWorldRef world, RBlockPos pos, RKey entityTypeKey) {
         this(player, world, pos, entityTypeKey, false);
     }
 
-    /**
-     * Creates a new BucketEntityPre event with cancelled state.
-     *
-     * @param player        the player using the bucket
-     * @param world         the world reference
-     * @param pos           the position
-     * @param entityTypeKey the entity type key
-     * @param isCancelled   whether the event is initially cancelled
-     */
     public BucketEntityPre(RPlayer player, RWorldRef world, RBlockPos pos, RKey entityTypeKey, boolean isCancelled) {
         this.player = Objects.requireNonNull(player, "player");
         this.world = Objects.requireNonNull(world, "world");
@@ -48,38 +31,18 @@ public final class BucketEntityPre extends BaseCancellablePreEvent {
         setCancelled(isCancelled);
     }
 
-    /**
-     * Returns the player using the bucket.
-     *
-     * @return the player
-     */
     public RPlayer player() {
         return player;
     }
 
-    /**
-     * Returns the world where the bucket is being used.
-     *
-     * @return the world
-     */
     public RWorldRef world() {
         return world;
     }
 
-    /**
-     * Returns the position.
-     *
-     * @return the position
-     */
     public RBlockPos pos() {
         return pos;
     }
 
-    /**
-     * Returns the entity type key.
-     *
-     * @return the entity type key
-     */
     public RKey entityTypeKey() {
         return entityTypeKey;
     }

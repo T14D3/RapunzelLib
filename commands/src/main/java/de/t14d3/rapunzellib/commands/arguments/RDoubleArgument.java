@@ -54,27 +54,12 @@ public class RDoubleArgument<S extends RCommandSource> implements RArgument<S, D
         }
     }
     
-    /**
-     * Creates a required double argument.
-     * 
-     * @param name the argument name
-     * @param <S> the command source type
-     * @return a new double argument
-     */
     public static <S extends RCommandSource> RDoubleArgument<S> required(@NotNull String name) {
         return new Builder<S>(name)
             .optional(false)
             .build();
     }
     
-    /**
-     * Creates an optional double argument with a default value.
-     * 
-     * @param name the argument name
-     * @param defaultValue the default value
-     * @param <S> the command source type
-     * @return a new double argument
-     */
     public static <S extends RCommandSource> RDoubleArgument<S> optional(@NotNull String name, double defaultValue) {
         return new Builder<S>(name)
             .optional(true)
@@ -125,21 +110,11 @@ public class RDoubleArgument<S extends RCommandSource> implements RArgument<S, D
         return (min == null || value >= min) && (max == null || value <= max);
     }
     
-    /**
-     * Gets the minimum value for this argument.
-     * 
-     * @return the minimum value, or null if not set
-     */
     @Nullable
     public Double getMin() {
         return min;
     }
     
-    /**
-     * Gets the maximum value for this argument.
-     * 
-     * @return the maximum value, or null if not set
-     */
     @Nullable
     public Double getMax() {
         return max;

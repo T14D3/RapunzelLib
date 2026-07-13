@@ -6,6 +6,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * @deprecated Use {@link de.t14d3.rapunzellib.devrunner.DevRunnerConfigParser} instead.
+ */
+@Deprecated
 final class ServerRunnerCli {
     private static final String DEFAULT_JAVA = defaultJava();
 

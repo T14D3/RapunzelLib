@@ -18,11 +18,6 @@ import java.util.Optional;
  */
 public interface RInventory extends RContainer {
 
-    /**
-     * Returns the number of slots in this inventory.
-     *
-     * @return the total slot count
-     */
     int size();
 
     /**
@@ -41,11 +36,6 @@ public interface RInventory extends RContainer {
      */
     void setItem(int slot, @Nullable RItem item);
 
-    /**
-     * Returns an immutable snapshot of all slot contents.
-     *
-     * @return a list of optional items, one per slot
-     */
     default @NotNull List<Optional<RItem>> contents() {
         int size = size();
         List<Optional<RItem>> contents = new ArrayList<>(size);

@@ -384,6 +384,14 @@ public final class BootstrapServices {
         registries.register(RRegistries.ITEM_TYPES, itemTypes);
         registries.register(RRegistries.BLOCK_TYPES, blockTypes);
 
+        // Register type registry wrappers globally - they're stateless delegates to the shared registry access.
+        context.sharedRuntime().registerIfAbsent(REntityTypeRegistry.class,
+            new RegistryAccessBackedEntityTypeRegistry(registries));
+        context.sharedRuntime().registerIfAbsent(RItemTypeRegistry.class,
+            new RegistryAccessBackedItemTypeRegistry(registries));
+        context.sharedRuntime().registerIfAbsent(RBlockTypeRegistry.class,
+            new RegistryAccessBackedBlockTypeRegistry(registries));
+
         registerRegistryAccess(context, DefaultRRegistryAccess.class, registries);
     }
 
@@ -412,9 +420,13 @@ public final class BootstrapServices {
             context.registerAlias(RRegistryAccess.class, registryAccessType);
         }
 
-        context.register(REntityTypeRegistry.class, new RegistryAccessBackedEntityTypeRegistry(sharedRegistries));
-        context.register(RItemTypeRegistry.class, new RegistryAccessBackedItemTypeRegistry(sharedRegistries));
-        context.register(RBlockTypeRegistry.class, new RegistryAccessBackedBlockTypeRegistry(sharedRegistries));
+        // Register type registry wrappers globally - identical for all contexts.
+        context.sharedRuntime().registerIfAbsent(REntityTypeRegistry.class,
+            new RegistryAccessBackedEntityTypeRegistry(sharedRegistries));
+        context.sharedRuntime().registerIfAbsent(RItemTypeRegistry.class,
+            new RegistryAccessBackedItemTypeRegistry(sharedRegistries));
+        context.sharedRuntime().registerIfAbsent(RBlockTypeRegistry.class,
+            new RegistryAccessBackedBlockTypeRegistry(sharedRegistries));
         return sharedRegistries;
     }
 

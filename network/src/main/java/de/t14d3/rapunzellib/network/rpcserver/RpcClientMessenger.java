@@ -123,9 +123,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         startClient();
     }
 
-    /**
-     * Starts the client connection and background threads.
-     */
     private void startClient() {
         if (running.compareAndSet(false, true)) {
             connect();
@@ -146,9 +143,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    /**
-     * Establishes connection to the proxy with automatic reconnection.
-     */
     private void connect() {
         while (running.get() && !connected.get()) {
             try {
@@ -176,9 +170,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    /**
-     * Performs the actual connection attempt.
-     */
     private void doConnect() throws IOException {
         logger.info("Connecting to RPC server at {}:{}...", config.proxyHost(), config.proxyPort());
 
@@ -204,17 +195,11 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         logger.info("Connected to RPC server at {}:{}", config.proxyHost(), config.proxyPort());
     }
 
-    /**
-     * Sends the HELLO handshake message.
-     */
     private void sendHello() {
         RpcProtocolMessage hello = RpcProtocolMessage.hello(config.serverName(), config.protocolVersion());
         sendProtocolMessage(hello);
     }
 
-    /**
-     * Sends a heartbeat message to keep connection alive.
-     */
     private void sendHeartbeat() {
         if (!connected.get() || !running.get()) {
             return;
@@ -234,9 +219,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    /**
-     * Main reader loop for incoming messages.
-     */
     private void runReaderLoop() {
         while (running.get() && connected.get() && socket != null && !socket.isClosed()) {
             try {
@@ -277,12 +259,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    /**
-     * Reads a framed message from the input stream.
-     *
-     * @return the parsed protocol message, or null if invalid
-     * @throws IOException if reading fails
-     */
     private @Nullable RpcProtocolMessage readMessage() throws IOException {
         // Read 4-byte length prefix
         int length;
@@ -311,11 +287,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    /**
-     * Handles an incoming protocol message.
-     *
-     * @param message the message to handle
-     */
     private void handleMessage(@NotNull RpcProtocolMessage message) {
         RpcProtocolMessage.Type type = message.getType();
         if (type == null) {
@@ -332,9 +303,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    /**
-     * Handles HELLO response from proxy.
-     */
     private void handleHello(@NotNull RpcProtocolMessage message) {
         String name = message.getServerName();
         String version = message.getVersion();
@@ -349,9 +317,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
             version != null ? version : "unknown");
     }
 
-    /**
-     * Handles application MESSAGE envelope.
-     */
     private void handleApplicationMessage(@NotNull RpcProtocolMessage message) {
         String channel = message.getChannel();
         String data = message.getData();
@@ -371,25 +336,16 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         deliverToLocalListeners(channel, data, sourceServer);
     }
 
-    /**
-     * Handles HEARTBEAT message from server.
-     */
     private void handleHeartbeat(@NotNull RpcProtocolMessage message) {
         logger.debug("Heartbeat received from proxy");
         lastHeartbeat.set(System.currentTimeMillis());
     }
 
-    /**
-     * Handles DISCONNECT message from server.
-     */
     private void handleServerDisconnect(@NotNull RpcProtocolMessage message) {
         logger.info("Server sent graceful disconnect");
         connected.set(false);
     }
 
-    /**
-     * Handles connection loss and triggers reconnection.
-     */
     private void handleDisconnect() {
         if (!connected.compareAndSet(true, false)) {
             return; // Already disconnected
@@ -407,9 +363,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    /**
-     * Closes the current socket and streams.
-     */
     private void closeSocket() {
         if (output != null) {
             try {
@@ -434,9 +387,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         }
     }
 
-    /**
-     * Delivers a message to local registered listeners.
-     */
     private void deliverToLocalListeners(@NotNull String channel, @NotNull String data, @NotNull String sourceServer) {
         List<MessageListener> list = listeners.get(channel);
         if (list == null || list.isEmpty()) {
@@ -513,12 +463,6 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
         sendProtocolMessage(message);
     }
 
-    /**
-     * Sends a protocol message to the server.
-     *
-     * @param message the message to send
-     * @return true if sent successfully
-     */
     private synchronized boolean sendProtocolMessage(@NotNull RpcProtocolMessage message) {
         if (!connected.get() || output == null) {
             return false;

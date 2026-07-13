@@ -14,6 +14,7 @@ public final class RuntimeProfiles {
         RuntimeCapability.EVENTS,
         RuntimeCapability.GUI,
         RuntimeCapability.INVENTORY,
+        RuntimeCapability.LIVETESTS,
         RuntimeCapability.NBT,
         RuntimeCapability.VISUALS,
         RuntimeCapability.WORLDS,

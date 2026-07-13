@@ -180,19 +180,10 @@ public final class RCommandSources {
         return of(platformId, handle, replyChannels(audience), player, permissionChecker);
     }
 
-    /**
-     * Creates a default permission checker that delegates to the player if present.
-     *
-     * @param player the optional player
-     * @return the permission predicate
-     */
     private static Predicate<String> defaultPermissionChecker(Optional<RPlayer> player) {
         return permission -> player.map(value -> value.hasPermission(permission)).orElse(false);
     }
 
-    /**
-     * Default implementation of {@link RCommandSource} backed by a native platform handle.
-     */
     private static final class DefaultRCommandSource extends RNativeHandle<Object> implements RCommandSource {
         private final ReplyChannels replyChannels;
         private final Optional<RPlayer> player;

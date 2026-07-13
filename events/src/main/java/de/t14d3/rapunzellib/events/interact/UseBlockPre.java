@@ -15,43 +15,20 @@ public final class UseBlockPre extends BaseCancellablePreEvent {
     private final RPlayer player;
     private final RBlock block;
 
-    /**
-     * Creates a new UseBlockPre event.
-     *
-     * @param player the player using the block
-     * @param block  the block being used
-     */
     public UseBlockPre(RPlayer player, RBlock block) {
         this(player, block, false);
     }
 
-    /**
-     * Creates a new UseBlockPre event with cancelled state.
-     *
-     * @param player      the player using the block
-     * @param block       the block being used
-     * @param isCancelled whether the event is initially cancelled
-     */
     public UseBlockPre(RPlayer player, RBlock block, boolean isCancelled) {
         this.player = Objects.requireNonNull(player, "player");
         this.block = Objects.requireNonNull(block, "block");
         setCancelled(isCancelled);
     }
 
-    /**
-     * Returns the player using the block.
-     *
-     * @return the player
-     */
     public RPlayer player() {
         return player;
     }
 
-    /**
-     * Returns the block being used.
-     *
-     * @return the block
-     */
     public RBlock block() {
         return block;
     }

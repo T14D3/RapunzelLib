@@ -62,6 +62,8 @@ dependencyResolutionManagement {
         maven("https://maven.fabricmc.net/")
         maven("https://maven.neoforged.net/releases/")
         maven("https://repo.spongepowered.org/repository/maven-public/")
+        maven("https://repo.opencollab.dev/maven-snapshots")
+        maven("https://repo.opencollab.dev/maven-releases")
     }
 
     versionCatalogs {

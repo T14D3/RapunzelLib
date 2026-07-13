@@ -47,24 +47,10 @@ public class RCommandNode<S extends RCommandSource> {
     private final List<String> aliases;
     private RCommandNode<S> redirect;
     
-    /**
-     * Creates a new root command node.
-     * 
-     * @param name the name of the root command
-     * @return a new root command node
-     */
     public static <S extends RCommandSource> RCommandNode<S> literal(@NotNull String name) {
         return new RCommandNode<>(name, null, null);
     }
 
-    /**
-     * Creates a new argument command node.
-     *
-     * @param argument the argument definition
-     * @param <S>      the command source type
-     * @param <T>      the argument value type
-     * @return a new argument node
-     */
     public static <S extends RCommandSource, T> RCommandNode<S> argument(@NotNull RArgument<S, T> argument) {
         return new RCommandNode<>(argument.getName(), null, argument);
     }
@@ -82,12 +68,6 @@ public class RCommandNode<S extends RCommandSource> {
         this.requirement = s -> true;
     }
     
-    /**
-     * Creates a new child node for this parent.
-     * 
-     * @param name the name of the child node
-     * @return the new child node
-     */
     @NotNull
     public RCommandNode<S> then(@NotNull String name) {
         if (children.containsKey(name)) {
@@ -157,32 +137,16 @@ public class RCommandNode<S extends RCommandSource> {
         return this;
     }
     
-    /**
-     * Gets a child node by name.
-     * 
-     * @param name the name of the child node
-     * @return the child node, or null if not found
-     */
     @Nullable
     public RCommandNode<S> getChild(@NotNull String name) {
         return children.get(name);
     }
     
-    /**
-     * Gets all child nodes of this node.
-     * 
-     * @return an unmodifiable collection of child nodes
-     */
     @NotNull
     public Collection<RCommandNode<S>> getChildren() {
         return Collections.unmodifiableCollection(children.values());
     }
     
-    /**
-     * Gets the name/identifier of this node.
-     * 
-     * @return the name of this node
-     */
     @NotNull
     public String getName() {
         return name;
@@ -206,188 +170,94 @@ public class RCommandNode<S extends RCommandSource> {
         return argument != null;
     }
 
-    /**
-     * Gets the argument definition for this node.
-     *
-     * @return the argument, or null if this is a literal node
-     */
     public @Nullable RArgument<S, ?> getArgument() {
         return argument;
     }
     
-    /**
-     * Gets the parent node of this node.
-     * 
-     * @return the parent node, or null if this is a root node
-     */
     @Nullable
     public RCommandNode<S> getParent() {
         return parent;
     }
     
-    /**
-     * Gets the command executor for this node.
-     * 
-     * @return the executor, or null if not set
-     */
     @Nullable
     public RCommandExecutor<S> getExecutor() {
         return executor;
     }
 
-    /**
-     * Gets the execution delegate node.
-     *
-     * @return the execution delegate, or null if not set
-     */
     @Nullable
     public RCommandNode<S> getExecutionDelegate() {
         return executionDelegate;
     }
     
-    /**
-     * Sets the command executor for this node.
-     * 
-     * @param executor the executor to set
-     * @return this node for chaining
-     */
     @NotNull
     public RCommandNode<S> setExecutor(@NotNull RCommandExecutor<S> executor) {
         this.executor = executor;
         return this;
     }
     
-    /**
-     * Sets the command executor using a fluent method name.
-     * 
-     * @param executor the executor to set
-     * @return this node for chaining
-     */
     @NotNull
     public RCommandNode<S> executes(@NotNull RCommandExecutor<S> executor) {
         this.executor = executor;
         return this;
     }
 
-    /**
-     * Gets the suggestion provider for this node.
-     *
-     * @return the suggestion provider, or null if not set
-     */
     @Nullable
     public RCommandSuggestionProvider<S> getSuggestionProvider() {
         return suggestionProvider;
     }
 
-    /**
-     * Sets the suggestion provider for this node.
-     *
-     * @param suggestionProvider the suggestion provider
-     * @return this node for chaining
-     */
     @NotNull
     public RCommandNode<S> setSuggestionProvider(@NotNull RCommandSuggestionProvider<S> suggestionProvider) {
         this.suggestionProvider = suggestionProvider;
         return this;
     }
 
-    /**
-     * Sets the suggestion provider using a fluent method name.
-     *
-     * @param suggestionProvider the suggestion provider
-     * @return this node for chaining
-     */
     @NotNull
     public RCommandNode<S> suggests(@NotNull RCommandSuggestionProvider<S> suggestionProvider) {
         this.suggestionProvider = suggestionProvider;
         return this;
     }
     
-    /**
-     * Gets the requirement predicate.
-     * 
-     * @return the requirement predicate
-     */
     @NotNull
     public Predicate<S> getRequirement() {
         return requirement;
     }
     
-    /**
-     * Sets a requirement predicate for this node.
-     * 
-     * @param requirement the requirement predicate
-     * @return this node for chaining
-     */
     @NotNull
     public RCommandNode<S> setRequirement(@NotNull Predicate<S> requirement) {
         this.requirement = requirement;
         return this;
     }
     
-    /**
-     * Sets a requirement predicate using a fluent method name.
-     * 
-     * @param requirement the requirement predicate
-     * @return this node for chaining
-     */
     @NotNull
     public RCommandNode<S> requires(@NotNull Predicate<S> requirement) {
         this.requirement = requirement;
         return this;
     }
     
-    /**
-     * Sets a permission requirement for this node.
-     * 
-     * @param permission the permission string required
-     * @return this node for chaining
-     */
     @NotNull
     public RCommandNode<S> setPermission(@Nullable String permission) {
         this.permission = permission;
         return this;
     }
     
-    /**
-     * Sets a permission requirement using a fluent method name.
-     * 
-     * @param permission the permission string required
-     * @return this node for chaining
-     */
     @NotNull
     public RCommandNode<S> requiresPermission(@NotNull String permission) {
         this.permission = permission;
         return this;
     }
     
-    /**
-     * Gets the permission string required for this node.
-     * 
-     * @return the permission string, or null if not set
-     */
     @Nullable
     public String getPermission() {
         return permission;
     }
     
-    /**
-     * Sets the description of this command node.
-     * 
-     * @param description the description text
-     * @return this node for chaining
-     */
     @NotNull
     public RCommandNode<S> setDescription(@Nullable String description) {
         this.description = description;
         return this;
     }
     
-    /**
-     * Gets the description of this command node.
-     * 
-     * @return the description, or null if not set
-     */
     @Nullable
     public String getDescription() {
         return description;
@@ -405,21 +275,11 @@ public class RCommandNode<S extends RCommandSource> {
         return this;
     }
     
-    /**
-     * Gets all aliases for this command node.
-     * 
-     * @return an unmodifiable list of aliases
-     */
     @NotNull
     public List<String> getAliases() {
         return Collections.unmodifiableList(aliases);
     }
     
-    /**
-     * Gets the redirect target for this node.
-     * 
-     * @return the redirect node, or null if not set
-     */
     @Nullable
     public RCommandNode<S> getRedirect() {
         return redirect;
@@ -455,11 +315,6 @@ public class RCommandNode<S extends RCommandSource> {
         return executor != null;
     }
     
-    /**
-     * Gets the full command path for this node.
-     * 
-     * @return the full command path
-     */
     @NotNull
     public String getPath() {
         if (parent == null) {
@@ -478,14 +333,6 @@ public class RCommandNode<S extends RCommandSource> {
         return attachedChild;
     }
 
-    /**
-     * Copies a subtree and attaches it to a new parent.
-     *
-     * @param source the source node to copy
-     * @param parent the new parent for the copy
-     * @param copies map of original to copy for redirect resolution
-     * @return the copied node
-     */
     private static <S extends RCommandSource> @NotNull RCommandNode<S> copySubtree(
         @NotNull RCommandNode<S> source,
         @Nullable RCommandNode<S> parent,
@@ -507,13 +354,6 @@ public class RCommandNode<S extends RCommandSource> {
         return copy;
     }
 
-    /**
-     * Copies redirect references from the source subtree to the copied subtree.
-     *
-     * @param source the source node
-     * @param copy   the copied node
-     * @param copies map of original to copy for redirect resolution
-     */
     private static <S extends RCommandSource> void copyRedirects(
         @NotNull RCommandNode<S> source,
         @NotNull RCommandNode<S> copy,

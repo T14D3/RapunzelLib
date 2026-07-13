@@ -22,32 +22,14 @@ public class RCommandException extends Exception {
     private final boolean shouldSendToPlayer;
     private final Object @Nullable [] context;
     
-    /**
-     * Creates a new command exception.
-     * 
-     * @param message the error message
-     */
     public RCommandException(@NotNull String message) {
         this(message, RCommandResult.FAILURE, true, null, (Object[]) null);
     }
     
-    /**
-     * Creates a new command exception with a cause.
-     * 
-     * @param message the error message
-     * @param cause the cause of this exception
-     */
     public RCommandException(@NotNull String message, @Nullable Throwable cause) {
         this(message, RCommandResult.FAILURE, true, cause, (Object[]) null);
     }
     
-    /**
-     * Creates a new command exception with formatted context.
-     * 
-     * @param message the error message
-     * @param shouldSendToPlayer whether this error should be shown to the player
-     * @param context optional context objects for error handling
-     */
     public RCommandException(
         @NotNull String message,
         boolean shouldSendToPlayer,

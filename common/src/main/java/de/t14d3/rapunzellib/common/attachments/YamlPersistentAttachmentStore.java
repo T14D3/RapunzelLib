@@ -28,18 +28,9 @@ import java.util.Objects;
 public final class YamlPersistentAttachmentStore implements AutoCloseable {
     private static final String BYTES_KEY = "$bytes";
 
-    /** Logger for warnings and debug output */
     private final Logger logger;
-    /** The YAML config file backing this store */
     private final YamlConfig config;
 
-    /**
-     * Creates a new YAML persistent attachment store.
-     *
-     * @param logger        the logger
-     * @param configService the config service for loading the YAML file
-     * @param file          the path to the YAML file
-     */
     public YamlPersistentAttachmentStore(
         @NotNull Logger logger,
         @NotNull ConfigService configService,
@@ -51,12 +42,6 @@ public final class YamlPersistentAttachmentStore implements AutoCloseable {
         this.config = configService.load(file, "");
     }
 
-    /**
-     * Reads the attachment compound at the given path.
-     *
-     * @param path the dot-separated path
-     * @return the deserialized NBT compound
-     */
     public @NotNull RNbtCompound get(@NotNull String path) {
         Objects.requireNonNull(path, "path");
         synchronized (config) {
@@ -64,12 +49,6 @@ public final class YamlPersistentAttachmentStore implements AutoCloseable {
         }
     }
 
-    /**
-     * Writes the attachment compound at the given path and persists to disk.
-     *
-     * @param path the dot-separated path
-     * @param root the NBT compound to write
-     */
     public void put(@NotNull String path, @NotNull RNbtCompound root) {
         Objects.requireNonNull(path, "path");
         Objects.requireNonNull(root, "root");
@@ -79,9 +58,6 @@ public final class YamlPersistentAttachmentStore implements AutoCloseable {
         }
     }
 
-    /**
-     * Flushes pending writes to disk.
-     */
     @Override
     public void close() {
         try {

@@ -3,21 +3,25 @@ package de.t14d3.rapunzellib.platform.neoforge;
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.bootstrap.BootstrapHandle;
+import de.t14d3.rapunzellib.commands.ConsoleCommandDispatcher;
 import de.t14d3.rapunzellib.common.bootstrap.BootstrapServices;
-import de.t14d3.rapunzellib.network.bootstrap.BackendTransportBootstrap;
-import de.t14d3.rapunzellib.network.bootstrap.SharedBackendBootstrap;
+import de.t14d3.rapunzellib.common.context.ConsumerView;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
+import de.t14d3.rapunzellib.network.bootstrap.BackendTransportBootstrap;
+import de.t14d3.rapunzellib.network.bootstrap.SharedBackendBootstrap;
 import de.t14d3.rapunzellib.network.queue.NetworkQueueTransportDecorator;
 import de.t14d3.rapunzellib.platform.PlatformFeatures;
 import de.t14d3.rapunzellib.platform.neoforge.network.NeoForgePluginMessenger;
 import de.t14d3.rapunzellib.platform.neoforge.scheduler.NeoForgeScheduler;
 import de.t14d3.rapunzellib.runtime.EngineFamily;
+import de.t14d3.rapunzellib.runtime.LifecycleOwner;
 import de.t14d3.rapunzellib.runtime.PlatformRuntime;
 import de.t14d3.rapunzellib.runtime.RuntimeProfiles;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -31,25 +35,34 @@ public final class NeoForgeRapunzelBootstrap {
     private NeoForgeRapunzelBootstrap() {
     }
 
-    public static RapunzelContext bootstrap(
-            String modId,
-            MinecraftServer server,
-            Logger logger,
-            Path dataDirectory,
-            Class<?> resourceAnchor
-    ) {
-        return bootstrapHandle(modId, server, logger, dataDirectory, resourceAnchor).context();
+    // ── Platform bootstrap (called by NeoForgePlatformMod lifecycle hooks) ──
+
+    public static BootstrapHandle bootstrapPlatform(MinecraftServer server) {
+        Logger logger = LoggerFactory.getLogger(MOD_ID);
+        Path dataDir = Path.of("").resolve("config").resolve(MOD_ID);
+        return Rapunzel.bootstrap(MOD_ID, () -> createContext(MOD_ID, server, logger, dataDir, NeoForgePlatformMod.class));
     }
 
-    public static BootstrapHandle bootstrapHandle(
-            String modId,
-            MinecraftServer server,
-            Logger logger,
-            Path dataDirectory,
-            Class<?> resourceAnchor
-    ) {
-        return Rapunzel.bootstrap(modId, () -> createContext(modId, server, logger, dataDirectory, resourceAnchor));
+    // ── Consumer acquire ────────────────────────────────────────────────────
+
+    public static BootstrapHandle acquire(String modId, MinecraftServer server, Logger logger, Path dataDirectory, Class<?> resourceAnchor) {
+        RapunzelContext platform = Rapunzel.context();
+        try {
+            Files.createDirectories(dataDirectory);
+        } catch (Exception e) {
+            logger.debug("Failed to create data directory {}", dataDirectory, e);
+        }
+        ConsumerView view = new ConsumerView(
+            platform,
+            logger,
+            dataDirectory,
+            path -> Optional.ofNullable(openResource(resourceAnchor, path)),
+            new LifecycleOwner(modId)
+        );
+        return Rapunzel.acquire(modId, view);
     }
+
+    // ── Context creation ────────────────────────────────────────────────────
 
     public static RapunzelContext createContext(
             String modId,
@@ -89,6 +102,7 @@ public final class NeoForgeRapunzelBootstrap {
                 scheduler,
                 ctx -> {
                     ctx.register(MinecraftServer.class, server);
+                    ctx.register(ConsoleCommandDispatcher.class, new NeoForgeConsoleCommandDispatcher(server));
                     PlatformFeatures.install(ctx);
                 },
                 new BackendTransportBootstrap.Hooks(
@@ -98,6 +112,32 @@ public final class NeoForgeRapunzelBootstrap {
                 NeoForgePluginMessenger::setNetworkServerName
         );
     }
+
+    // ── Legacy API (deprecated) ─────────────────────────────────────────────
+
+    @Deprecated
+    public static RapunzelContext bootstrap(
+            String modId,
+            MinecraftServer server,
+            Logger logger,
+            Path dataDirectory,
+            Class<?> resourceAnchor
+    ) {
+        return acquire(modId, server, logger, dataDirectory, resourceAnchor).context();
+    }
+
+    @Deprecated
+    public static BootstrapHandle bootstrapHandle(
+            String modId,
+            MinecraftServer server,
+            Logger logger,
+            Path dataDirectory,
+            Class<?> resourceAnchor
+    ) {
+        return acquire(modId, server, logger, dataDirectory, resourceAnchor);
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
 
     private static InputStream openResource(Class<?> anchor, String path) {
         if (anchor == null || path == null) return null;

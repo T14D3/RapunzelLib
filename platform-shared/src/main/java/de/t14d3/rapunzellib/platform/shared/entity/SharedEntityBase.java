@@ -20,24 +20,10 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
-/**
- * Abstract base implementation of a generic Minecraft {@link Entity} wrapper.
- * <p>
- * Provides shared implementations for identity, location, custom names, teleportation,
- * and removal, delegating to utilities like {@link SharedEntityOperations} and
- * {@link SharedAdventureComponentCodec}.
- * </p>
- */
+/** Abstract base implementation of a generic Minecraft {@link Entity} wrapper. */
 public abstract class SharedEntityBase extends RNativeHandle<Entity> implements REntity {
     private final SharedWorldHooks worldHooks;
 
-    /**
-     * Constructs a new entity base with a lazy-mutable attachment container and a world factory.
-     *
-     * @param platformId   the platform identifier
-     * @param handle       the native Minecraft Entity
-     * @param worldFactory a function to create {@link RWorld} wrappers from {@link ServerLevel} instances
-     */
     protected SharedEntityBase(
         @NotNull PlatformId platformId,
         @NotNull Entity handle,
@@ -46,14 +32,6 @@ public abstract class SharedEntityBase extends RNativeHandle<Entity> implements 
         this(platformId, handle, RAttachmentContainer.lazyMutable(), SharedWorldHooks.of(worldFactory));
     }
 
-    /**
-     * Constructs a new entity base with explicit attachments and world hooks.
-     *
-     * @param platformId   the platform identifier
-     * @param handle       the native Minecraft Entity
-     * @param attachments  the attachment container for this entity
-     * @param worldHooks   shared world creation and resolution hooks
-     */
     protected SharedEntityBase(
         @NotNull PlatformId platformId,
         @NotNull Entity handle,
@@ -64,43 +42,27 @@ public abstract class SharedEntityBase extends RNativeHandle<Entity> implements 
         this.worldHooks = Objects.requireNonNull(worldHooks, "worldHooks");
     }
 
-    /**
-     * Replaces the underlying native entity handle, typically used after a respawn or dimension change.
-     *
-     * @param newHandle the new native Entity handle
-     */
+    /** Replaces the underlying native entity handle, typically used after a respawn or dimension change. */
     public void updateHandle(@NotNull Entity newHandle) {
         updateNativeHandle(Objects.requireNonNull(newHandle, "newHandle"));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public final @NotNull UUID uuid() {
         return handle().getUUID();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public final @NotNull RRegistryRef<REntityType> typeRef() {
         return REntityType.ref(BuiltInRegistries.ENTITY_TYPE.getKey(handle().getType()).toString());
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public final @NotNull Optional<RWorld> world() {
         ServerLevel level = (ServerLevel) handle().level();
         return Optional.of(worldHooks.createWorld(level));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public final @NotNull Optional<RLocation> location() {
         Entity entity = handle();
@@ -115,25 +77,16 @@ public abstract class SharedEntityBase extends RNativeHandle<Entity> implements 
         ));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean canTeleport() {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean teleport(@NotNull RLocation location) {
         return SharedEntityOperations.teleport(handle(), location, worldHooks);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public @NotNull Optional<String> getName() {
         Component customName = handle().getCustomName();
@@ -143,17 +96,11 @@ public abstract class SharedEntityBase extends RNativeHandle<Entity> implements 
         return Optional.of(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(SharedAdventureComponentCodec.toAdventure(customName)));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void setName(@NotNull String name) {
         handle().setCustomName(net.minecraft.network.chat.Component.literal(name));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public @NotNull Optional<net.kyori.adventure.text.Component> getDisplayName() {
         Component customName = handle().getCustomName();
@@ -163,26 +110,17 @@ public abstract class SharedEntityBase extends RNativeHandle<Entity> implements 
         return Optional.of(SharedAdventureComponentCodec.toAdventure(customName));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void setDisplayName(@NotNull net.kyori.adventure.text.Component displayName) {
         handle().setCustomName(SharedAdventureComponentCodec.toNative(displayName));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean remove() {
         handle().remove(Entity.RemovalReason.DISCARDED);
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public boolean isRemoved() {
         return handle().isRemoved();

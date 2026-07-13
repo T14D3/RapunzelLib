@@ -85,12 +85,6 @@ public final class SharedEntityNbtSerializerCore<L extends SharedEntityLocation>
         }
     }
 
-    /**
-     * Removes location-related fields from the NBT tree.
-     *
-     * @param nbt the NBT compound
-     * @return the stripped compound
-     */
     private @NotNull RNbtCompound stripLocationData(@NotNull RNbtCompound nbt) {
         return Objects.requireNonNull(nbt, "nbt")
             .remove(EntityRootNbt.Paths.POS)
@@ -104,22 +98,10 @@ public final class SharedEntityNbtSerializerCore<L extends SharedEntityLocation>
             .remove(EntityRootNbt.Paths.WORLD_UUID_MOST);
     }
 
-    /**
-     * Creates a position list from a location.
-     *
-     * @param location the entity location
-     * @return the position as [x, y, z]
-     */
     private static @NotNull List<Double> position(@NotNull SharedEntityLocation location) {
         return List.of(location.x(), location.y(), location.z());
     }
 
-    /**
-     * Creates a rotation list from a location.
-     *
-     * @param location the entity location
-     * @return the rotation as [yaw, pitch]
-     */
     private static @NotNull List<Float> rotation(@NotNull SharedEntityLocation location) {
         return List.of(location.yaw(), location.pitch());
     }

@@ -15,17 +15,9 @@ import java.util.function.Supplier;
  * wrapping them into a {@link PersistentAttachmentSession} on each access.
  */
 public class StoredPersistentAttachmentContainer extends DefaultAttachmentContainer {
-    /** Loads the current persistent root compound */
     private final Supplier<RNbtCompound> loader;
-    /** Saves an updated persistent root compound */
     private final Consumer<RNbtCompound> saver;
 
-    /**
-     * Creates a container with full transient and persistent support.
-     *
-     * @param loader loads the persistent root compound
-     * @param saver  saves the persistent root compound
-     */
     public StoredPersistentAttachmentContainer(
         @NotNull Supplier<@NotNull RNbtCompound> loader,
         @NotNull Consumer<@NotNull RNbtCompound> saver
@@ -33,13 +25,6 @@ public class StoredPersistentAttachmentContainer extends DefaultAttachmentContai
         this(AttachmentStorageSupport.TRANSIENT_AND_PERSISTENT, loader, saver);
     }
 
-    /**
-     * Creates a container with the given storage support.
-     *
-     * @param support the attachment storage support
-     * @param loader  loads the persistent root compound
-     * @param saver   saves the persistent root compound
-     */
     public StoredPersistentAttachmentContainer(
         @NotNull AttachmentStorageSupport support,
         @NotNull Supplier<@NotNull RNbtCompound> loader,

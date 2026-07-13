@@ -8,10 +8,5 @@ package de.t14d3.rapunzellib.visuals;
  */
 public interface VisualConfig {
 
-    /**
-     * Returns the maximum view distance in blocks.
-     *
-     * @return the view distance; a negative value means no limit
-     */
     double viewDistance();
 }

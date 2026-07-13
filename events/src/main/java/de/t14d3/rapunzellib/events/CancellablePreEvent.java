@@ -13,11 +13,7 @@ import java.util.Optional;
  * vote via {@link Decision} (PASS/ALLOW/DENY), and provide an optional deny reason.</p>
  */
 public interface CancellablePreEvent extends GamePreEvent {
-    /**
-     * Returns the current decision for this event.
-     *
-     * @return the decision
-     */
+    
     Decision decision();
 
     /**
@@ -28,20 +24,10 @@ public interface CancellablePreEvent extends GamePreEvent {
      */
     boolean isCancelled();
 
-    /**
-     * Returns whether this event has been denied.
-     *
-     * @return true if the decision is DENY
-     */
     default boolean isDenied() {
         return decision() == Decision.DENY;
     }
 
-    /**
-     * Returns whether this event has been explicitly allowed.
-     *
-     * @return true if the decision is ALLOW
-     */
     default boolean isAllowed() {
         return decision() == Decision.ALLOW;
     }
@@ -68,10 +54,5 @@ public interface CancellablePreEvent extends GamePreEvent {
      */
     void deny(@Nullable Component reason);
 
-    /**
-     * Returns the reason for denial, if set.
-     *
-     * @return an optional containing the deny reason
-     */
     @NotNull Optional<Component> denyReason();
 }

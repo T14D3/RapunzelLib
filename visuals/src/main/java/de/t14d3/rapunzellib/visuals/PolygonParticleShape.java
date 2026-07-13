@@ -14,12 +14,6 @@ final class PolygonParticleShape implements ParticleShape {
     private final List<RLocation> vertices;
     private final boolean closed;
 
-    /**
-     * Creates a polygon shape.
-     *
-     * @param vertices the polygon vertices
-     * @param closed   whether to connect the last vertex back to the first
-     */
     PolygonParticleShape(@NotNull List<RLocation> vertices, boolean closed) {
         this.vertices = List.copyOf(vertices);
         this.closed = closed;

@@ -12,6 +12,7 @@ import de.t14d3.rapunzellib.registry.RRegistryTypeHandle;
 import de.t14d3.rapunzellib.runtime.EngineFamily;
 import de.t14d3.rapunzellib.runtime.LifecycleOwner;
 import de.t14d3.rapunzellib.runtime.PlatformRuntime;
+import de.t14d3.rapunzellib.runtime.RapunzelRuntime;
 import de.t14d3.rapunzellib.runtime.RuntimeCapability;
 import de.t14d3.rapunzellib.runtime.RuntimeRole;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
@@ -43,7 +44,7 @@ final class RItemTypeLookupTest {
     void itemsResolveRuntimeItemTypesFromRegisteredRegistry() {
         TestItemType stone = new TestItemType(RKey.of("minecraft:stone"), "stone-handle");
         TestContext context = new TestContext(Path.of("."));
-        context.services().register(RItemTypeRegistry.class, new TestItemTypeRegistry(stone));
+        RapunzelRuntime.getInstance().registerIfAbsent(RItemTypeRegistry.class, new TestItemTypeRegistry(stone));
         Rapunzel.bootstrap(this, context);
 
         RItem item = RItem.of("minecraft:stone", 2);

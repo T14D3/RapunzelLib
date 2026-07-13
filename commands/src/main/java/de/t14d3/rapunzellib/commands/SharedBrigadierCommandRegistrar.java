@@ -15,18 +15,9 @@ import org.jetbrains.annotations.NotNull;
  * @param <S> the Brigadier command source type
  */
 public interface SharedBrigadierCommandRegistrar<S> {
-    /**
-     * Gets the platform identifier.
-     *
-     * @return the platform ID
-     */
+    
     @NotNull PlatformId platformId();
 
-    /**
-     * Gets the Brigadier source type.
-     *
-     * @return the source type class
-     */
     @NotNull Class<S> sourceType();
 
     /**

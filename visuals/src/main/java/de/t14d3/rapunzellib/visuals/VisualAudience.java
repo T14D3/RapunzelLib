@@ -24,21 +24,10 @@ public interface VisualAudience {
      */
     @NotNull Collection<RPlayer> resolve();
 
-    /**
-     * Returns an empty audience (no players).
-     *
-     * @return an empty audience
-     */
     static @NotNull VisualAudience empty() {
         return Collections::emptyList;
     }
 
-    /**
-     * Returns an audience targeting a single player.
-     *
-     * @param player the target player
-     * @return a single-player audience
-     */
     static @NotNull VisualAudience player(@NotNull RPlayer player) {
         return () -> Collections.singletonList(player);
     }

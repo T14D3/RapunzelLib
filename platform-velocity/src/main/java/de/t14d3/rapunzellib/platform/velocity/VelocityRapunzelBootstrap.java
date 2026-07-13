@@ -5,7 +5,9 @@ import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.RapunzelLibVersion;
 import de.t14d3.rapunzellib.bootstrap.BootstrapHandle;
+import de.t14d3.rapunzellib.commands.ConsoleCommandDispatcher;
 import de.t14d3.rapunzellib.common.bootstrap.BootstrapServices;
+import de.t14d3.rapunzellib.common.context.ConsumerView;
 import de.t14d3.rapunzellib.config.ConfigService;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
@@ -27,6 +29,7 @@ import de.t14d3.rapunzellib.platform.velocity.network.VelocityNetworkInfoService
 import de.t14d3.rapunzellib.platform.velocity.network.VelocityPluginMessenger;
 import de.t14d3.rapunzellib.platform.velocity.objects.VelocityPersistentAttachmentsStore;
 import de.t14d3.rapunzellib.platform.velocity.scheduler.VelocityScheduler;
+import de.t14d3.rapunzellib.runtime.LifecycleOwner;
 import de.t14d3.rapunzellib.runtime.PlatformRuntime;
 import de.t14d3.rapunzellib.runtime.RuntimeProfiles;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
@@ -40,14 +43,28 @@ public final class VelocityRapunzelBootstrap {
     private VelocityRapunzelBootstrap() {
     }
 
-    public static RapunzelContext bootstrap(Object plugin, ProxyServer proxy, Logger logger, Path dataDirectory) {
-        return bootstrapHandle(plugin, proxy, logger, dataDirectory).context();
-    }
+    // ── Platform bootstrap (called by VelocityPlatformPlugin) ───────────────
 
-    public static BootstrapHandle bootstrapHandle(Object plugin, ProxyServer proxy, Logger logger, Path dataDirectory) {
+    public static BootstrapHandle bootstrapPlatform(Object plugin, ProxyServer proxy, Logger logger, Path dataDirectory) {
         VelocityPlatformBootstrapHost.prepareBootstrap(plugin);
         return Rapunzel.bootstrap(plugin, () -> createContext(plugin, proxy, logger, dataDirectory));
     }
+
+    // ── Consumer acquire ────────────────────────────────────────────────────
+
+    public static BootstrapHandle acquire(Object plugin, ProxyServer proxy, Logger logger, Path dataDirectory) {
+        RapunzelContext platform = Rapunzel.context();
+        ConsumerView view = new ConsumerView(
+            platform,
+            logger,
+            dataDirectory,
+            path -> Optional.ofNullable(openResource(plugin, path)),
+            new LifecycleOwner(plugin)
+        );
+        return Rapunzel.acquire(plugin, view);
+    }
+
+    // ── Context creation ────────────────────────────────────────────────────
 
     public static RapunzelContext createContext(Object plugin, ProxyServer proxy, Logger logger, Path dataDirectory) {
         logger.info("Bootstrapping RapunzelLib {}", RapunzelLibVersion.current());
@@ -64,6 +81,7 @@ public final class VelocityRapunzelBootstrap {
             BootstrapServices.bootstrapFirstPhase(runtime, logger, dataDirectory, resources, scheduler);
         RapunzelContext ctx = firstPhase.context();
         ctx.register(ProxyServer.class, proxy);
+        ctx.register(ConsoleCommandDispatcher.class, new VelocityConsoleCommandDispatcher(proxy));
 
         ConfigService configService = firstPhase.configService();
 
@@ -163,6 +181,20 @@ public final class VelocityRapunzelBootstrap {
 
         return ctx;
     }
+
+    // ── Legacy API (deprecated) ─────────────────────────────────────────────
+
+    @Deprecated
+    public static RapunzelContext bootstrap(Object plugin, ProxyServer proxy, Logger logger, Path dataDirectory) {
+        return acquire(plugin, proxy, logger, dataDirectory).context();
+    }
+
+    @Deprecated
+    public static BootstrapHandle bootstrapHandle(Object plugin, ProxyServer proxy, Logger logger, Path dataDirectory) {
+        return acquire(plugin, proxy, logger, dataDirectory);
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
 
     private static InputStream openResource(Object plugin, String path) {
         if (path == null) return null;

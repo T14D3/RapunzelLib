@@ -13,30 +13,15 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
-/**
- * Shared hooks for dispatching lifecycle events (world load, chunk unload, player quit).
- * <p>
- * Also provides initialization of the mixin event bridge.
- */
+/** Shared hooks for dispatching lifecycle events (world load, chunk unload, player quit). */
 public final class SharedLifecycleEventHooks {
     private SharedLifecycleEventHooks() {
     }
 
-    /**
-     * Initializes the mixin events bridge with the given event bus.
-     *
-     * @param bus the game event bus
-     */
     public static void initializeMixins(@NotNull GameEventBus bus) {
         SharedMixinEventsBridge.initialize(Objects.requireNonNull(bus, "bus"));
     }
 
-    /**
-     * Dispatches a world load post event.
-     *
-     * @param bus   the game event bus
-     * @param level the loaded server level
-     */
     public static void dispatchWorldLoadPost(@NotNull GameEventBus bus, @NotNull ServerLevel level) {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(level, "level");
@@ -46,14 +31,6 @@ public final class SharedLifecycleEventHooks {
         bus.dispatchPost(new WorldLoadPost(worldRef(level)));
     }
 
-    /**
-     * Dispatches a chunk unload post event.
-     *
-     * @param bus    the game event bus
-     * @param level  the server level
-     * @param chunkX the chunk X coordinate
-     * @param chunkZ the chunk Z coordinate
-     */
     public static void dispatchChunkUnloadPost(
         @NotNull GameEventBus bus,
         @NotNull ServerLevel level,
@@ -68,12 +45,6 @@ public final class SharedLifecycleEventHooks {
         bus.dispatchPost(new ChunkUnloadPost(worldRef(level), chunkX, chunkZ));
     }
 
-    /**
-     * Dispatches a player quit post event.
-     *
-     * @param bus    the game event bus
-     * @param player the quitting player
-     */
     public static void dispatchPlayerQuitPost(@NotNull GameEventBus bus, @NotNull ServerPlayer player) {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(player, "player");
@@ -83,12 +54,6 @@ public final class SharedLifecycleEventHooks {
         bus.dispatchPost(new PlayerQuitPost(player.getUUID(), player.getName().getString()));
     }
 
-    /**
-     * Creates an {@link RWorldRef} from a server level.
-     *
-     * @param level the server level
-     * @return the world reference
-     */
     private static @NotNull RWorldRef worldRef(@NotNull ServerLevel level) {
         // #if VERSION >= 1.21.11
         RKey id = RKey.of(level.dimension().identifier().toString());

@@ -21,29 +21,18 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Abstract base implementation of {@link Worlds} that provides world lookup and caching.
- * <p>
  * Maintains a {@link ConcurrentHashMap}-backed cache of wrapped world instances keyed by {@link RKey}.
- * Implements {@link SharedWorldHooks} to serve as the bridge between the entity system and world creation.
- * </p>
  *
- * @param <W> the concrete world wrapper type managed by this implementation
+ * @param <W> the concrete world wrapper type
  */
 public abstract class SharedWorldsCore<W extends RWorld> implements Worlds, SharedWorldHooks {
     private final MinecraftServer server;
     private final ConcurrentHashMap<RKey, W> cache = new ConcurrentHashMap<>();
 
-    /**
-     * Constructs a new worlds core.
-     *
-     * @param server the Minecraft server instance
-     */
     protected SharedWorldsCore(@NotNull MinecraftServer server) {
         this.server = Objects.requireNonNull(server, "server");
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public @NotNull Collection<RWorld> all() {
         Collection<RWorld> worlds = new ArrayList<>();
@@ -53,9 +42,6 @@ public abstract class SharedWorldsCore<W extends RWorld> implements Worlds, Shar
         return worlds;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public @NotNull Optional<RWorld> getByName(@NotNull String name) {
         if (name == null || name.isBlank()) return Optional.empty();
@@ -68,9 +54,6 @@ public abstract class SharedWorldsCore<W extends RWorld> implements Worlds, Shar
         return Optional.empty();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public @NotNull Optional<RWorld> get(@NotNull RKey key) {
         Objects.requireNonNull(key, "key");
@@ -85,51 +68,25 @@ public abstract class SharedWorldsCore<W extends RWorld> implements Worlds, Shar
         return Optional.of(createWorld(level));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public final @NotNull Optional<RWorld> wrap(@NotNull Object nativeWorld) {
         Objects.requireNonNull(nativeWorld, "nativeWorld");
         return adaptNativeWorld(nativeWorld).flatMap(this::wrapNative).map(RWorld.class::cast);
     }
 
-    /**
-     * Wraps a native {@link ServerLevel} into an {@link Optional} containing the managed wrapper type.
-     *
-     * @param level the server level to wrap
-     * @return an Optional containing the wrapped world
-     */
     public final @NotNull Optional<W> wrapNative(@NotNull ServerLevel level) {
         return Optional.of(createWorld(level));
     }
 
-    /**
-     * Attempts to adapt a generic native object into a {@link ServerLevel}.
-     *
-     * @param nativeWorld the object to adapt
-     * @return an Optional containing the adapted ServerLevel, or empty if not adaptable
-     */
     protected @NotNull Optional<? extends ServerLevel> adaptNativeWorld(@NotNull Object nativeWorld) {
         return nativeWorld instanceof ServerLevel level ? Optional.of(level) : Optional.empty();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public final @NotNull W createWorld(@NotNull ServerLevel level) {
         return wrapInternal(level);
     }
 
-    /**
-     * Checks whether the given name matches the dimension location or key of the specified level.
-     *
-     * @param name  the name to match
-     * @param level the server level to test
-     * @param key   the pre-computed RKey for the level
-     * @return {@code true} if the name matches
-     */
     protected boolean matchesName(@NotNull String name, @NotNull ServerLevel level, @NotNull RKey key) {
         // #if VERSION >= 1.21.11
         return name.equalsIgnoreCase(level.dimension().identifier().toString()) || name.equalsIgnoreCase(key.asString());
@@ -138,28 +95,10 @@ public abstract class SharedWorldsCore<W extends RWorld> implements Worlds, Shar
         // #endif
     }
 
-    /**
-     * Creates a new world wrapper for the given server level.
-     *
-     * @param level the server level to wrap
-     * @return the new wrapper instance
-     */
     protected abstract @NotNull W createWorldWrapper(@NotNull ServerLevel level);
 
-    /**
-     * Updates an existing world wrapper with fresh data from the given server level.
-     *
-     * @param existingWorld the existing wrapper to update
-     * @param level         the server level providing updated state
-     */
     protected abstract void updateWorldWrapper(@NotNull W existingWorld, @NotNull ServerLevel level);
 
-    /**
-     * Internal wrapping helper that returns cached instances when available.
-     *
-     * @param level the server level to wrap
-     * @return the cached or newly created wrapper
-     */
     private @NotNull W wrapInternal(@NotNull ServerLevel level) {
         RKey key = key(level);
         return cache.compute(key, (k, existing) -> {
@@ -169,12 +108,6 @@ public abstract class SharedWorldsCore<W extends RWorld> implements Worlds, Shar
         });
     }
 
-    /**
-     * Extracts the {@link RKey} for the given server level.
-     *
-     * @param level the server level
-     * @return the corresponding RKey
-     */
     private static @NotNull RKey key(@NotNull ServerLevel level) {
         // #if VERSION >= 1.21.11
         return RKey.of(level.dimension().identifier().toString());

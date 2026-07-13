@@ -35,14 +35,6 @@ public final class SharedNmsBeaconBeamVisual extends SharedNmsVisual<BeaconBeamC
     private int currentPyramidLevels;
     private boolean currentExtendToSky;
 
-    /**
-     * Creates a new beacon beam visual.
-     *
-     * @param id       the visual ID
-     * @param config   the beacon beam config
-     * @param audience the visual audience
-     * @param manager  the visual manager
-     */
     public SharedNmsBeaconBeamVisual(
         @NotNull VisualId id,
         @NotNull BeaconBeamConfig config,
@@ -132,9 +124,6 @@ public final class SharedNmsBeaconBeamVisual extends SharedNmsVisual<BeaconBeamC
         }
     }
 
-    /**
-     * Re-shows the visual if currently shown, to apply configuration updates.
-     */
     private void reshowIfNeeded() {
         if (shown) {
             hide();
@@ -142,14 +131,6 @@ public final class SharedNmsBeaconBeamVisual extends SharedNmsVisual<BeaconBeamC
         }
     }
 
-    /**
-     * Sends a block update packet to a player and records it for later cleanup.
-     *
-     * @param player     the player
-     * @param sentBlocks the list tracking sent blocks
-     * @param pos        the block position
-     * @param state      the block state
-     */
     private void sendBlock(
         @NotNull ServerPlayer player,
         @NotNull List<BlockPos> sentBlocks,
@@ -160,22 +141,10 @@ public final class SharedNmsBeaconBeamVisual extends SharedNmsVisual<BeaconBeamC
         sentBlocks.add(pos);
     }
 
-    /**
-     * Converts an RBlockPos to a native BlockPos.
-     *
-     * @param pos the RBlockPos
-     * @return the native BlockPos
-     */
     private static BlockPos toBlockPos(RBlockPos pos) {
         return new BlockPos(pos.x(), pos.y(), pos.z());
     }
 
-    /**
-     * Returns the stained glass block state for a dye color.
-     *
-     * @param color the dye color
-     * @return the stained glass block state
-     */
     private static BlockState getStainedGlassState(DyeColor color) {
         return switch (color) {
             case WHITE -> Blocks.WHITE_STAINED_GLASS.defaultBlockState();
@@ -197,12 +166,6 @@ public final class SharedNmsBeaconBeamVisual extends SharedNmsVisual<BeaconBeamC
         };
     }
 
-    /**
-     * Converts a NamedTextColor to the closest DyeColor.
-     *
-     * @param color the named text color
-     * @return the corresponding dye color
-     */
     private static DyeColor toDyeColor(@NotNull NamedTextColor color) {
         if (color == NamedTextColor.WHITE) return DyeColor.WHITE;
         if (color == NamedTextColor.GOLD) return DyeColor.ORANGE;

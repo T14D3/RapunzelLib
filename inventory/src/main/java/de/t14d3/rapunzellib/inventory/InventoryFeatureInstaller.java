@@ -13,11 +13,6 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface InventoryFeatureInstaller {
 
-    /**
-     * Returns the platform this installer is associated with.
-     *
-     * @return the platform identifier
-     */
     @NotNull PlatformId platformId();
 
     /**

@@ -24,15 +24,7 @@ public record BlockPlacePost(
     RKey blockTypeKey,
     boolean cancelled
 ) implements GamePostEvent {
-    /**
-     * Creates a BlockPlacePost with a string block type key.
-     *
-     * @param player      the player who placed the block
-     * @param world       the world reference
-     * @param pos         the position
-     * @param blockTypeKey the block type key as a string
-     * @param cancelled   whether the placement was cancelled
-     */
+    
     public BlockPlacePost(RPlayer player, RWorldRef world, RBlockPos pos, String blockTypeKey, boolean cancelled) {
         this(player, world, pos, RKey.of(blockTypeKey), cancelled);
     }

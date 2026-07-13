@@ -7,4 +7,3 @@ public interface GameEventBridge extends AutoCloseable {
     @Override
     void close();
 }
-

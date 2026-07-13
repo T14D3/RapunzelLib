@@ -16,18 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @param <W> the wrapper type
  */
 public abstract class CachedWrapperStore<K, N, W> {
-    /** Concurrent cache mapping keys to wrapper instances */
     private final ConcurrentHashMap<K, W> cache = new ConcurrentHashMap<>();
 
-    /**
-     * Wraps or retrieves a cached wrapper for the given native handle.
-     * If no wrapper exists for the key, a new one is created. Otherwise the
-     * existing wrapper is updated with the new native handle.
-     *
-     * @param key          the cache key
-     * @param nativeHandle the native handle to wrap
-     * @return an existing or newly created wrapper
-     */
     protected final @NotNull W wrapCached(@NotNull K key, @NotNull N nativeHandle) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(nativeHandle, "nativeHandle");
@@ -40,19 +30,7 @@ public abstract class CachedWrapperStore<K, N, W> {
         });
     }
 
-    /**
-     * Creates a new wrapper for the given native handle.
-     *
-     * @param nativeHandle the native handle to wrap
-     * @return a new wrapper instance
-     */
     protected abstract @NotNull W createWrapper(@NotNull N nativeHandle);
 
-    /**
-     * Updates an existing wrapper with a new native handle.
-     *
-     * @param existingWrapper the existing wrapper to update
-     * @param nativeHandle    the new native handle
-     */
     protected abstract void updateWrapper(@NotNull W existingWrapper, @NotNull N nativeHandle);
 }

@@ -22,27 +22,20 @@ import java.util.concurrent.ConcurrentHashMap;
  * wrapper type to find a matching adapter for the requested view type.
  */
 public final class DefaultRNativeInterop implements MutableRNativeInterop {
-    /** The platform this interop belongs to */
     private final PlatformId platformId;
-    /** Map of native type -> (view type -> adapter) */
     private final ConcurrentHashMap<Class<?>, ConcurrentHashMap<Class<?>, RNativeViewAdapter<?, ?>>> adapters =
         new ConcurrentHashMap<>();
 
-    /**
-     * Creates a new interop for the given platform.
-     *
-     * @param platformId the platform identifier
-     */
     public DefaultRNativeInterop(@NotNull PlatformId platformId) {
         this.platformId = Objects.requireNonNull(platformId, "platformId");
     }
 
     /**
-     * Registers a view adapter that can project a native wrapper into a view type.
+     * Registers a view adapter for a specific native wrapper type and view type.
      *
-     * @param nativeType the native wrapper class
-     * @param viewType   the projected view type
-     * @param adapter    the adapter that performs the projection
+     * @param nativeType the native wrapper class to register the adapter for
+     * @param viewType   the view type the adapter produces
+     * @param adapter    the adapter instance
      * @param <N>        the native wrapper type
      * @param <T>        the view type
      */
@@ -60,12 +53,15 @@ public final class DefaultRNativeInterop implements MutableRNativeInterop {
     }
 
     /**
-     * Attempts to find a projected view of the given native wrapper.
+     * Finds a view for the given native wrapper by walking the type hierarchy.
      *
-     * @param nativeWrapper the native wrapper instance
-     * @param type          the desired view type
+     * <p>Resolution walks the superclass and interface hierarchy of the native
+     * wrapper's runtime type to find a registered adapter for the requested view type.</p>
+     *
+     * @param nativeWrapper the native wrapper object
+     * @param type          the requested view type
      * @param <T>           the view type
-     * @return an optional containing the view, or empty if not available
+     * @return an {@link Optional} containing the view, or empty if no adapter is found
      */
     @Override
     public <T> @NotNull Optional<T> findView(@NotNull RNative nativeWrapper, @NotNull Class<T> type) {
@@ -82,14 +78,6 @@ public final class DefaultRNativeInterop implements MutableRNativeInterop {
         return adapter.findView(nativeWrapper).map(type::cast);
     }
 
-    /**
-     * Walks the type hierarchy to find a matching adapter.
-     *
-     * @param nativeType the native wrapper class
-     * @param viewType   the requested view type
-     * @param <T>        the view type
-     * @return the matching adapter, or null if none found
-     */
     @SuppressWarnings("unchecked")
     private <T> RNativeViewAdapter<RNative, T> findAdapter(Class<?> nativeType, Class<T> viewType) {
         ArrayDeque<Class<?>> queue = new ArrayDeque<>();

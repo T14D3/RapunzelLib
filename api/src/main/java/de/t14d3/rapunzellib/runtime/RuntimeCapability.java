@@ -13,5 +13,6 @@ public enum RuntimeCapability {
     NBT,
     VISUALS,
     WORLDS,
-    BLOCKS
+    BLOCKS,
+    LIVETESTS
 }

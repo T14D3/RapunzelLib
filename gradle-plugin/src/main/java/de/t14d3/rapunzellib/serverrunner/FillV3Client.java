@@ -19,22 +19,22 @@ import java.util.HexFormat;
 import java.util.Map;
 import java.util.Objects;
 
-final class FillV3Client {
+public final class FillV3Client {
     private static final URI BASE = URI.create("https://fill.papermc.io/v3/");
     private static final String USER_AGENT = "RapunzelLib/FillV3Client (https://github.com/T14D3/RapunzelLib)";
 
     private final HttpClient http;
 
-    FillV3Client() {
+    public FillV3Client() {
         this.http = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)
             .connectTimeout(Duration.ofSeconds(20))
             .build();
     }
 
-    record ResolvedBuild(int build, String downloadName, String sha256, String url) {}
+    public record ResolvedBuild(int build, String downloadName, String sha256, String url) {}
 
-    String resolveLatestVersion(String project) throws IOException, InterruptedException {
+    public String resolveLatestVersion(String project) throws IOException, InterruptedException {
         Objects.requireNonNull(project, "project");
 
         // Fill v3 exposes a dedicated versions listing endpoint where the newest version is index 0.
@@ -65,7 +65,7 @@ final class FillV3Client {
         throw new IOException("No versions found for project " + project);
     }
 
-    ResolvedBuild resolveLatestBuild(String project, String version) throws IOException, InterruptedException {
+    public ResolvedBuild resolveLatestBuild(String project, String version) throws IOException, InterruptedException {
         Objects.requireNonNull(project, "project");
         Objects.requireNonNull(version, "version");
 
@@ -118,7 +118,7 @@ final class FillV3Client {
         return new ResolvedBuild(buildNumber, name, sha256, url);
     }
 
-    Path downloadJar(String project, String version, ResolvedBuild build, Path cacheDir) throws IOException, InterruptedException {
+    public Path downloadJar(String project, String version, ResolvedBuild build, Path cacheDir) throws IOException, InterruptedException {
         Objects.requireNonNull(build, "build");
         Objects.requireNonNull(cacheDir, "cacheDir");
 

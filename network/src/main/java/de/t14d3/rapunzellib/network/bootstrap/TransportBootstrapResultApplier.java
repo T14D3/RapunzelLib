@@ -68,9 +68,6 @@ public final class TransportBootstrapResultApplier {
         return effective;
     }
 
-    /**
-     * Registers a closeable resource in the context if non-null.
-     */
     private static void registerCloseable(RapunzelContext ctx, AutoCloseable closeable) {
         if (closeable != null) {
             ctx.registerCloseable(closeable);

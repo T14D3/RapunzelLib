@@ -32,11 +32,6 @@ public enum DyeColor {
         this.namedColor = namedColor;
     }
 
-    /**
-     * Returns the Adventure named text color for this dye color.
-     *
-     * @return the named text color
-     */
     public NamedTextColor adventureColor() {
         return namedColor;
     }

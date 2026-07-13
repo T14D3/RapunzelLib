@@ -36,42 +36,18 @@ public record BlockPlaceSnapshot(
         this(playerUuid, RBlockSnapshot.of(world, pos, blockTypeKey), cancelled);
     }
 
-    /**
-     * Creates a snapshot from raw world/position/type data.
-     *
-     * @param playerUuid    the player UUID
-     * @param world         the world reference
-     * @param pos           the block position
-     * @param blockTypeKey  the block type key
-     * @param cancelled     whether the placement was cancelled
-     */
     public BlockPlaceSnapshot(UUID playerUuid, RWorldRef world, RBlockPos pos, RKey blockTypeKey, boolean cancelled) {
         this(playerUuid, RBlockSnapshot.of(world, pos, blockTypeKey), cancelled);
     }
 
-    /**
-     * Returns the world reference from the block snapshot.
-     *
-     * @return the world
-     */
     public RWorldRef world() {
         return block.world();
     }
 
-    /**
-     * Returns the position from the block snapshot.
-     *
-     * @return the position
-     */
     public RBlockPos pos() {
         return block.pos();
     }
 
-    /**
-     * Returns the block type key from the block snapshot.
-     *
-     * @return the block type key
-     */
     public RKey blockTypeKey() {
         return block.blockTypeKey();
     }

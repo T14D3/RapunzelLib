@@ -72,13 +72,6 @@ public class RStringArgument<S extends RCommandSource> implements RArgument<S, S
         }
     }
     
-    /**
-     * Creates a required word argument.
-     * 
-     * @param name the argument name
-     * @param <S> the command source type
-     * @return a new word argument
-     */
     public static <S extends RCommandSource> RStringArgument<S> word(@NotNull String name) {
         return new Builder<S>(name)
             .type(StringType.SINGLE_WORD)
@@ -100,14 +93,6 @@ public class RStringArgument<S extends RCommandSource> implements RArgument<S, S
             .build();
     }
     
-    /**
-     * Creates an optional string argument with a default value.
-     * 
-     * @param name the argument name
-     * @param defaultValue the default value
-     * @param <S> the command source type
-     * @return a new string argument
-     */
     public static <S extends RCommandSource> RStringArgument<S> optional(@NotNull String name, @Nullable String defaultValue) {
         return new Builder<S>(name)
             .type(StringType.SINGLE_WORD)
@@ -150,22 +135,11 @@ public class RStringArgument<S extends RCommandSource> implements RArgument<S, S
         return input;
     }
     
-    /**
-     * Gets the string type for this argument.
-     * 
-     * @return the string type
-     */
     @NotNull
     public StringType getType() {
         return type;
     }
     
-    /**
-     * Sets suggestion providers for tab completion.
-     * 
-     * @param suggestions the list of suggestions
-     * @return this argument for chaining
-     */
     public RStringArgument<S> suggestions(@NotNull List<String> suggestions) {
         this.suggestions = suggestions;
         return this;

@@ -217,9 +217,6 @@ public class DistributedCacheManager implements AutoCloseable {
         return active;
     }
 
-    /**
-     * Handles an incoming cache invalidation message from another server.
-     */
     private void handleInvalidation(CacheInvalidationMessage invalidationMessage, String sourceServer) {
         if (invalidationMessage == null) {
             return;

@@ -12,6 +12,10 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * @deprecated Use {@link de.t14d3.rapunzellib.devrunner.DevRunnerBootstrap} instead.
+ */
+@Deprecated
 final class ServerRunnerPatches {
     record RegexReplace(String relativePath, String regex, String replacement) {}
 

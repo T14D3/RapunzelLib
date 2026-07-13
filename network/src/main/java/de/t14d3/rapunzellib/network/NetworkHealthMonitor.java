@@ -81,12 +81,6 @@ public final class NetworkHealthMonitor {
         );
     }
 
-    /**
-     * Normalizes a transport name for consistent keying.
-     *
-     * @param transport the transport name
-     * @return the normalized name, never null
-     */
     private static String normalize(String transport) {
         if (transport == null) {
             return "unknown";
@@ -95,9 +89,6 @@ public final class NetworkHealthMonitor {
         return trimmed.isBlank() ? "unknown" : trimmed;
     }
 
-    /**
-     * Tracks failure counts within a sliding time window.
-     */
     private static final class FailureWindow {
         private final long windowStart;
         private int failures;

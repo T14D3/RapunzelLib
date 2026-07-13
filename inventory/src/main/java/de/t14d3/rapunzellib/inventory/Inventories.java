@@ -18,11 +18,6 @@ import java.util.Optional;
  */
 public interface Inventories extends InventoryInterop {
 
-    /**
-     * Returns the platform this inventory service is bound to.
-     *
-     * @return the platform identifier
-     */
     @NotNull PlatformId platformId();
 
     /**

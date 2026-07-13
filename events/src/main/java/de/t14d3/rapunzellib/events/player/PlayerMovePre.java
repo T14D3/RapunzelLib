@@ -15,12 +15,6 @@ public final class PlayerMovePre extends BaseCancellablePreEvent {
     private final RLocation from;
     private final RLocation to;
 
-    /**
-     * Creates a new PlayerMovePre event.
-     * @param player the player who is moving
-     * @param from the location the player is moving from
-     * @param to the location the player is moving to
-     */
     public PlayerMovePre(RPlayer player, RLocation from, RLocation to) {
         this(player, from, to, false);
     }
@@ -39,26 +33,14 @@ public final class PlayerMovePre extends BaseCancellablePreEvent {
         setCancelled(isCancelled);
     }
 
-    /**
-     * Returns the player who is moving.
-     * @return the player
-     */
     public RPlayer player() {
         return player;
     }
 
-    /**
-     * Returns the location the player is moving from.
-     * @return the from location
-     */
     public RLocation from() {
         return from;
     }
 
-    /**
-     * Returns the location the player is moving to.
-     * @return the to location
-     */
     public RLocation to() {
         return to;
     }

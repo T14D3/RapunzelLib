@@ -154,20 +154,21 @@ public final class ConventionPluginSupport {
             project.getLogger().error("Loom not found!");
             return;
         }
+        project.getConfigurations().maybeCreate("minecraft");
         project.getDependencies().add("minecraft", library(project, "minecraft"));
         if (usesOfficialMojangMappings(project)) {
             Method mappingsMethod = firstZeroArgMethod(loom.getClass(), "officialMojangMappings");
             if (mappingsMethod != null) {
                 Object mappings = invoke(mappingsMethod, loom);
                 if (mappings != null) {
+                    project.getConfigurations().maybeCreate("mappings");
                     project.getDependencies().add("mappings", mappings);
                 }
             }
         }
-        project.getDependencies().add(
-            isFabricObfuscationDisabled(project) ? "implementation" : "modImplementation",
-            library(project, "fabric-loader")
-        );
+        String targetConfig = isFabricObfuscationDisabled(project) ? "implementation" : "modImplementation";
+        project.getConfigurations().maybeCreate(targetConfig);
+        project.getDependencies().add(targetConfig, library(project, "fabric-loader"));
     }
 
     public static boolean isFabricLoomEnabled(Project project) {
@@ -188,15 +189,31 @@ public final class ConventionPluginSupport {
             return;
         }
 
-        project.getConfigurations().named("modImplementation").configure(configuration ->
-            configuration.extendsFrom(fabricImplementation)
-        );
+        Configuration modImpl = project.getConfigurations().maybeCreate("modImplementation");
+        modImpl.extendsFrom(fabricImplementation);
     }
 
     public static void configureFabricLoomProperties(Project project) {
-        if (isFabricObfuscationDisabled(project)) {
-            project.getExtensions().getExtraProperties().set("fabric.loom.disableObfuscation", "true");
+        project.getExtensions().getExtraProperties().set(
+            "fabric.loom.disableObfuscation",
+            String.valueOf(isFabricObfuscationDisabled(project))
+        );
+    }
+
+    /**
+     * Returns the appropriate Fabric Loom plugin ID for the current Minecraft target.
+     *
+     * <p>Loom 1.16+ ships two plugin variants:
+     * <ul>
+     *   <li>{@code net.fabricmc.fabric-loom} - for non-obfuscated versions (Minecraft 26.1+)
+     *   <li>{@code net.fabricmc.fabric-loom-remap} - for obfuscated versions (1.21.11 or older)
+     * </ul>
+     */
+    public static String fabricLoomPluginId(Project project) {
+        if (requiresOfficialMojangMappings(version(project, "minecraft"))) {
+            return "net.fabricmc.fabric-loom-remap";
         }
+        return "net.fabricmc.fabric-loom";
     }
 
     public static void configureFabricWithoutLoom(Project project) {
@@ -256,6 +273,20 @@ public final class ConventionPluginSupport {
         return libs(project).findVersion(alias).map(version -> version.getRequiredVersion()).orElseThrow();
     }
 
+    /**
+     * Determines whether a Minecraft version needs the explicit {@code officialMojangMappings()} call
+     * and the {@code net.fabricmc.fabric-loom-remap} plugin.
+     *
+     * <p>Loom 1.16+ ships two plugin IDs:
+     * <ul>
+     *   <li>{@code net.fabricmc.fabric-loom} - for non-obfuscated versions (Minecraft 26.1+)
+     *   <li>{@code net.fabricmc.fabric-loom-remap} - for obfuscated versions (1.21.11 or older)
+     * </ul>
+     *
+     * Older versions (1.21.11 and below) still ship an obfuscated game JAR and need the
+     * remap-based pipeline.  Newer versions ship merged/official-mapped JARs where Loom
+     * auto-configures Mojang mappings natively.
+     */
     static boolean requiresOfficialMojangMappings(String minecraftVersion) {
         String[] segments = minecraftVersion.split("\\.");
         int[] parts = new int[segments.length];

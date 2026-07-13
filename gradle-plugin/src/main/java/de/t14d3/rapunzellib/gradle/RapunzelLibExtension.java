@@ -21,6 +21,7 @@ public abstract class RapunzelLibExtension {
     private final NamedDomainObjectContainer<RegistryCatalogSpec> registryCatalogs;
     private final RNbtSchemaGenerationExtension rNbtSchema;
     private final MultiVersionExtension multiVersion;
+    private final ContextWrapperGenerationExtension contextWrapper;
 
     @Inject
     public RapunzelLibExtension(ObjectFactory objects) {
@@ -31,6 +32,7 @@ public abstract class RapunzelLibExtension {
         );
         this.rNbtSchema = objects.newInstance(RNbtSchemaGenerationExtension.class);
         this.multiVersion = objects.newInstance(MultiVersionExtension.class);
+        this.contextWrapper = objects.newInstance(ContextWrapperGenerationExtension.class);
     }
 
     public abstract RegularFileProperty getMessagesFile();
@@ -78,10 +80,14 @@ public RNbtSchemaGenerationExtension getRNbtSchema() {
 }
 
 public MultiVersionExtension getMultiVersion() {
-    return multiVersion;
-}
+        return multiVersion;
+    }
 
-public void keyCatalog(Action<? super KeyCatalogGenerationExtension> action) {
+    public ContextWrapperGenerationExtension getContextWrapper() {
+        return contextWrapper;
+    }
+
+    public void keyCatalog(Action<? super KeyCatalogGenerationExtension> action) {
     action.execute(keyCatalog);
 }
 
@@ -94,10 +100,14 @@ public void rNbtSchema(Action<? super RNbtSchemaGenerationExtension> action) {
 }
 
 public void multiVersion(Action<? super MultiVersionExtension> action) {
-    action.execute(multiVersion);
-}
+        action.execute(multiVersion);
+    }
 
-public void applyDefaultConventions(Project project) {
+    public void contextWrapper(Action<? super ContextWrapperGenerationExtension> action) {
+        action.execute(contextWrapper);
+    }
+
+    public void applyDefaultConventions(Project project) {
     getMessagesFile().convention(project.getLayout().getProjectDirectory().file("src/main/resources/messages.yml"));
     getAdditionalMessagesFiles().convention(List.of());
     getFailOnUnusedKeys().convention(true);
@@ -123,5 +133,6 @@ public void applyDefaultConventions(Project project) {
     keyCatalog.applyDefaultConventions(project);
     rNbtSchema.applyDefaultConventions(project);
     registryCatalogs.configureEach(spec -> spec.applyDefaultConventions(project));
+    contextWrapper.applyDefaultConventions(project);
 }
 }

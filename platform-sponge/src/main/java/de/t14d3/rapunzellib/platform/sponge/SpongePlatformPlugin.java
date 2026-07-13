@@ -24,7 +24,7 @@ public final class SpongePlatformPlugin {
 
     @Listener
     public void onServerStarted(StartedEngineEvent<Server> event) {
-        SpongeRapunzelBootstrap.bootstrapHandle(container, dataDirectory, event.engine());
+        SpongeRapunzelBootstrap.bootstrapPlatform(container, dataDirectory, event.engine());
     }
 
     @Listener

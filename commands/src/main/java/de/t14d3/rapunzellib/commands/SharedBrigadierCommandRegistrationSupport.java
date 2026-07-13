@@ -66,13 +66,6 @@ public final class SharedBrigadierCommandRegistrationSupport {
         return true;
     }
 
-    /**
-     * Type-safe registration of shared commands.
-     *
-     * @param <S>        the Brigadier source type
-     * @param dispatcher the Brigadier command dispatcher
-     * @param registrar  the shared registrar
-     */
     @SuppressWarnings("unchecked")
     private static <S> void register(
         @NotNull CommandDispatcher<S> dispatcher,

@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class PaperWorlds extends SharedWorldsCore<PaperWorld> {
     private final ConcurrentHashMap<ServerLevel, RWorldRef> worldRefCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ServerLevel, UUID> worldUuidCache = new ConcurrentHashMap<>();
 
     public PaperWorlds(MinecraftServer server) {
         super(server);
@@ -23,7 +24,7 @@ public final class PaperWorlds extends SharedWorldsCore<PaperWorld> {
 
     @Override
     protected @NotNull PaperWorld createWorldWrapper(@NotNull ServerLevel level) {
-        return new PaperWorld(level, this);
+        return new PaperWorld(level, this, cachedWorldUuid(level));
     }
 
     @Override
@@ -40,9 +41,17 @@ public final class PaperWorlds extends SharedWorldsCore<PaperWorld> {
         });
     }
 
+    /**
+     * Returns the cached UUID for the given world, resolving it once via
+     * {@link PaperHandleBridge#worldUuid(ServerLevel)}.
+     */
+    public @NotNull UUID cachedWorldUuid(@NotNull ServerLevel level) {
+        return worldUuidCache.computeIfAbsent(level, PaperHandleBridge::worldUuid);
+    }
+
     @Override
     public @NotNull Optional<UUID> worldUuid(@NotNull ServerLevel level) {
-        return Optional.of(PaperHandleBridge.worldUuid(level));
+        return Optional.of(cachedWorldUuid(level));
     }
 
     @Override

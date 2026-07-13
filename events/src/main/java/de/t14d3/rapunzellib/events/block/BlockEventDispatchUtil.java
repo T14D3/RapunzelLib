@@ -97,15 +97,15 @@ public final class BlockEventDispatchUtil {
      * Dispatches a {@link BlockPhysicsPre} event (and optionally a {@link BlockPhysicsPost}
      * if cancelled) and returns whether the event was denied.
      *
-     * @param bus           the event bus
-     * @param needsPre      whether to dispatch the pre-event
-     * @param needsPost     whether to dispatch the post-event if cancelled
-     * @param worldKey      the world key
-     * @param x             the x coordinate
-     * @param y             the y coordinate
-     * @param z             the z coordinate
-     * @param blockTypeKey  the block type key
-     * @param changedTypeId the type ID of the changed block
+     * @param bus            the event bus
+     * @param needsPre       whether to dispatch the pre-event
+     * @param needsPost      whether to dispatch the post-event if cancelled
+     * @param worldKey       the world key
+     * @param x              the x coordinate
+     * @param y              the y coordinate
+     * @param z              the z coordinate
+     * @param blockTypeKey   the block type key (the block undergoing physics)
+     * @param changedTypeKey the block type that changed, triggering this physics update
      * @return true if the event was denied
      */
     public static boolean dispatchBlockPhysicsPre(
@@ -117,18 +117,18 @@ public final class BlockEventDispatchUtil {
             int y,
             int z,
             RKey blockTypeKey,
-            int changedTypeId
+            RKey changedTypeKey
     ) {
         boolean cancelled = false;
 
         if (needsPre) {
-            BlockPhysicsPre pre = new BlockPhysicsPre(worldRef(worldKey), blockPos(x, y, z), blockTypeKey, changedTypeId);
+            BlockPhysicsPre pre = new BlockPhysicsPre(worldRef(worldKey), blockPos(x, y, z), blockTypeKey, changedTypeKey);
             bus.dispatchPre(pre);
             cancelled = pre.isDenied();
         }
 
         if (cancelled && needsPost) {
-            bus.dispatchPost(new BlockPhysicsPost(worldRef(worldKey), blockPos(x, y, z), blockTypeKey, changedTypeId, true));
+            bus.dispatchPost(new BlockPhysicsPost(worldRef(worldKey), blockPos(x, y, z), blockTypeKey, changedTypeKey, true));
         }
 
         return cancelled;
@@ -137,14 +137,14 @@ public final class BlockEventDispatchUtil {
     /**
      * Dispatches a {@link BlockPhysicsPost} event.
      *
-     * @param bus           the event bus
-     * @param worldKey      the world key
-     * @param x             the x coordinate
-     * @param y             the y coordinate
-     * @param z             the z coordinate
-     * @param blockTypeKey  the block type key
-     * @param changedTypeId the type ID of the changed block
-     * @param cancelled     whether the physics update was cancelled
+     * @param bus            the event bus
+     * @param worldKey       the world key
+     * @param x              the x coordinate
+     * @param y              the y coordinate
+     * @param z              the z coordinate
+     * @param blockTypeKey   the block type key
+     * @param changedTypeKey the block type that changed, triggering this physics update
+     * @param cancelled      whether the physics update was cancelled
      */
     public static void dispatchBlockPhysicsPost(
             GameEventBus bus,
@@ -153,22 +153,16 @@ public final class BlockEventDispatchUtil {
             int y,
             int z,
             RKey blockTypeKey,
-            int changedTypeId,
+            RKey changedTypeKey,
             boolean cancelled
     ) {
-        bus.dispatchPost(new BlockPhysicsPost(worldRef(worldKey), blockPos(x, y, z), blockTypeKey, changedTypeId, cancelled));
+        bus.dispatchPost(new BlockPhysicsPost(worldRef(worldKey), blockPos(x, y, z), blockTypeKey, changedTypeKey, cancelled));
     }
 
-    /**
-     * Creates an {@link RWorldRef} from a world key.
-     */
     private static RWorldRef worldRef(RKey worldKey) {
         return new RWorldRef(worldKey.asString(), worldKey);
     }
 
-    /**
-     * Creates an {@link RBlockPos} from coordinates.
-     */
     private static RBlockPos blockPos(int x, int y, int z) {
         return new RBlockPos(x, y, z);
     }

@@ -5,23 +5,13 @@ import de.t14d3.rapunzellib.bootstrap.BoundPlatformBootstrapHost;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Objects;
-
 public final class PaperPlatformBootstrapHost extends BoundPlatformBootstrapHost<JavaPlugin> {
-    public static final String PLUGIN_NAME = "RapunzelLibPlatformPaper";
+    public static final String PLUGIN_NAME = "RapunzelLib";
 
     private static final PaperPlatformBootstrapHost INSTANCE = new PaperPlatformBootstrapHost();
 
     private PaperPlatformBootstrapHost() {
         super(PLUGIN_NAME);
-    }
-
-    public static @NotNull PaperPlatformBootstrapHost prepareBootstrap(@NotNull JavaPlugin plugin) {
-        Objects.requireNonNull(plugin, "plugin");
-        if (plugin instanceof PaperPlatformPlugin) {
-            return registerCanonicalHost(plugin);
-        }
-        return INSTANCE;
     }
 
     public static @NotNull PaperPlatformBootstrapHost registerCanonicalHost(@NotNull JavaPlugin plugin) {
@@ -36,6 +26,19 @@ public final class PaperPlatformBootstrapHost extends BoundPlatformBootstrapHost
 
     public void bindPlugin(@NotNull JavaPlugin plugin) {
         bindOwner(plugin);
+    }
+
+    /**
+     * Returns the bound Paper platform plugin instance.
+     *
+     * @return the platform plugin
+     * @throws IllegalStateException if no plugin has been bound yet
+     */
+    public static @NotNull JavaPlugin getPlugin() {
+        return INSTANCE.boundOwner()
+                .orElseThrow(() -> new IllegalStateException(
+                        "PaperPlatformPlugin has not been bound yet. "
+                                + "Ensure PaperPlatformPlugin.onLoad() has been called."));
     }
 
     public void onPluginDisable(@NotNull JavaPlugin plugin) {

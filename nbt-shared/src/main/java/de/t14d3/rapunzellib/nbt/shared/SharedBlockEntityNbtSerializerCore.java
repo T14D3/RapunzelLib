@@ -62,12 +62,6 @@ public final class SharedBlockEntityNbtSerializerCore<L extends SharedBlockEntit
         }
     }
 
-    /**
-     * Resolves the block entity type key from the registry.
-     *
-     * @param type the block entity type
-     * @return the type key
-     */
     private static @NotNull RKey typeKey(@NotNull BlockEntityType<?> type) {
         var key = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(Objects.requireNonNull(type, "type"));
         if (key == null) {
@@ -76,31 +70,14 @@ public final class SharedBlockEntityNbtSerializerCore<L extends SharedBlockEntit
         return RKey.of(key.toString());
     }
 
-    /**
-     * Gets the registry access for a block entity.
-     *
-     * @param blockEntity the block entity
-     * @return the registry provider
-     */
     private static @NotNull HolderLookup.Provider registries(@NotNull BlockEntity blockEntity) {
         return blockEntity.getLevel() == null ? fallbackRegistries() : blockEntity.getLevel().registryAccess();
     }
 
-    /**
-     * Provides a fallback registry when the block entity has no level.
-     *
-     * @return the frozen registry provider
-     */
     private static @NotNull HolderLookup.Provider fallbackRegistries() {
         return RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY).freeze();
     }
 
-    /**
-     * Gets the display name for a block entity.
-     *
-     * @param blockEntity the block entity
-     * @return the type name as string
-     */
     private static @NotNull String blockEntityName(@NotNull BlockEntity blockEntity) {
         return typeKey(blockEntity.getType()).asString();
     }

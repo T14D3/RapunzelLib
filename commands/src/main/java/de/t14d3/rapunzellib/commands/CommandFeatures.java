@@ -19,9 +19,7 @@ import java.util.Optional;
  * </p>
  */
 public final class CommandFeatures {
-    /**
-     * The installer registry for resolving platform-specific command feature installers.
-     */
+    
     private static final FeatureInstallerRegistry<CommandFeatureInstaller> INSTALLER_REGISTRY = FeatureInstallerRegistry.create(
         CommandFeatureInstaller.class,
         CommandFeatureInstaller::platformId,
@@ -58,30 +56,15 @@ public final class CommandFeatures {
         );
     }
 
-    /**
-     * Gets (or installs) the command source adapters.
-     *
-     * @return the command source adapters
-     */
     public static @NotNull CommandSourceAdapters adapters() {
         install();
         return Rapunzel.context().services().get(CommandSourceAdapters.class);
     }
 
-    /**
-     * Gets (or installs) the command service.
-     *
-     * @return the command service
-     */
     public static @NotNull RCommandService commands() {
         return install();
     }
 
-    /**
-     * Gets the optional shared Brigadier command registrar.
-     *
-     * @return the registrar, or empty if not available
-     */
     public static @NotNull Optional<SharedBrigadierCommandRegistrar<?>> brigadierRegistrar() {
         @SuppressWarnings("rawtypes")
         Optional<SharedBrigadierCommandRegistrar> registrar = Rapunzel.context().services().find(SharedBrigadierCommandRegistrar.class);

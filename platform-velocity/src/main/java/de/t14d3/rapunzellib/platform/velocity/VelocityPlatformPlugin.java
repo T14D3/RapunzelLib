@@ -6,7 +6,6 @@ import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
-import de.t14d3.rapunzellib.bootstrap.BootstrapHandle;
 import org.slf4j.Logger;
 
 import java.nio.file.Path;
@@ -25,7 +24,7 @@ public final class VelocityPlatformPlugin {
 
     @Subscribe
     public void onProxyInitialize(ProxyInitializeEvent event) {
-        VelocityRapunzelBootstrap.bootstrapHandle(this, proxy, logger, dataDirectory);
+        VelocityRapunzelBootstrap.bootstrapPlatform(this, proxy, logger, dataDirectory);
     }
 
     @Subscribe

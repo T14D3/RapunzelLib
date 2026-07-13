@@ -12,6 +12,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.jar.JarFile;
 
+/**
+ * @deprecated Use {@link de.t14d3.rapunzellib.devrunner.DevRunnerBootstrap} instead.
+ */
+@Deprecated
 final class ServerBootstrapSupport {
     private static final SecureRandom RNG = new SecureRandom();
     private static final String SECRET_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

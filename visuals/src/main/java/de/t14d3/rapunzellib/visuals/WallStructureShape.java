@@ -17,13 +17,6 @@ final class WallStructureShape implements BlockStructureShape {
     private final RWorldRef world;
     private final float thickness;
 
-    /**
-     * Creates a wall structure shape from two corner positions.
-     *
-     * @param corner1       the first corner
-     * @param corner2       the second corner
-     * @param worldLocation a reference location to derive the world
-     */
     WallStructureShape(@NotNull RBlockPos corner1, @NotNull RBlockPos corner2, @NotNull RLocation worldLocation) {
         this.world = worldLocation.world();
         this.corner1 = corner1;

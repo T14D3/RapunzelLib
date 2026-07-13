@@ -67,13 +67,6 @@ public final class SharedInventoryFeatureInstallerSupport {
         return List.of(containerFactory(platformId, itemAdapter), menuFactory(platformId, itemAdapter));
     }
 
-    /**
-     * Creates a wrapper factory for {@link Container}.
-     *
-     * @param platformId  the platform identifier
-     * @param itemAdapter the item stack adapter
-     * @return the container wrapper factory
-     */
     private static @NotNull InventoryWrapperFactory<Container> containerFactory(
         @NotNull PlatformId platformId,
         @NotNull ItemStackAdapter<ItemStack> itemAdapter
@@ -94,13 +87,6 @@ public final class SharedInventoryFeatureInstallerSupport {
         );
     }
 
-    /**
-     * Creates a wrapper factory for {@link AbstractContainerMenu}.
-     *
-     * @param platformId  the platform identifier
-     * @param itemAdapter the item stack adapter
-     * @return the menu wrapper factory
-     */
     private static @NotNull InventoryWrapperFactory<AbstractContainerMenu> menuFactory(
         @NotNull PlatformId platformId,
         @NotNull ItemStackAdapter<ItemStack> itemAdapter

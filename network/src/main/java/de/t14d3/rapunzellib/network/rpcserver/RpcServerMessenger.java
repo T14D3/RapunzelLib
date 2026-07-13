@@ -112,9 +112,6 @@ public class RpcServerMessenger implements Messenger, AutoCloseable {
  startServer();
  }
 
- /**
- * Starts the server socket and accept thread.
- */
  private void startServer() {
  if (running.compareAndSet(false, true)) {
  try {
@@ -144,9 +141,6 @@ public class RpcServerMessenger implements Messenger, AutoCloseable {
  }
  }
 
- /**
- * Main accept loop for incoming connections.
- */
  private void runAcceptLoop() {
  while (running.get() && serverSocket != null && !serverSocket.isClosed()) {
  try {
@@ -314,9 +308,6 @@ public class RpcServerMessenger implements Messenger, AutoCloseable {
  return clients.containsKey(serverName);
  }
 
- /**
- * Delivers a message to local registered listeners.
- */
  private void deliverToLocalListeners(@NotNull String channel, @NotNull String data, @NotNull String sourceServer) {
  List<MessageListener> list = listeners.get(channel);
  if (list == null || list.isEmpty()) {
@@ -332,9 +323,6 @@ public class RpcServerMessenger implements Messenger, AutoCloseable {
  }
  }
 
- /**
- * Closes all client connections.
- */
  private void closeAllClients() {
  synchronized (clients) {
  for (BackendClientHandler client : clients.values()) {

@@ -25,13 +25,9 @@ import java.util.function.Supplier;
 public abstract class AbstractTypeRegistry<H, W extends RRegistryTypeHandle<H>, V extends RRegistryType>
     extends CachedRegistryWrappers<H, W>
     implements RTypeRegistry<V> {
-    /** Looks up a native handle by key */
     private final Function<? super RKey, ? extends H> handleLookup;
-    /** Supplies all native handles */
     private final Supplier<? extends Iterable<? extends H>> entriesSupplier;
-    /** Extracts the registry key from a handle */
     private final Function<? super H, RKey> keyResolver;
-    /** The view type class for casting */
     private final Class<V> viewType;
 
     /**

@@ -19,12 +19,6 @@ final class DefaultInventories implements Inventories {
     private final PlatformId platformId;
     private final List<InventoryWrapperFactory<?>> wrapperFactories;
 
-    /**
-     * Constructs a new {@code DefaultInventories} instance.
-     *
-     * @param platformId       the platform identifier
-     * @param wrapperFactories the list of wrapper factories to delegate to
-     */
     DefaultInventories(@NotNull PlatformId platformId, @NotNull List<? extends InventoryWrapperFactory<?>> wrapperFactories) {
         this.platformId = Objects.requireNonNull(platformId, "platformId");
         this.wrapperFactories = List.copyOf(Objects.requireNonNull(wrapperFactories, "wrapperFactories"));

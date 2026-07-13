@@ -94,9 +94,9 @@ final class BootstrapServicesRegistryTest {
         assertSame(itemTypes, registries.registry(RRegistries.ITEM_TYPES));
         assertSame(blockTypes, registries.registry(RRegistries.BLOCK_TYPES));
 
-        assertInstanceOf(RegistryAccessBackedEntityTypeRegistry.class, context.services().get(REntityTypeRegistry.class));
-        assertInstanceOf(RegistryAccessBackedItemTypeRegistry.class, context.services().get(RItemTypeRegistry.class));
-        assertInstanceOf(RegistryAccessBackedBlockTypeRegistry.class, context.services().get(RBlockTypeRegistry.class));
+        assertInstanceOf(RegistryAccessBackedEntityTypeRegistry.class, context.sharedRuntime().get(REntityTypeRegistry.class));
+        assertInstanceOf(RegistryAccessBackedItemTypeRegistry.class, context.sharedRuntime().get(RItemTypeRegistry.class));
+        assertInstanceOf(RegistryAccessBackedBlockTypeRegistry.class, context.sharedRuntime().get(RBlockTypeRegistry.class));
         assertNotSame(entityTypes, context.entityTypes());
         assertNotSame(itemTypes, context.itemTypes());
         assertNotSame(blockTypes, context.blockTypes());
@@ -137,9 +137,9 @@ final class BootstrapServicesRegistryTest {
         assertSame(registries, context.registries());
         assertSame(registries, context.services().get(BridgedRegistryAccess.class));
         assertEquals(List.of(RRegistries.ENTITY_TYPES, RRegistries.ITEM_TYPES, RRegistries.BLOCK_TYPES), registries.registryKeys());
-        assertInstanceOf(RegistryAccessBackedEntityTypeRegistry.class, context.services().get(REntityTypeRegistry.class));
-        assertInstanceOf(RegistryAccessBackedItemTypeRegistry.class, context.services().get(RItemTypeRegistry.class));
-        assertInstanceOf(RegistryAccessBackedBlockTypeRegistry.class, context.services().get(RBlockTypeRegistry.class));
+        assertInstanceOf(RegistryAccessBackedEntityTypeRegistry.class, context.sharedRuntime().get(REntityTypeRegistry.class));
+        assertInstanceOf(RegistryAccessBackedItemTypeRegistry.class, context.sharedRuntime().get(RItemTypeRegistry.class));
+        assertInstanceOf(RegistryAccessBackedBlockTypeRegistry.class, context.sharedRuntime().get(RBlockTypeRegistry.class));
         assertSame(zombie, context.entityTypes().require(zombie.key()));
         assertSame(apple, context.itemTypes().require(apple.key()));
         assertSame(stone, context.blockTypes().require(stone.key()));

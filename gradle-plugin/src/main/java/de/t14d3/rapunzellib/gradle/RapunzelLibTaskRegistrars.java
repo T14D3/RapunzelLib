@@ -8,6 +8,7 @@ import de.t14d3.rapunzellib.gradle.tasks.RunServersTask;
 import de.t14d3.rapunzellib.gradle.tasks.ValidateMessagesTask;
 import de.t14d3.rapunzellib.gradle.tasks.VerifyInstallerWiringTask;
 import de.t14d3.rapunzellib.gradle.tasks.VerifySharedParityTask;
+import de.t14d3.rapunzellib.gradle.tasks.GenerateContextWrapperTask;
 import org.gradle.api.Project;
 import org.gradle.api.tasks.TaskProvider;
 
@@ -118,6 +119,47 @@ public final class RapunzelLibTaskRegistrars {
         project.getTasks().register("rapunzellibVerifySharedParity", VerifySharedParityTask.class, task -> {
             task.setGroup("verification");
             task.setDescription("Checks Fabric/NeoForge modules stay aligned on minecraft + mappings assumptions.");
+        });
+    }
+
+    public static TaskProvider<DevRunnerTask> registerDevRunnerTask(Project project, DevRunnerExtension devRunnerExtension) {
+        return project.getTasks().register("rapunzellibDevRun", DevRunnerTask.class, task -> {
+            task.setGroup("run");
+            task.setDescription("Runs a dev environment with configurable server topology via DevRunner.");
+            task.setExtension(devRunnerExtension);
+        });
+    }
+
+    public static TaskProvider<DevRunnerTask> registerDevRunnerPerfTask(Project project, DevRunnerExtension devRunnerExtension) {
+        return project.getTasks().register("rapunzellibDevRunPerf", DevRunnerTask.class, task -> {
+            task.setGroup("run");
+            task.setDescription("Runs a dev environment with JFR profiling enabled via DevRunner.");
+            task.setExtension(devRunnerExtension);
+            task.getExtension().getJfrEnabled().set(true);
+        });
+    }
+
+    public static TaskProvider<GenerateContextWrapperTask> registerContextWrapperTask(
+        Project project, RapunzelLibExtension extension
+    ) {
+        // Register task lazily - no configuration action, to avoid Gradle 9.x
+        // restriction on NamedDomainObjectProvider.configure during plugin resolution.
+        return project.getTasks().register(
+            "rapunzellibGenerateContextWrapper", GenerateContextWrapperTask.class
+        );
+    }
+
+    public static void configureContextWrapperTask(
+        Project project, RapunzelLibExtension extension,
+        TaskProvider<GenerateContextWrapperTask> taskProvider
+    ) {
+        taskProvider.configure(task -> {
+            task.setGroup("rapunzellib");
+            task.setDescription("Generates a per-project static wrapper around RapunzelContext.");
+
+            task.getPackageName().convention(extension.getContextWrapper().getPackageName());
+            task.getClassName().convention(extension.getContextWrapper().getClassName());
+            task.getOutputDir().convention(extension.getContextWrapper().getOutputDir());
         });
     }
 }

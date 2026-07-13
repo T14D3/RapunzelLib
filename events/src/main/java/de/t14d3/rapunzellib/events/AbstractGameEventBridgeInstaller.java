@@ -17,12 +17,6 @@ public abstract class AbstractGameEventBridgeInstaller implements GameEventBridg
     private final PlatformId platformId;
     private final GameEventSupportManifest supportManifest;
 
-    /**
-     * Constructs a new abstract bridge installer.
-     *
-     * @param platformId      the platform identifier
-     * @param supportManifest the support manifest for this platform
-     */
     protected AbstractGameEventBridgeInstaller(
         @NotNull PlatformId platformId,
         @NotNull GameEventSupportManifest supportManifest

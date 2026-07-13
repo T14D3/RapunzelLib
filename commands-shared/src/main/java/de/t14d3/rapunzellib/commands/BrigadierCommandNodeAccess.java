@@ -18,11 +18,11 @@ import java.util.Set;
  * via reflection to support runtime command un-registration.
  */
 final class BrigadierCommandNodeAccess {
-    /** Reflective handle to {@link CommandNode#children}. */
+    
     private static final Field CHILDREN = field("children");
-    /** Reflective handle to {@link CommandNode#literals}. */
+    
     private static final Field LITERALS = field("literals");
-    /** Reflective handle to {@link CommandNode#arguments}. */
+    
     private static final Field ARGUMENTS = field("arguments");
 
     private BrigadierCommandNodeAccess() {
@@ -46,12 +46,6 @@ final class BrigadierCommandNodeAccess {
         }
     }
 
-    /**
-     * Removes a single command label from the root node.
-     *
-     * @param root  the root command node
-     * @param label the command label to remove
-     */
     private static void removeCommand(@NotNull RootCommandNode<?> root, @NotNull String label) {
         if (label.isBlank()) {
             return;
@@ -77,12 +71,6 @@ final class BrigadierCommandNodeAccess {
         return (Map<String, CommandNode<?>>) get(ARGUMENTS, root);
     }
 
-    /**
-     * Removes an entry (and any namespaced variants) from the given map.
-     *
-     * @param map   the node map
-     * @param label the label to remove
-     */
     private static void remove(@NotNull Map<String, CommandNode<?>> map, @NotNull String label) {
         map.remove(label);
         for (String key : namespacedKeys(map.keySet(), label)) {
@@ -90,13 +78,6 @@ final class BrigadierCommandNodeAccess {
         }
     }
 
-    /**
-     * Finds keys in the collection that are namespaced variants of the given label.
-     *
-     * @param keys  the existing keys
-     * @param label the label to match after the namespace separator
-     * @return the matching namespaced keys
-     */
     private static @NotNull Set<String> namespacedKeys(@NotNull Collection<String> keys, @NotNull String label) {
         Set<String> matches = new LinkedHashSet<>();
         for (String key : keys) {
@@ -111,13 +92,6 @@ final class BrigadierCommandNodeAccess {
         return matches;
     }
 
-    /**
-     * Retrieves a declared {@link Field} by name and makes it accessible.
-     *
-     * @param name the field name
-     * @return the accessible field
-     * @throws IllegalStateException if the field cannot be found
-     */
     private static @NotNull Field field(@NotNull String name) {
         try {
             Field field = CommandNode.class.getDeclaredField(name);
@@ -128,14 +102,6 @@ final class BrigadierCommandNodeAccess {
         }
     }
 
-    /**
-     * Reads the value of a field from the given target object.
-     *
-     * @param field  the field to read
-     * @param target the target object
-     * @return the field value
-     * @throws IllegalStateException if the field cannot be read
-     */
     private static Object get(@NotNull Field field, @NotNull Object target) {
         try {
             return field.get(target);

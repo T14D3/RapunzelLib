@@ -228,7 +228,7 @@ final class TransportSelectionPlannerTest {
         assertInstanceOf(CompositeMessenger.class, selected);
         selected.registerListener("channel", (channel, data, senderServer) -> {
         });
-        assertEquals(1, sharedFallback.listenerRegistrations);
+        assertEquals(1, plugin.listenerRegistrations);
     }
 
     private static Messenger select(

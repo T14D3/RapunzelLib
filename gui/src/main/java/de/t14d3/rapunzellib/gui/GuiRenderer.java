@@ -14,18 +14,9 @@ import java.util.Set;
  * </p>
  */
 public interface GuiRenderer {
-    /**
-     * Returns the unique name of this renderer.
-     *
-     * @return the renderer name
-     */
+    
     @NotNull String name();
 
-    /**
-     * Returns the set of capabilities this renderer supports.
-     *
-     * @return an immutable set of capabilities
-     */
     @NotNull Set<GuiCapability> capabilities();
 
     /**
@@ -41,7 +32,7 @@ public interface GuiRenderer {
      *
      * @param gui     the GUI to render
      * @param player  the target player
-     * @param context the render context
+     * @param context the render context with capability-specific settings
      */
     void render(@NotNull Gui gui, @NotNull RPlayer player, @NotNull RenderContext context);
 

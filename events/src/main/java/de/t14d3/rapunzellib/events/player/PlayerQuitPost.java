@@ -12,15 +12,9 @@ import java.util.UUID;
  * @param name the player's name
  */
 public record PlayerQuitPost(UUID uuid, String name) implements GamePostEvent {
-    /**
-     * Creates a new player quit post-event.
-     *
-     * @param uuid the player's UUID
-     * @param name the player's name
-     */
+    
     public PlayerQuitPost(UUID uuid, String name) {
         this.uuid = Objects.requireNonNull(uuid, "uuid");
         this.name = Objects.requireNonNull(name, "name");
     }
 }
-

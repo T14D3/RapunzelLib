@@ -15,11 +15,6 @@ import java.util.Optional;
  */
 public interface PlayerInventory {
 
-    /**
-     * Returns the main player inventory (hotbar + 27 main slots).
-     *
-     * @return the main inventory
-     */
     @NotNull RInventory inventory();
 
     /**
@@ -29,11 +24,6 @@ public interface PlayerInventory {
      */
     @NotNull RInventory armor();
 
-    /**
-     * Returns the player's ender chest inventory.
-     *
-     * @return the ender chest inventory
-     */
     @NotNull RInventory enderChest();
 
     /**

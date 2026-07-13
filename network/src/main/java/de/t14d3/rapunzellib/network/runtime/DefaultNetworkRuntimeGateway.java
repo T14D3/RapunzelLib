@@ -234,9 +234,6 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
         }
     }
 
-    /**
-     * Sends an RPC error response to a specific server.
-     */
     private void sendRpcError(String requestId, String sourceServer, String message) {
         try {
             publishToServer(
@@ -255,18 +252,12 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
         }
     }
 
-    /**
-     * Throws if the gateway has been closed.
-     */
     private void ensureOpen() {
         if (closed) {
             throw new IllegalStateException("NetworkRuntimeGateway is closed");
         }
     }
 
-    /**
-     * A managed subscription that automatically tracks and cleans up.
-     */
     private final class ManagedSubscription implements Subscription {
         private final NetworkEventBus.Subscription delegate;
         private volatile boolean closed;

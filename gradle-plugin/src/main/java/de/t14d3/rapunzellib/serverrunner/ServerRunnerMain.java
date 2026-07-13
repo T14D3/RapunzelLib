@@ -5,6 +5,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 
+/**
+ * @deprecated Use {@link de.t14d3.rapunzellib.devrunner.DevRunnerMain} instead.
+ */
+@Deprecated
 public final class ServerRunnerMain {
     private ServerRunnerMain() {
     }

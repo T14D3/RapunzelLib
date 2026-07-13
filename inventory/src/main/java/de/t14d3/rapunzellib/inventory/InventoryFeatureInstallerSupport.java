@@ -88,7 +88,6 @@ public final class InventoryFeatureInstallerSupport {
         };
     }
 
-
     /**
      * Checks whether the given item represents an "empty" or "air" slot.
      *
@@ -129,13 +128,7 @@ public final class InventoryFeatureInstallerSupport {
      */
     @FunctionalInterface
     public interface SlotWriter<H, N> {
-        /**
-         * Sets the item at the specified slot in the native handle.
-         *
-         * @param handle the native inventory handle
-         * @param slot   the target slot index
-         * @param item   the native item to place, or null to clear
-         */
+        
         void set(@NotNull H handle, int slot, @Nullable N item);
     }
 
@@ -194,11 +187,6 @@ public final class InventoryFeatureInstallerSupport {
             return new Builder<>(handleType, itemAdapter);
         }
 
-        /**
-         * Returns the native handle type this adapter supports.
-         *
-         * @return the handle class
-         */
         public @NotNull Class<H> handleType() {
             return handleType;
         }
@@ -235,11 +223,6 @@ public final class InventoryFeatureInstallerSupport {
             itemSetter.set(handle, slot, item);
         }
 
-        /**
-         * Returns whether a fast clear action has been registered.
-         *
-         * @return true if a clear action is available
-         */
         public boolean hasClearAction() {
             return clearAction != null;
         }
@@ -338,12 +321,6 @@ public final class InventoryFeatureInstallerSupport {
                 return this;
             }
 
-            /**
-             * Sets an optional bulk-clear action for the native handle.
-             *
-             * @param clearAction the clear action, may be null
-             * @return this builder
-             */
             public @NotNull Builder<H, N> clear(@Nullable Consumer<? super H> clearAction) {
                 this.clearAction = clearAction;
                 return this;
@@ -371,12 +348,6 @@ public final class InventoryFeatureInstallerSupport {
                 return this;
             }
 
-            /**
-             * Sets a constant sentinel empty native item.
-             *
-             * @param emptyItem the empty item, may be null
-             * @return this builder
-             */
             public @NotNull Builder<H, N> emptyItem(@Nullable N emptyItem) {
                 this.emptyItemSupplier = () -> emptyItem;
                 return this;
@@ -402,23 +373,9 @@ public final class InventoryFeatureInstallerSupport {
         }
     }
 
-    /**
-     * An {@link RInventory} implementation that delegates all slot operations to a
-     * {@link SlotInventoryAdapter} and holds a native handle.
-     *
-     * @param <H> the native handle type
-     * @param <N> the native item stack type
-     */
     private static final class SlotAccessRInventory<H, N> extends RNativeHandle<H> implements RInventory {
         private final SlotInventoryAdapter<H, N> adapter;
 
-        /**
-         * Constructs a new {@code SlotAccessRInventory}.
-         *
-         * @param platformId the platform identifier
-         * @param handle     the native inventory handle
-         * @param adapter    the adapter for slot-level access
-         */
         private SlotAccessRInventory(
             @NotNull PlatformId platformId,
             @NotNull H handle,

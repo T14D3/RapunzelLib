@@ -12,9 +12,6 @@ package de.t14d3.rapunzellib.visuals;
  */
 public record Quaternionf(float x, float y, float z, float w) {
 
-    /**
-     * Creates the identity quaternion (0, 0, 0, 1).
-     */
     public Quaternionf() {
         this(0, 0, 0, 1);
     }

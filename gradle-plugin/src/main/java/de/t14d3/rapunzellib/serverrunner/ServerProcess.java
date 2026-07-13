@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings({"ClassCanBeRecord", "FieldCanBeLocal"})
-final class ServerProcess {
+public final class ServerProcess {
     private final String name;
     private final Process process;
     private final OutputStream stdin;
@@ -30,7 +30,7 @@ final class ServerProcess {
     }
 
     @SuppressWarnings("SameParameterValue")
-    static ServerProcess start(String name, Path workingDir, List<String> command, Map<String, String> env) throws IOException {
+    public static ServerProcess start(String name, Path workingDir, List<String> command, Map<String, String> env) throws IOException {
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(workingDir.toAbsolutePath().normalize().toFile());
         if (env != null) pb.environment().putAll(env);
@@ -44,27 +44,27 @@ final class ServerProcess {
         return new ServerProcess(name, process, stdin, out, err);
     }
 
-    String name() {
+    public String name() {
         return name;
     }
 
-    void waitFor() throws InterruptedException {
+    public void waitFor() throws InterruptedException {
         process.waitFor();
     }
 
-    boolean waitFor(long timeoutMs) throws InterruptedException {
+    public boolean waitFor(long timeoutMs) throws InterruptedException {
         return process.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
     }
 
-    void destroy() {
+    public void destroy() {
         process.destroy();
     }
 
-    void destroyForcibly() {
+    public void destroyForcibly() {
         process.destroyForcibly();
     }
 
-    void sendLine(String line) {
+    public void sendLine(String line) {
         if (stdin == null || line == null) return;
         try {
             stdin.write((line + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
@@ -73,11 +73,11 @@ final class ServerProcess {
         }
     }
 
-    boolean isAlive() {
+    public boolean isAlive() {
         return process.isAlive();
     }
 
-    CompletableFuture<Process> onExit() {
+    public CompletableFuture<Process> onExit() {
         return process.onExit();
     }
 
@@ -97,7 +97,7 @@ final class ServerProcess {
         return t;
     }
 
-    static List<String> javaCommand(String javaBin, List<String> jvmArgs, String jarName, List<String> programArgs) {
+    public static List<String> javaCommand(String javaBin, List<String> jvmArgs, String jarName, List<String> programArgs) {
         List<String> cmd = new ArrayList<>();
         cmd.add(javaBin);
         if (jvmArgs != null) cmd.addAll(jvmArgs);

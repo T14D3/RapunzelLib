@@ -10,7 +10,10 @@ public final class NeoForgePlatformMod {
     public NeoForgePlatformMod(IEventBus modEventBus) {
         NeoForgePlatformBootstrapHost host = NeoForgePlatformBootstrapHost.registerCanonicalHost();
         modEventBus.addListener(NeoForgePluginMessenger::registerPayloadHandlers);
-        NeoForge.EVENT_BUS.addListener(host::onServerAboutToStart);
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.server.ServerAboutToStartEvent event) -> {
+            host.bindServer(event.getServer());
+            NeoForgeRapunzelBootstrap.bootstrapPlatform(event.getServer());
+        });
         NeoForge.EVENT_BUS.addListener(host::onServerStopping);
         NeoForge.EVENT_BUS.addListener(host::onServerStopped);
     }

@@ -15,13 +15,6 @@ final class BoxParticleShape implements ParticleShape {
     private final RLocation max;
     private final double step;
 
-    /**
-     * Creates a box shape.
-     *
-     * @param min  the minimum corner
-     * @param max  the maximum corner
-     * @param step the step size between sample points
-     */
     BoxParticleShape(@NotNull RLocation min, @NotNull RLocation max, double step) {
         this.min = min;
         this.max = max;

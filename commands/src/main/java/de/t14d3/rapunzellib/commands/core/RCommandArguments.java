@@ -63,11 +63,6 @@ public final class RCommandArguments<S> {
     private final RCommandNode<?> node;
     private final SuggestionsBuilder suggestionsBuilder;
 
-    /**
-     * Creates a new CommandArguments wrapper.
-     *
-     * @param context the underlying Brigadier command context
-     */
     public RCommandArguments(@NotNull CommandContext<S> context) {
         this(context.getSource(), context, null, null);
     }
@@ -104,23 +99,12 @@ public final class RCommandArguments<S> {
         this.suggestionsBuilder = suggestionsBuilder;
     }
 
-    /**
-     * Gets the underlying Brigadier command context.
-     *
-     * @return the command context
-     */
     @NotNull
     @SuppressWarnings("unchecked")
     public CommandContext<S> getContext() {
         return (CommandContext<S>) context;
     }
 
-    /**
-     * Gets an argument as a String.
-     *
-     * @param name the argument name
-     * @return an optional containing the string value, or empty if not present
-     */
     @NotNull
     public Optional<String> getString(@NotNull String name) {
         try {
@@ -131,12 +115,6 @@ public final class RCommandArguments<S> {
         }
     }
 
-    /**
-     * Gets an argument as an Integer.
-     *
-     * @param name the argument name
-     * @return an optional containing the integer value, or empty if not present
-     */
     @NotNull
     public Optional<Integer> getInteger(@NotNull String name) {
         try {
@@ -147,12 +125,6 @@ public final class RCommandArguments<S> {
         }
     }
 
-    /**
-     * Gets an argument as a Long.
-     *
-     * @param name the argument name
-     * @return an optional containing the long value, or empty if not present
-     */
     @NotNull
     public Optional<Long> getLong(@NotNull String name) {
         try {
@@ -163,12 +135,6 @@ public final class RCommandArguments<S> {
         }
     }
 
-    /**
-     * Gets an argument as a Double.
-     *
-     * @param name the argument name
-     * @return an optional containing the double value, or empty if not present
-     */
     @NotNull
     public Optional<Double> getDouble(@NotNull String name) {
         try {
@@ -179,12 +145,6 @@ public final class RCommandArguments<S> {
         }
     }
 
-    /**
-     * Gets an argument as a Float.
-     *
-     * @param name the argument name
-     * @return an optional containing the float value, or empty if not present
-     */
     @NotNull
     public Optional<Float> getFloat(@NotNull String name) {
         try {
@@ -195,12 +155,6 @@ public final class RCommandArguments<S> {
         }
     }
 
-    /**
-     * Gets an argument as a Boolean.
-     *
-     * @param name the argument name
-     * @return an optional containing the boolean value, or empty if not present
-     */
     @NotNull
     public Optional<Boolean> getBoolean(@NotNull String name) {
         try {
@@ -211,13 +165,6 @@ public final class RCommandArguments<S> {
         }
     }
 
-    /**
-     * Gets a command argument as an {@link RKey}.
-     * <p>Tries typed key arguments first, then falls back to string parsing.</p>
-     *
-     * @param name the argument name
-     * @return an optional containing the key, or empty if not present
-     */
     @NotNull
     public Optional<RKey> getKey(@NotNull String name) {
         Optional<RKey> typedKey = get(name, RKey.class);
@@ -227,15 +174,6 @@ public final class RCommandArguments<S> {
         return getString(name).flatMap(RKey::tryParse);
     }
 
-    /**
-     * Gets a command argument as a typed {@link RRegistryRef}.
-     * <p>Tries typed registry ref arguments first, then falls back to key-based lookup.</p>
-     *
-     * @param name        the argument name
-     * @param registryKey the expected registry key
-     * @param <T>         the registry entry type
-     * @return an optional containing the registry ref, or empty if not present
-     */
     @NotNull
     public <T> Optional<RRegistryRef<T>> getRegistryRef(@NotNull String name, @NotNull RRegistryKey<T> registryKey) {
         Objects.requireNonNull(registryKey, "registryKey");
@@ -246,75 +184,36 @@ public final class RCommandArguments<S> {
         return getKey(name).map(registryKey::ref);
     }
 
-    /**
-     * Gets a command argument as an entity type registry ref.
-     *
-     * @param name the argument name
-     * @return an optional containing the entity type ref, or empty
-     */
     @NotNull
     public Optional<RRegistryRef<REntityType>> getEntityTypeRef(@NotNull String name) {
         return getRegistryRef(name, RRegistries.ENTITY_TYPES);
     }
 
-    /**
-     * Gets a command argument as a resolved entity type.
-     *
-     * @param name the argument name
-     * @return an optional containing the entity type, or empty
-     */
     @NotNull
     public Optional<REntityType> getEntityType(@NotNull String name) {
         return resolveRegistryRef(getEntityTypeRef(name));
     }
 
-    /**
-     * Gets a command argument as a block type registry ref.
-     *
-     * @param name the argument name
-     * @return an optional containing the block type ref, or empty
-     */
     @NotNull
     public Optional<RRegistryRef<RBlockType>> getBlockTypeRef(@NotNull String name) {
         return getRegistryRef(name, RRegistries.BLOCK_TYPES);
     }
 
-    /**
-     * Gets a command argument as a resolved block type.
-     *
-     * @param name the argument name
-     * @return an optional containing the block type, or empty
-     */
     @NotNull
     public Optional<RBlockType> getBlockType(@NotNull String name) {
         return resolveRegistryRef(getBlockTypeRef(name));
     }
 
-    /**
-     * Gets a command argument as an item type registry ref.
-     *
-     * @param name the argument name
-     * @return an optional containing the item type ref, or empty
-     */
     @NotNull
     public Optional<RRegistryRef<RItemType>> getItemTypeRef(@NotNull String name) {
         return getRegistryRef(name, RRegistries.ITEM_TYPES);
     }
 
-    /**
-     * Gets a command argument as a resolved item type.
-     *
-     * @param name the argument name
-     * @return an optional containing the item type, or empty
-     */
     @NotNull
     public Optional<RItemType> getItemType(@NotNull String name) {
         return resolveRegistryRef(getItemTypeRef(name));
     }
 
-    /**
-     * Gets a typed registry ref, checking that the value's registry key matches.
-     */
     @SuppressWarnings("unchecked")
     private <T> @NotNull Optional<RRegistryRef<T>> getTypedRegistryRef(
         @NotNull String name,
@@ -331,23 +230,12 @@ public final class RCommandArguments<S> {
         return Optional.of((RRegistryRef<T>) value);
     }
 
-    /**
-     * Resolves a registry ref to its actual registry entry.
-     */
     private <T> @NotNull Optional<T> resolveRegistryRef(@NotNull Optional<RRegistryRef<T>> ref) {
         return ref.flatMap(value -> Rapunzel.findContext()
             .map(context -> value.find(context.registries()))
             .orElse(Optional.empty()));
     }
 
-    /**
-     * Gets an argument of a specific type.
-     *
-     * @param name the argument name
-     * @param type the class of the argument type
-     * @param <T> the argument type
-     * @return an optional containing the argument value, or empty if not present
-     */
     @NotNull
     public <T> Optional<T> get(@NotNull String name, @NotNull Class<T> type) {
         try {
@@ -358,31 +246,16 @@ public final class RCommandArguments<S> {
         }
     }
 
-    /**
-     * Gets the command source.
-     *
-     * @return the command source
-     */
     @NotNull
     public S getSource() {
         return source;
     }
 
-    /**
-     * Gets the command source (alias for {@link #getSource()}).
-     *
-     * @return the command source
-     */
     @NotNull
     public S sender() {
         return source;
     }
 
-    /**
-     * Gets the native platform source object, if available.
-     *
-     * @return an optional containing the native handle
-     */
     @NotNull
     public Optional<Object> getNativeSource() {
         if (source instanceof RNativeHandle<?> nativeHandle) {
@@ -391,21 +264,11 @@ public final class RCommandArguments<S> {
         return Optional.empty();
     }
 
-    /**
-     * Gets the current command node.
-     *
-     * @return the command node, or null
-     */
     @Nullable
     public RCommandNode<?> getNode() {
         return node;
     }
 
-    /**
-     * Gets the current command node, if available.
-     *
-     * @return an optional containing the current node
-     */
     @NotNull
     public Optional<RCommandNode<?>> currentNode() {
         return Optional.ofNullable(node);
@@ -426,13 +289,6 @@ public final class RCommandArguments<S> {
         }
     }
 
-    /**
-     * Gets an argument, returning a default value if not present.
-     *
-     * @param name the argument name
-     * @param defaultValue the default value to return
-     * @return the argument value, or the default value if not present
-     */
     @NotNull
     public <T> T getOrDefault(@NotNull String name, @NotNull T defaultValue) {
         @SuppressWarnings("unchecked")
@@ -440,11 +296,6 @@ public final class RCommandArguments<S> {
         return get(name, type).orElse(defaultValue);
     }
 
-    /**
-     * Gets the input string that was parsed.
-     *
-     * @return the input string
-     */
     @NotNull
     public String getInput() {
         return context.getInput();
@@ -475,11 +326,6 @@ public final class RCommandArguments<S> {
         return suggestionsBuilder != null;
     }
 
-    /**
-     * Gets the suggestions builder, if available.
-     *
-     * @return an optional containing the suggestions builder
-     */
     @NotNull
     public Optional<SuggestionsBuilder> getSuggestionsBuilder() {
         return Optional.ofNullable(suggestionsBuilder);
@@ -546,11 +392,6 @@ public final class RCommandArguments<S> {
         return requireSuggestionsBuilder().buildFuture();
     }
 
-    /**
-     * Gets a map of all parsed argument names to their values.
-     *
-     * @return an unmodifiable map of argument names to values
-     */
     @NotNull
     public Map<String, Object> getParsedArguments() {
         Map<String, Object> parsed = new LinkedHashMap<>();
@@ -603,23 +444,12 @@ public final class RCommandArguments<S> {
         return entries.stream().map(Map.Entry::getValue).toList();
     }
 
-    /**
-     * Gets the raw string value of a specific argument.
-     *
-     * @param name the argument name
-     * @return an optional containing the raw string value
-     */
     @NotNull
     public Optional<String> getRawArgument(@NotNull String name) {
         Objects.requireNonNull(name, "name");
         return Optional.ofNullable(getRawArguments().get(name));
     }
 
-    /**
-     * Gets the names of all parsed command nodes.
-     *
-     * @return a list of parsed node names in order
-     */
     @NotNull
     public List<String> getParsedNodeNames() {
         return context.getNodes().stream()
@@ -627,9 +457,6 @@ public final class RCommandArguments<S> {
             .toList();
     }
 
-    /**
-     * Gets the string range for the current node in the parsed input.
-     */
     private @NotNull Optional<com.mojang.brigadier.context.StringRange> currentRange() {
         List<? extends ParsedCommandNode<?>> nodes = context.getNodes();
         if (nodes.isEmpty()) {

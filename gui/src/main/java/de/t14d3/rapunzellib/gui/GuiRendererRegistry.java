@@ -41,11 +41,6 @@ public interface GuiRendererRegistry {
         throw new UnsupportedOperationException("unregisterRenderer");
     }
 
-    /**
-     * Returns all registered renderers.
-     *
-     * @return an immutable collection of renderers
-     */
     @NotNull Collection<@NotNull GuiRenderer> renderers();
 
     /**
@@ -60,13 +55,6 @@ public interface GuiRendererRegistry {
                 .findFirst();
     }
 
-    /**
-     * Gets a renderer by name, throwing if not found.
-     *
-     * @param name the renderer name
-     * @return the renderer
-     * @throws IllegalArgumentException if no renderer is registered with that name
-     */
     default @NotNull GuiRenderer get(@NotNull String name) {
         return find(name).orElseThrow(() ->
                 new IllegalArgumentException("No renderer registered with name: " + name));
@@ -102,12 +90,6 @@ public interface GuiRendererRegistry {
         return GuiRendererSelectionSupport.unionCapabilities(renderers());
     }
 
-    /**
-     * Creates a new registry for the given context.
-     *
-     * @param context the Rapunzel context
-     * @return a new registry instance
-     */
     static @NotNull GuiRendererRegistry create(@NotNull RapunzelContext context) {
         return new DefaultGuiRendererRegistry(context);
     }

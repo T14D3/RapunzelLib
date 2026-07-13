@@ -17,12 +17,7 @@ public record MessageKey(@NotNull String value) {
         }
     }
 
-    /**
-     * Creates a new message key from the given string.
-     *
-     * @param value the key value
-     * @return a new MessageKey
-     */
+    /** Creates a new message key from the given string. */
     public static @NotNull MessageKey of(@NotNull String value) {
         return new MessageKey(value);
     }

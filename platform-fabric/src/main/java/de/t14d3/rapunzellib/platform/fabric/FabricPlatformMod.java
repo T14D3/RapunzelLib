@@ -7,7 +7,10 @@ public final class FabricPlatformMod implements ModInitializer {
     @Override
     public void onInitialize() {
         FabricPlatformBootstrapHost host = FabricPlatformBootstrapHost.registerCanonicalHost();
-        ServerLifecycleEvents.SERVER_STARTING.register(host::bindServer);
+        ServerLifecycleEvents.SERVER_STARTING.register(server -> {
+            host.bindServer(server);
+            FabricRapunzelBootstrap.bootstrapPlatform(server);
+        });
         ServerLifecycleEvents.SERVER_STOPPING.register(host::onServerStopping);
         ServerLifecycleEvents.SERVER_STOPPED.register(host::onServerStopped);
     }

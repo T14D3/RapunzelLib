@@ -1,0 +1,10 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="LGPL-2.1"
+
+[[mods]]
+modId="rapunzellib"
+version="${version}"
+displayName="RapunzelLib"
+description="RapunzelLib - cross-platform Minecraft library."
+authors="t14d3"

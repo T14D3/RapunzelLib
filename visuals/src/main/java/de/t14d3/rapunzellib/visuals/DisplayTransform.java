@@ -33,14 +33,6 @@ public record DisplayTransform(
         );
     }
 
-    /**
-     * Creates a scale-only transform.
-     *
-     * @param sx the x-axis scale factor
-     * @param sy the y-axis scale factor
-     * @param sz the z-axis scale factor
-     * @return the scale display transform
-     */
     public static @NotNull DisplayTransform scale(float sx, float sy, float sz) {
         return new DisplayTransform(
             new Vector3f(0, 0, 0),
@@ -50,14 +42,6 @@ public record DisplayTransform(
         );
     }
 
-    /**
-     * Creates a translation-only transform.
-     *
-     * @param x the x-axis translation
-     * @param y the y-axis translation
-     * @param z the z-axis translation
-     * @return the translation display transform
-     */
     public static @NotNull DisplayTransform translate(float x, float y, float z) {
         return new DisplayTransform(
             new Vector3f(x, y, z),

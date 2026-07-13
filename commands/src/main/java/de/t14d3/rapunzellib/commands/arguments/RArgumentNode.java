@@ -57,61 +57,30 @@ public class RArgumentNode<S extends RCommandSource, T> {
         return new RArgumentNode<>(childNode, argument);
     }
     
-    /**
-     * Gets the command node for this argument.
-     * 
-     * @return the command node
-     */
     @NotNull
     public RCommandNode<S> getNode() {
         return node;
     }
     
-    /**
-     * Gets the argument definition for this node.
-     * 
-     * @return the argument definition
-     */
     @NotNull
     public RArgument<S, T> getArgument() {
         return argument;
     }
     
-    /**
-     * Gets the Brigadier argument type for this node.
-     * 
-     * @return the Brigadier argument type
-     */
     @NotNull
     public ArgumentType<T> getArgumentType() {
         return argument.getArgumentType();
     }
     
-    /**
-     * Gets whether this argument is optional.
-     * 
-     * @return true if optional
-     */
     public boolean isOptional() {
         return argument.isOptional();
     }
     
-    /**
-     * Gets the default value supplier for this argument.
-     * 
-     * @return the default value supplier, or null if not set
-     */
     @NotNull
     public java.util.function.Supplier<T> getDefaultValue() {
         return argument.getDefaultValue();
     }
     
-    /**
-     * Gets suggestion providers for tab completion.
-     * 
-     * @param source the command source
-     * @return the list of suggestions
-     */
     @NotNull
     public java.util.List<String> getSuggestions(@NotNull S source) {
         return argument.getSuggestions(source);

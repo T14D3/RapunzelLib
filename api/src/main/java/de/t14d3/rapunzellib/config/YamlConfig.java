@@ -21,50 +21,21 @@ import java.util.UUID;
  * A YAML configuration file with typed read access, comments support, and save/reload.
  */
 public interface YamlConfig {
-    /**
-     * Checks whether a value exists at the given path.
-     *
-     * @param path the path to check
-     * @return true if a value exists
-     */
+    /** Checks whether a value exists at the given path. */
     boolean contains(@NotNull String path);
 
-    /**
-     * Returns all keys in this config.
-     *
-     * @param deep whether to include nested keys
-     * @return a set of keys
-     */
+    /** Returns all keys in this config. */
     @NotNull Set<String> keys(boolean deep);
 
-    /**
-     * Returns the raw value at the given path.
-     *
-     * @param path the path to read
-     * @return the value, or null if not found
-     */
+    /** Returns the raw value at the given path. */
     @Nullable Object get(@NotNull String path);
 
-    /**
-     * Returns the value at the given path coerced to the specified type.
-     *
-     * @param path the path to read
-     * @param type the expected type
-     * @param <T>  the type
-     * @return the value, or null if missing or uncoercible
-     */
+    /** Returns the value at the given path coerced to the specified type. */
     default <T> @Nullable T get(@NotNull String path, @NotNull Class<T> type) {
         return get(path, type, null);
     }
 
-    /**
-     * Returns the value at the given path as an Optional.
-     *
-     * @param path the path to read
-     * @param type the expected type
-     * @param <T>  the type
-     * @return an Optional containing the value, or empty if missing
-     */
+    /** Returns the value at the given path as an Optional. */
     default <T> @NotNull Optional<T> getOptional(@NotNull String path, @NotNull Class<T> type) {
         return Optional.ofNullable(get(path, type, null));
     }
@@ -80,51 +51,23 @@ public interface YamlConfig {
         return def;
     }
 
-    /**
-     * Returns a string value at the given path, with a default fallback.
-     *
-     * @param path the path to read
-     * @param def  the default value
-     * @return the string value, or def if not found
-     */
+    /** Returns a string value at the given path, with a default fallback. */
     @Nullable String getString(@NotNull String path, @Nullable String def);
 
-    /**
-     * Returns a string value at the given path, or null.
-     *
-     * @param path the path to read
-     * @return the string value, or null if not found
-     */
+    /** Returns a string value at the given path, or null. */
     default @Nullable String getString(@NotNull String path) {
         return getString(path, null);
     }
 
-    /**
-     * Returns an integer value at the given path, with a default fallback.
-     *
-     * @param path the path to read
-     * @param def  the default value
-     * @return the int value, or def if not found
-     */
+    /** Returns an integer value at the given path, with a default fallback. */
     int getInt(@NotNull String path, int def);
 
-    /**
-     * Returns an integer value at the given path, defaulting to 0.
-     *
-     * @param path the path to read
-     * @return the int value, or 0 if not found
-     */
+    /** Returns an integer value at the given path, defaulting to 0. */
     default int getInt(@NotNull String path) {
         return getInt(path, 0);
     }
 
-    /**
-     * Returns a long value at the given path, with a default fallback.
-     *
-     * @param path the path to read
-     * @param def  the default value
-     * @return the long value, or def if not found
-     */
+    /** Returns a long value at the given path, with a default fallback. */
     default long getLong(@NotNull String path, long def) {
         Long v = get(path, Long.class, null);
         if (v != null) return v;
@@ -133,50 +76,23 @@ public interface YamlConfig {
         return def;
     }
 
-    /**
-     * Returns a long value at the given path, defaulting to 0.
-     *
-     * @param path the path to read
-     * @return the long value, or 0 if not found
-     */
+    /** Returns a long value at the given path, defaulting to 0. */
     default long getLong(@NotNull String path) {
         return getLong(path, 0L);
     }
 
-    /**
-     * Returns a boolean value at the given path, with a default fallback.
-     *
-     * @param path the path to read
-     * @param def  the default value
-     * @return the boolean value, or def if not found
-     */
+    /** Returns a boolean value at the given path, with a default fallback. */
     boolean getBoolean(@NotNull String path, boolean def);
 
-    /**
-     * Returns a boolean value at the given path, defaulting to false.
-     *
-     * @param path the path to read
-     * @return the boolean value, or false if not found
-     */
+    /** Returns a boolean value at the given path, defaulting to false. */
     default boolean getBoolean(@NotNull String path) {
         return getBoolean(path, false);
     }
 
-    /**
-     * Returns a double value at the given path, with a default fallback.
-     *
-     * @param path the path to read
-     * @param def  the default value
-     * @return the double value, or def if not found
-     */
+    /** Returns a double value at the given path, with a default fallback. */
     double getDouble(@NotNull String path, double def);
 
-    /**
-     * Returns a double value at the given path, defaulting to 0.
-     *
-     * @param path the path to read
-     * @return the double value, or 0 if not found
-     */
+    /** Returns a double value at the given path, defaulting to 0. */
     default double getDouble(@NotNull String path) {
         return getDouble(path, 0D);
     }
@@ -245,23 +161,27 @@ public interface YamlConfig {
         return get(path, enumType, def);
     }
 
-    /**
-     * Sets a value at the given path.
-     *
-     * @param path  the path to set
-     * @param value the value to set, or null to remove
-     */
+    /** Sets a value at the given path. */
     void set(@NotNull String path, @Nullable Object value);
 
-    /**
-     * Removes the value at the given path.
-     *
-     * @param path the path to remove
-     */
+    /** Removes the value at the given path. */
     default void remove(@NotNull String path) {
         set(path, null);
     }
 
+    /**
+     * Returns the value at the given path, or sets and returns the default if absent.
+     *
+     * <p>If the value exists at the path, it is returned as-is. Otherwise, the
+     * default value is written to the config and returned. This is useful for
+     * populating config files with safe defaults on first access.</p>
+     *
+     * @param path the configuration path
+     * @param type the expected value type
+     * @param def  the default value to set and return if absent (may be null)
+     * @param <T>  the value type
+     * @return the existing value, or the default if no value was present
+     */
     default <T> @Nullable T getOrSetDefault(@NotNull String path, @NotNull Class<T> type, @Nullable T def) {
         T existing = get(path, type, null);
         if (existing != null) return existing;
@@ -269,35 +189,28 @@ public interface YamlConfig {
         return def;
     }
 
-    /**
-     * Returns the comment at the given path.
-     *
-     * @param path the path to read
-     * @return the comment, or null if not set
-     */
+    /** Returns the comment at the given path. */
     @Nullable String getComment(@NotNull String path);
 
-    /**
-     * Sets a comment at the given path.
-     *
-     * @param path    the path to comment
-     * @param comment the comment text
-     */
+    /** Sets a comment at the given path. */
     void setComment(@NotNull String path, @NotNull String comment);
 
     /**
      * Saves the config to disk.
+     *
+     * <p>Writes the current in-memory state to the file path this config was loaded from.
+     * Preserves comments if supported by the implementation.</p>
      */
     void save();
 
     /**
      * Reloads the config from disk.
+     *
+     * <p>Discards any in-memory changes and re-reads the file from disk.</p>
      */
     void reload();
 
-    /**
-     * Returns a nested section at {@code path}, or {@code null} if the value at that path is not a mapping.
-     */
+    /** Returns a nested section at {@code path}, or {@code null} if the value at that path is not a mapping. */
     default @Nullable ConfigurationSection getConfigurationSection(@NotNull String path) {
         if (path.isBlank()) return new YamlConfigSection(this, "");
         Object v = get(path);
@@ -305,9 +218,7 @@ public interface YamlConfig {
         return null;
     }
 
-    /**
-     * Ensures a mapping exists at {@code path} and returns it as a section.
-     */
+    /** Ensures a mapping exists at {@code path} and returns it as a section. */
     default @NotNull ConfigurationSection createSection(@NotNull String path) {
         if (path.isBlank()) return new YamlConfigSection(this, "");
         Object v = get(path);

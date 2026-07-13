@@ -44,16 +44,10 @@ public final class BlockTransformPre extends BaseCancellablePreEvent {
         return pos;
     }
 
-    /**
-     * The block type before transformation.
-     */
     public RKey originalBlockTypeKey() {
         return originalBlockTypeKey;
     }
 
-    /**
-     * The block type after transformation.
-     */
     public RKey transformedBlockTypeKey() {
         return transformedBlockTypeKey;
     }

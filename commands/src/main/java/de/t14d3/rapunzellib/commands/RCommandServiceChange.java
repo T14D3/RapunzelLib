@@ -33,9 +33,6 @@ public record RCommandServiceChange(
         }
     }
 
-    /**
-     * The type of command service change.
-     */
     public enum Type {
         /** A command tree was registered. */
         REGISTERED,

@@ -29,6 +29,7 @@ final class PaperGameEventSupport {
             BlockPlacePre.class,
             BlockPlacePost.class,
             BlockPlaceSnapshot.class,
+            BlockPhysicsPre.class,
             BlockPhysicsPost.class,
             AttackEntityPre.class,
             AttackEntityPost.class,

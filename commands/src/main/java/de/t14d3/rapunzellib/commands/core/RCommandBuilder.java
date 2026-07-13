@@ -45,12 +45,6 @@ public class RCommandBuilder<S extends RCommandSource> {
     private final List<String> aliases;
     private RCommandNode<S> redirect;
 
-    /**
-     * Creates a new command builder for the given command name.
-     * 
-     * @param name the name of the command
-     * @return a new command builder
-     */
     @NotNull
     public static <S extends RCommandSource> RCommandBuilder<S> create(@NotNull String name) {
         return new RCommandBuilder<>(name);
@@ -62,12 +56,6 @@ public class RCommandBuilder<S extends RCommandSource> {
         this.requirement = source -> true;
     }
 
-    /**
-     * Sets the command executor.
-     * 
-     * @param executor the executor to execute when this command is run
-     * @return this builder for chaining
-     */
     @NotNull
     public RCommandBuilder<S> executes(@NotNull RCommandExecutor<S> executor) {
         this.executor = executor;
@@ -80,12 +68,6 @@ public class RCommandBuilder<S extends RCommandSource> {
         return this;
     }
 
-    /**
-     * Sets a requirement predicate for the command.
-     * 
-     * @param requirement the requirement predicate
-     * @return this builder for chaining
-     */
     @NotNull
     public RCommandBuilder<S> requires(@NotNull Predicate<S> requirement) {
         this.requirement = requirement;
@@ -113,12 +95,6 @@ public class RCommandBuilder<S extends RCommandSource> {
         return this;
     }
 
-    /**
-     * Sets the description of the command.
-     * 
-     * @param description the description text
-     * @return this builder for chaining
-     */
     @NotNull
     public RCommandBuilder<S> description(@Nullable String description) {
         this.description = description;
@@ -149,12 +125,6 @@ public class RCommandBuilder<S extends RCommandSource> {
         return this;
     }
 
-    /**
-     * Sets a redirect target for the command.
-     * 
-     * @param redirect the node to redirect to
-     * @return this builder for chaining
-     */
     @NotNull
     public RCommandBuilder<S> redirects(@NotNull RCommandNode<S> redirect) {
         this.redirect = redirect;

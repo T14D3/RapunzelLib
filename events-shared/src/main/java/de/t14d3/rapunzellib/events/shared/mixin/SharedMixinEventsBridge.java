@@ -23,11 +23,6 @@ public final class SharedMixinEventsBridge {
         SharedMixinBusHolder.setBus(eventBus);
     }
 
-    /**
-     * Returns the current event bus.
-     *
-     * @return the event bus, or {@code null} if not initialized
-     */
     public static @Nullable GameEventBus bus() {
         return SharedMixinBusHolder.bus();
     }

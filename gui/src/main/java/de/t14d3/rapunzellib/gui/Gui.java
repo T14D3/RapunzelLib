@@ -15,11 +15,7 @@ import org.jetbrains.annotations.Nullable;
  * </p>
  */
 public interface Gui {
-    /**
-     * Gets the renderer responsible for displaying this GUI.
-     *
-     * @return the GUI renderer
-     */
+    
     @NotNull GuiRenderer renderer();
 
     /**
@@ -29,18 +25,8 @@ public interface Gui {
      */
     @NotNull GuiLayout layout();
 
-    /**
-     * Get the title of this GUI.
-     *
-     * @return the title component, or null if not set
-     */
     @Nullable Component title();
 
-    /**
-     * Get the number of rows for grid-based layouts.
-     *
-     * @return the number of rows (1-6), or 0 if using linear layout
-     */
     int rows();
 
     /**
@@ -57,11 +43,6 @@ public interface Gui {
      */
     void close(@NotNull RPlayer player);
 
-    /**
-     * Creates a new {@link GuiBuilder} for constructing a GUI.
-     *
-     * @return a new builder
-     */
     @NotNull
     static GuiBuilder builder() {
         return new GuiBuilder();

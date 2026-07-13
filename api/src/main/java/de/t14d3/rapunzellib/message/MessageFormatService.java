@@ -14,43 +14,29 @@ public interface MessageFormatService {
      */
     void reload();
 
-    /**
-     * Checks whether the given key exists in the message registry.
-     *
-     * @param key the message key
-     * @return true if the key exists
-     */
+    /** Checks whether the given key exists in the message registry. */
     boolean contains(@NotNull String key);
 
-    /**
-     * Returns all registered message keys.
-     *
-     * @return set of message keys
-     */
+    /** Returns all registered message keys. */
     @NotNull Set<String> keys();
 
-    /**
-     * Returns the raw (unformatted) message string for the given key.
-     *
-     * @param key the message key
-     * @return raw message string
-     */
+    /** Returns the raw (unformatted) message string for the given key. */
     @NotNull String raw(@NotNull String key);
 
     /**
      * Resolves the message for the given key as a formatted component.
      *
      * @param key the message key
-     * @return formatted component
+     * @return the formatted component, or a fallback if the key is not found
      */
     @NotNull Component component(@NotNull String key);
 
     /**
      * Resolves the message for the given key with placeholders applied.
      *
-     * @param key the message key
-     * @param placeholders the placeholders to apply
-     * @return formatted component
+     * @param key          the message key
+     * @param placeholders the placeholders to substitute into the message template
+     * @return the formatted component with placeholders resolved
      */
     @NotNull Component component(@NotNull String key, @NotNull Placeholders placeholders);
 

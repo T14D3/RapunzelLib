@@ -170,9 +170,6 @@ public final class NetworkEventBus {
         messenger.sendToProxy(channel, json.toJson(payload));
     }
 
-    /**
-     * Dispatches a received message to all registered typed listeners.
-     */
     private void dispatchTyped(String channel, String data, String serverName) {
         List<TypedRegistration<?>> regs = typedListeners.get(channel);
         if (regs == null || regs.isEmpty()) return;
@@ -202,14 +199,8 @@ public final class NetworkEventBus {
         }
     }
 
-    /**
-     * Internal record holding a typed listener with its payload class.
-     */
     private record TypedRegistration<T>(Class<T> type, TypedListener<T> listener) {
 
-        /**
-         * Deserializes and dispatches the message to the typed listener.
-         */
         private void dispatch(JsonCodec json, String data, String serverName) {
             T payload = json.fromJson(data, type);
             listener.onEvent(payload, serverName);

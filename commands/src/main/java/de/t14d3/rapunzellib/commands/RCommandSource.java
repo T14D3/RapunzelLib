@@ -25,20 +25,10 @@ public interface RCommandSource extends RAudience {
      */
     @NotNull Optional<RPlayer> player();
 
-    /**
-     * Gets the audience for system messages.
-     *
-     * @return the system audience
-     */
     default @NotNull Audience systemAudience() {
         return audience();
     }
 
-    /**
-     * Gets the audience for failure/error messages.
-     *
-     * @return the failure audience
-     */
     default @NotNull Audience failureAudience() {
         return audience();
     }

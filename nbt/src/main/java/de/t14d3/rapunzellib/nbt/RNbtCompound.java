@@ -90,7 +90,7 @@ public final class RNbtCompound implements RNbtValue {
     /**
      * Looks up a value by key.
      *
-     * @param key the key to look up
+     * @param key the NBT key to look up
      * @return an Optional containing the value, or empty if absent
      */
     public @NotNull Optional<RNbtValue> get(@NotNull String key) {

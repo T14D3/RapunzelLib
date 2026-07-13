@@ -37,12 +37,6 @@ public record GameEventSupportManifest(
         return builder(platformId).build();
     }
 
-    /**
-     * Creates a new {@link Builder} for the given platform ID.
-     *
-     * @param platformId the platform identifier
-     * @return a new builder
-     */
     public static @NotNull Builder builder(@NotNull PlatformId platformId) {
         return new Builder(platformId);
     }
@@ -102,12 +96,6 @@ public record GameEventSupportManifest(
         return supportByEvent.getOrDefault(eventType, GameEventSupport.unsupported(eventType));
     }
 
-    /**
-     * Returns whether the given event type is supported.
-     *
-     * @param eventType the event class
-     * @return true if supported
-     */
     public boolean supports(@NotNull Class<? extends GameEvent> eventType) {
         return support(eventType).supported();
     }

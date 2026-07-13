@@ -121,12 +121,6 @@ public final class GameEvents {
         );
     }
 
-    /**
-     * Finds the {@link GameEventBridgeInstaller} for the given platform ID.
-     *
-     * @param platformId the platform identifier
-     * @return an optional containing the installer, or empty if none is registered
-     */
     private static @NotNull Optional<GameEventBridgeInstaller> findInstaller(@NotNull PlatformId platformId) {
         try {
             return Optional.of(INSTALLER_REGISTRY.resolve(platformId));

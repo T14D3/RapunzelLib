@@ -137,12 +137,6 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  }
  }
 
- /**
- * Reads a framed message from the input stream.
- *
- * @return the parsed protocol message, or null if invalid
- * @throws IOException if reading fails
- */
  private @Nullable RpcProtocolMessage readMessage() throws IOException {
  // Read 4-byte length prefix
  int length;
@@ -171,11 +165,6 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  }
  }
 
- /**
- * Handles an incoming protocol message.
- *
- * @param message the message to handle
- */
  private void handleMessage(@NotNull RpcProtocolMessage message) {
  RpcProtocolMessage.Type type = message.getType();
  if (type == null) {
@@ -192,9 +181,6 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  }
  }
 
- /**
- * Handles HELLO message from backend.
- */
  private void handleHello(@NotNull RpcProtocolMessage message) {
  String name = message.getServerName();
  String version = message.getVersion();
@@ -224,9 +210,6 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  sendMessage(RpcProtocolMessage.hello(localServerName, config.protocolVersion()));
  }
 
- /**
- * Handles application MESSAGE envelope.
- */
  private void handleApplicationMessage(@NotNull RpcProtocolMessage message) {
  if (!identified.get()) {
  logger.warn("Received MESSAGE before HELLO from {}", socket.getInetAddress());
@@ -252,9 +235,6 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  routeMessage(channel, data, targetServer, sourceServer);
  }
 
- /**
- * Routes a message to appropriate destinations.
- */
  private void routeMessage(@NotNull String channel, @NotNull String data,
  @Nullable String targetServer, @NotNull String sourceServer) {
  // Deliver to local listeners
@@ -272,9 +252,6 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  }
  }
 
- /**
- * Delivers message to local registered listeners.
- */
  private void deliverToLocalListeners(@NotNull String channel, @NotNull String data, @NotNull String sourceServer) {
  List<MessageListener> list = listeners.get(channel);
  if (list == null || list.isEmpty()) {
@@ -290,9 +267,6 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  }
  }
 
- /**
- * Broadcasts message to all connected backends except the source.
- */
  private void broadcastToBackends(@NotNull String channel, @NotNull String data, @NotNull String sourceServer) {
  RpcProtocolMessage message = RpcProtocolMessage.message(channel, data, null, sourceServer);
 
@@ -305,17 +279,11 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  }
  }
 
- /**
- * Handles HEARTBEAT message.
- */
  private void handleHeartbeat(@NotNull RpcProtocolMessage message) {
  // Just update the timestamp - already done in run()
  logger.debug("Heartbeat received from {}", serverName);
  }
 
- /**
- * Handles DISCONNECT message.
- */
  private void handleDisconnect(@NotNull RpcProtocolMessage message) {
  logger.info("Client {} sent graceful disconnect", serverName);
  running.set(false);

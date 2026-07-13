@@ -15,20 +15,10 @@ public final class SharedMixinBusHolder {
     private SharedMixinBusHolder() {
     }
 
-    /**
-     * Sets the event bus instance.
-     *
-     * @param eventBus the game event bus
-     */
     public static void setBus(@NotNull GameEventBus eventBus) {
         bus = eventBus;
     }
 
-    /**
-     * Returns the current event bus instance.
-     *
-     * @return the event bus, or {@code null} if not initialized
-     */
     public static @Nullable GameEventBus bus() {
         return bus;
     }

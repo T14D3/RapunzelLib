@@ -28,14 +28,6 @@ import java.util.UUID;
 public final class SharedNmsParticleVisual extends SharedNmsVisual<ParticleConfig> implements ParticleVisual {
     private ParticleShape currentShape;
 
-    /**
-     * Creates a new particle visual.
-     *
-     * @param id       the visual ID
-     * @param config   the particle config
-     * @param audience the visual audience
-     * @param manager  the visual manager
-     */
     public SharedNmsParticleVisual(
         @NotNull VisualId id,
         @NotNull ParticleConfig config,
@@ -87,11 +79,6 @@ public final class SharedNmsParticleVisual extends SharedNmsVisual<ParticleConfi
         }
     }
 
-    /**
-     * Creates the dust particle options from the configured color.
-     *
-     * @return the dust particle options
-     */
     private DustParticleOptions createParticleOptions() {
         TextColor color = config.color();
         int rgb = color != null ? color.value() : 0xFFFFFF;

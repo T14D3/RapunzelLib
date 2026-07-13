@@ -19,11 +19,6 @@ import java.util.Set;
 public final class VisualBuilder {
     private final VisualManager manager;
 
-    /**
-     * Creates a new visual builder backed by the given manager.
-     *
-     * @param manager the visual manager used to create visuals
-     */
     VisualBuilder(@NotNull VisualManager manager) {
         this.manager = manager;
     }
@@ -88,58 +83,27 @@ public final class VisualBuilder {
             this.manager = manager;
         }
 
-        /**
-         * Sets the particle shape.
-         *
-         * @param shape the shape to use
-         * @return this builder for chaining
-         */
         public @NotNull ParticleBuilder shape(@NotNull ParticleShape shape) {
             this.shape = shape;
             return this;
         }
 
-        /**
-         * Sets the particle color.
-         *
-         * @param color the text color
-         * @return this builder for chaining
-         */
         public @NotNull ParticleBuilder color(@NotNull TextColor color) {
             this.color = color;
             return this;
         }
 
-        /**
-         * Sets the particle density (particles per block).
-         *
-         * @param density the density value, must be in (0, 100]
-         * @return this builder for chaining
-         * @throws IllegalArgumentException if density is not in (0, 100]
-         */
         public @NotNull ParticleBuilder density(double density) {
             if (density <= 0 || density > 100) throw new IllegalArgumentException("density must be in (0, 100]");
             this.density = density;
             return this;
         }
 
-        /**
-         * Sets the visual audience.
-         *
-         * @param audience the target audience
-         * @return this builder for chaining
-         */
         public @NotNull ParticleBuilder audience(@NotNull VisualAudience audience) {
             this.audience = audience;
             return this;
         }
 
-        /**
-         * Sets the view distance for this visual.
-         *
-         * @param viewDistance the maximum view distance in blocks
-         * @return this builder for chaining
-         */
         public @NotNull ParticleBuilder viewDistance(double viewDistance) {
             this.viewDistance = viewDistance;
             return this;
@@ -174,12 +138,6 @@ public final class VisualBuilder {
             this.manager = manager;
         }
 
-        /**
-         * Sets the block type to display.
-         *
-         * @param block the block type
-         * @return this builder for chaining
-         */
         public @NotNull BlockDisplayBuilder block(@NotNull RBlockType block) {
             this.block = block;
             return this;
@@ -196,56 +154,26 @@ public final class VisualBuilder {
             return this;
         }
 
-        /**
-         * Sets the location for the block display.
-         *
-         * @param location the world location
-         * @return this builder for chaining
-         */
         public @NotNull BlockDisplayBuilder location(@NotNull RLocation location) {
             this.location = location;
             return this;
         }
 
-        /**
-         * Sets the overlay color.
-         *
-         * @param color the text color
-         * @return this builder for chaining
-         */
         public @NotNull BlockDisplayBuilder color(@NotNull TextColor color) {
             this.color = color;
             return this;
         }
 
-        /**
-         * Sets whether the block display should glow.
-         *
-         * @param glow {@code true} to enable glowing
-         * @return this builder for chaining
-         */
         public @NotNull BlockDisplayBuilder glow(boolean glow) {
             this.glow = glow;
             return this;
         }
 
-        /**
-         * Sets the visual audience.
-         *
-         * @param audience the target audience
-         * @return this builder for chaining
-         */
         public @NotNull BlockDisplayBuilder audience(@NotNull VisualAudience audience) {
             this.audience = audience;
             return this;
         }
 
-        /**
-         * Sets the view distance for this visual.
-         *
-         * @param viewDistance the maximum view distance in blocks
-         * @return this builder for chaining
-         */
         public @NotNull BlockDisplayBuilder viewDistance(double viewDistance) {
             this.viewDistance = viewDistance;
             return this;
@@ -284,56 +212,26 @@ public final class VisualBuilder {
             this.outlineBlock = RBlockType.require("minecraft:tinted_glass");
         }
 
-        /**
-         * Sets the block positions to outline.
-         *
-         * @param blocks the set of block positions
-         * @return this builder for chaining
-         */
         public @NotNull GlowOutlineBuilder blocks(@NotNull Set<RBlockPos> blocks) {
             this.blocks = blocks;
             return this;
         }
 
-        /**
-         * Sets the block type used for the outline.
-         *
-         * @param outlineBlock the outline block type
-         * @return this builder for chaining
-         */
         public @NotNull GlowOutlineBuilder outlineBlock(@NotNull RBlockType outlineBlock) {
             this.outlineBlock = outlineBlock;
             return this;
         }
 
-        /**
-         * Sets the outline color.
-         *
-         * @param color the text color
-         * @return this builder for chaining
-         */
         public @NotNull GlowOutlineBuilder color(@NotNull TextColor color) {
             this.color = color;
             return this;
         }
 
-        /**
-         * Sets the visual audience.
-         *
-         * @param audience the target audience
-         * @return this builder for chaining
-         */
         public @NotNull GlowOutlineBuilder audience(@NotNull VisualAudience audience) {
             this.audience = audience;
             return this;
         }
 
-        /**
-         * Sets the view distance for this visual.
-         *
-         * @param viewDistance the maximum view distance in blocks
-         * @return this builder for chaining
-         */
         public @NotNull GlowOutlineBuilder viewDistance(double viewDistance) {
             this.viewDistance = viewDistance;
             return this;
@@ -371,78 +269,36 @@ public final class VisualBuilder {
             this.manager = manager;
         }
 
-        /**
-         * Sets the beacon location.
-         *
-         * @param location the world location
-         * @return this builder for chaining
-         */
         public @NotNull BeaconBeamBuilder location(@NotNull RLocation location) {
             this.location = location;
             return this;
         }
 
-        /**
-         * Sets the beam color.
-         *
-         * @param color the text color
-         * @return this builder for chaining
-         */
         public @NotNull BeaconBeamBuilder color(@NotNull TextColor color) {
             this.color = color;
             return this;
         }
 
-        /**
-         * Sets the number of pyramid levels (0-4).
-         *
-         * @param pyramidLevels the pyramid level count, clamped to [0, 4]
-         * @return this builder for chaining
-         */
         public @NotNull BeaconBeamBuilder pyramidLevels(int pyramidLevels) {
             this.pyramidLevels = Math.max(0, Math.min(4, pyramidLevels));
             return this;
         }
 
-        /**
-         * Sets whether the beam extends to the sky.
-         *
-         * @param extendToSky {@code true} to extend the beam upward indefinitely
-         * @return this builder for chaining
-         */
         public @NotNull BeaconBeamBuilder extendToSky(boolean extendToSky) {
             this.extendToSky = extendToSky;
             return this;
         }
 
-        /**
-         * Sets a custom color renderer for the glass column.
-         *
-         * @param colorRenderer the renderer to use
-         * @return this builder for chaining
-         */
         public @NotNull BeaconBeamBuilder colorRenderer(BeaconColorRenderer colorRenderer) {
             this.colorRenderer = colorRenderer;
             return this;
         }
 
-        /**
-         * Sets the visual audience.
-         *
-         * @param audience the target audience
-         * @return this builder for chaining
-         */
         public @NotNull BeaconBeamBuilder audience(@NotNull VisualAudience audience) {
             this.audience = audience;
             return this;
         }
 
-        /**
-         * Sets the view distance for this visual.
-         *
-         * @param viewDistance the maximum view distance in blocks
-         * @return this builder for chaining
-         */
         public @NotNull BeaconBeamBuilder viewDistance(double viewDistance) {
             this.viewDistance = viewDistance;
             return this;
@@ -478,56 +334,26 @@ public final class VisualBuilder {
             this.manager = manager;
         }
 
-        /**
-         * Sets the block structure shape.
-         *
-         * @param shape the shape to use
-         * @return this builder for chaining
-         */
         public @NotNull BlockStructureBuilder shape(@NotNull BlockStructureShape shape) {
             this.shape = shape;
             return this;
         }
 
-        /**
-         * Sets the structure color.
-         *
-         * @param color the text color
-         * @return this builder for chaining
-         */
         public @NotNull BlockStructureBuilder color(@NotNull TextColor color) {
             this.color = color;
             return this;
         }
 
-        /**
-         * Sets whether the structure blocks should glow.
-         *
-         * @param glow {@code true} to enable glowing
-         * @return this builder for chaining
-         */
         public @NotNull BlockStructureBuilder glow(boolean glow) {
             this.glow = glow;
             return this;
         }
 
-        /**
-         * Sets the visual audience.
-         *
-         * @param audience the target audience
-         * @return this builder for chaining
-         */
         public @NotNull BlockStructureBuilder audience(@NotNull VisualAudience audience) {
             this.audience = audience;
             return this;
         }
 
-        /**
-         * Sets the view distance for this visual.
-         *
-         * @param viewDistance the maximum view distance in blocks
-         * @return this builder for chaining
-         */
         public @NotNull BlockStructureBuilder viewDistance(double viewDistance) {
             this.viewDistance = viewDistance;
             return this;

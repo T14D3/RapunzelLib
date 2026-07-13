@@ -16,13 +16,6 @@ import java.util.Objects;
 public abstract class LifecycleOwnerGameEventBridgeInstaller extends AbstractGameEventBridgeInstaller {
     private final String ownerTypeName;
 
-    /**
-     * Constructs a new lifecycle owner bridge installer.
-     *
-     * @param platformId      the platform identifier
-     * @param supportManifest the support manifest
-     * @param ownerTypeName   the fully qualified class name of the lifecycle owner
-     */
     protected LifecycleOwnerGameEventBridgeInstaller(
         @NotNull PlatformId platformId,
         @NotNull GameEventSupportManifest supportManifest,

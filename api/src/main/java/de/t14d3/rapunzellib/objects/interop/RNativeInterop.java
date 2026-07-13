@@ -10,13 +10,6 @@ import java.util.Optional;
  * alternative type interfaces.
  */
 public interface RNativeInterop {
-    /**
-     * Attempts to find a view of the given type for the specified native wrapper.
-     *
-     * @param nativeWrapper the native wrapper to adapt
-     * @param type          the desired view type class
-     * @param <T>           the view type
-     * @return an {@link Optional} containing the view, or empty if no adapter is registered
-     */
+    /** Finds a view of the given type for the specified native wrapper. */
     <T> @NotNull Optional<T> findView(@NotNull RNative nativeWrapper, @NotNull Class<T> type);
 }

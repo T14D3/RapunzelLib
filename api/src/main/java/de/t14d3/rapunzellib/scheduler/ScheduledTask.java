@@ -5,17 +5,11 @@ package de.t14d3.rapunzellib.scheduler;
  */
 public interface ScheduledTask {
     /**
-     * Cancels this task.
-     *
-     * <p>Implementations should treat cancellation as best-effort and idempotent.</p>
+     * Cancels this task. Implementations should treat cancellation as best-effort and idempotent.
      */
     void cancel();
 
-    /**
-     * Returns whether this task has been cancelled.
-     *
-     * @return true if cancelled, false otherwise
-     */
+    /** Returns whether this task has been cancelled. */
     boolean isCancelled();
 }
 

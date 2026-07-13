@@ -104,11 +104,6 @@ final class GameEventCatalog {
     private GameEventCatalog() {
     }
 
-    /**
-     * Returns the list of all shared event types.
-     *
-     * @return an unmodifiable list of event classes
-     */
     static List<Class<? extends GameEvent>> sharedEventTypes() {
         return SHARED_EVENT_TYPES;
     }

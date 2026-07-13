@@ -24,9 +24,7 @@ import java.util.function.Supplier;
  * @param <S> the command source type
  */
 public final class RKeyArgument<S extends RCommandSource> implements RArgument<S, RKey> {
-    /**
-     * The shared singleton Brigadier argument type for key parsing.
-     */
+    
     private static final KeyArgumentType ARGUMENT_TYPE = new KeyArgumentType();
 
     private final String name;
@@ -46,25 +44,10 @@ public final class RKeyArgument<S extends RCommandSource> implements RArgument<S
         this.suggestions = List.copyOf(suggestions);
     }
 
-    /**
-     * Creates a required key argument.
-     *
-     * @param name the argument name
-     * @param <S>  the command source type
-     * @return the key argument
-     */
     public static <S extends RCommandSource> @NotNull RKeyArgument<S> required(@NotNull String name) {
         return new RKeyArgument<>(name, false, null, List.of());
     }
 
-    /**
-     * Creates an optional key argument with a default value.
-     *
-     * @param name         the argument name
-     * @param defaultValue the default key value
-     * @param <S>          the command source type
-     * @return the key argument
-     */
     public static <S extends RCommandSource> @NotNull RKeyArgument<S> optional(
         @NotNull String name,
         @NotNull RKey defaultValue
@@ -119,9 +102,6 @@ public final class RKeyArgument<S extends RCommandSource> implements RArgument<S
         return RKey.parse(input);
     }
 
-    /**
-     * Brigadier {@link ArgumentType} that parses {@link RKey} values from command input.
-     */
     private static final class KeyArgumentType implements ArgumentType<RKey> {
         private static final DynamicCommandExceptionType INVALID_KEY =
             new DynamicCommandExceptionType(value -> () -> "Invalid key '" + value + "'");
@@ -143,13 +123,6 @@ public final class RKeyArgument<S extends RCommandSource> implements RArgument<S
             }
         }
 
-        /**
-         * Reads a key string from the reader, handling quoted strings.
-         *
-         * @param reader the Brigadier string reader
-         * @return the key string
-         * @throws CommandSyntaxException if reading fails
-         */
         private static @NotNull String readKey(@NotNull StringReader reader) throws CommandSyntaxException {
             if (reader.canRead() && reader.peek() == '"') {
                 return reader.readQuotedString();

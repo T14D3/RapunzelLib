@@ -23,14 +23,8 @@ package de.t14d3.rapunzellib.commands.core;
  */
 public final class RCommandResult {
     
-    /**
-     * The command executed successfully.
-     */
     public static final int SUCCESS = 1;
     
-    /**
-     * The command failed to execute.
-     */
     public static final int FAILURE = 0;
     
     /**

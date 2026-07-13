@@ -1,0 +1,5 @@
+de.t14d3.rapunzellib.devrunner.platform.PaperPlatformAdapter
+de.t14d3.rapunzellib.devrunner.platform.VelocityPlatformAdapter
+de.t14d3.rapunzellib.devrunner.platform.FabricPlatformAdapter
+de.t14d3.rapunzellib.devrunner.platform.NeoForgePlatformAdapter
+de.t14d3.rapunzellib.devrunner.platform.SpongePlatformAdapter
