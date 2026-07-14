@@ -12,6 +12,15 @@ public abstract class ContextWrapperGenerationExtension {
     public ContextWrapperGenerationExtension(ObjectFactory objects) {
     }
 
+    /**
+     * Whether the context wrapper task is enabled at all.
+     * <p>
+     * When {@code false}, the {@code rapunzellibGenerateContextWrapper}
+     * task is not registered and no wrapper class is generated.
+     * Defaults to {@code true}.
+     */
+    public abstract Property<Boolean> getEnabled();
+
     public abstract Property<String> getPackageName();
 
     public abstract Property<String> getClassName();
@@ -29,6 +38,7 @@ public abstract class ContextWrapperGenerationExtension {
     public abstract Property<Boolean> getTransformSources();
 
     public void applyDefaultConventions(Project project) {
+        getEnabled().convention(true);
         getPackageName().convention("generated.rapunzellib.context");
         getClassName().convention(sanitizeIdentifier(project.getName()) + "Rapunzel");
         getOutputDir().convention(project.getLayout().getProjectDirectory().dir("build/generated/sources/rapunzellib-context-wrapper"));

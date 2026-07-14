@@ -16,6 +16,7 @@ plugins {
     alias(libs.plugins.root.subproject.conventions)
     alias(libs.plugins.root.publishing.conventions)
     alias(libs.plugins.dokka)
+    alias(libs.plugins.rapunzellib.visualizer)
     alias(libs.plugins.userdev) apply false
     alias(libs.plugins.vanilla.gradle) apply false
 }

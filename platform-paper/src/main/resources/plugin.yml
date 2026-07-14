@@ -1,7 +1,7 @@
-name: RapunzelLibPlatformPaper
+name: RapunzelLib
 main: de.t14d3.rapunzellib.platform.paper.PaperPlatformPlugin
 version: ${version}
-description: Dynamically loaded RapunzelLib Paper platform companion plugin.
+description: RapunzelLib - cross-platform Minecraft library.
 authors:
   - t14d3
 api-version: '1.21'

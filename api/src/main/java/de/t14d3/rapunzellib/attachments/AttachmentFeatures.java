@@ -17,7 +17,7 @@ import java.util.Optional;
 /**
  * Entry point for installing and accessing attachment features on a platform.
  *
- * <p>Resolves the platform-specific {@link AttachmentFeatureInstaller} via {@link ServiceLoader}
+ * <p>Resolves the platform-specific {@link AttachmentFeatureInstaller} via {@link java.util.ServiceLoader}
  * and provides static convenience methods for attachment operations.</p>
  */
 public final class AttachmentFeatures {

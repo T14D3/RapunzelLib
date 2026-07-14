@@ -59,6 +59,10 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
         RapunzelLibTaskRegistrars.registerSharedParityTask(project);
         // Context wrapper task - register early so it's available in afterEvaluate.
         project.afterEvaluate(p -> {
+            if (!extension.getContextWrapper().getEnabled().get()) {
+                return;
+            }
+
             TaskProvider<GenerateContextWrapperTask> ctxWrapper =
                 RapunzelLibTaskRegistrars.registerContextWrapperTask(p, extension);
             RapunzelLibTaskRegistrars.configureContextWrapperTask(p, extension, ctxWrapper);
@@ -81,12 +85,14 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
 
                     // Replace the original source dir with the wrapper output dir
                     // in the compile task, preserving any other source dirs.
+                    // Use canonical paths to avoid path representation mismatches.
                     p.getTasks().named(mainSourceSet.getCompileJavaTaskName(), JavaCompile.class)
                         .configure(compile -> {
                             compile.dependsOn(ctxWrapper);
                             compile.setSource(p.files(p.provider(() -> {
                                 Set<File> dirs = new LinkedHashSet<>(mainSourceSet.getJava().getSrcDirs());
-                                dirs.remove(sourceDirFinal);
+                                String srcDirCanonical = canonicalPath(sourceDirFinal);
+                                dirs.removeIf(f -> canonicalPath(f).equals(srcDirCanonical));
                                 dirs.add(ctxWrapper.get().getOutputDir().get().getAsFile());
                                 return dirs;
                             })));
@@ -183,12 +189,13 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
                 project.getTasks().named(mainSourceSet.getSourcesJarTaskName()).configure(t -> t.dependsOn(activeMainTask));
             }
             if (project.getTasks().findByName("javadoc") != null) {
-                File compileSourceDir = multiversionOutputDir(project, activeVersion, "generated-sources/multiversion");
-                Set<File> compileSourceDirs = new LinkedHashSet<>(mainSourceSet.getJava().getSrcDirs());
-                compileSourceDirs.remove(sourceDir);
+                File javadocSourceDir = multiversionOutputDir(project, activeVersion, "generated-sources/multiversion");
+                Set<File> javadocSourceDirs = new LinkedHashSet<>(mainSourceSet.getJava().getSrcDirs());
+                String srcDirCanonical = canonicalPath(sourceDir);
+                javadocSourceDirs.removeIf(f -> canonicalPath(f).equals(srcDirCanonical));
                 project.getTasks().named("javadoc", Javadoc.class).configure(task -> {
                     task.dependsOn(activeMainTask);
-                    task.setSource(project.files(compileSourceDir, compileSourceDirs));
+                    task.setSource(project.files(javadocSourceDir, javadocSourceDirs));
                 });
             }
         }
@@ -234,7 +241,12 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
             TaskProvider<PreprocessSourcesTask> activePreprocessTask = activeTask;
             File compileSourceDir = activeOutputDir;
             Set<File> compileSourceDirs = new LinkedHashSet<>(sourceSet.getJava().getSrcDirs());
-            compileSourceDirs.remove(sourceDir);
+            // Remove the original source directory using canonical paths to handle
+            // path representation differences (e.g. relative vs absolute, symlinks).
+            // This prevents both the original AND preprocessed sources from appearing
+            // in the compile task source, which would cause duplicate class errors.
+            String sourceDirCanonical = canonicalPath(sourceDir);
+            compileSourceDirs.removeIf(f -> canonicalPath(f).equals(sourceDirCanonical));
             project.getTasks().named(sourceSet.getCompileJavaTaskName(), JavaCompile.class).configure(task -> {
                 task.dependsOn(activePreprocessTask);
                 task.setSource(project.files(compileSourceDir, compileSourceDirs));
@@ -279,5 +291,14 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
 
     private File multiversionOutputDir(Project project, String version, String outputRoot) {
         return new File(project.getBuildDir(), outputRoot + "/" + version);
+    }
+
+    private static String canonicalPath(File file) {
+        if (file == null) return "";
+        try {
+            return file.getCanonicalPath();
+        } catch (java.io.IOException e) {
+            return file.getAbsolutePath();
+        }
     }
 }

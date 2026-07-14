@@ -29,6 +29,9 @@ class GenerateRegistryCatalogTaskFunctionalTest {
             }
 
             rapunzellib {
+                contextWrapper {
+                    enabled.set(false)
+                }
                 registryCatalogs {
                     create('demo-item-types') {
                         packageName.set('com.example.catalog')
@@ -106,6 +109,9 @@ class GenerateRegistryCatalogTaskFunctionalTest {
             }
 
             rapunzellib {
+                contextWrapper {
+                    enabled.set(false)
+                }
                 registryCatalogs {
                     create('vanilla-item-types') {
                         packageName.set('com.example.catalog')

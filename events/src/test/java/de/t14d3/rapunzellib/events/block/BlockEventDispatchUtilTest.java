@@ -51,7 +51,7 @@ final class BlockEventDispatchUtilTest {
             70,
             8,
             RKey.of("minecraft:redstone_wire"),
-            55,
+            RKey.of("minecraft:redstone_wire"),
             true
         );
 

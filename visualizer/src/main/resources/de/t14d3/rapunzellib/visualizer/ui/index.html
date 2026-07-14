@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Codebase Visualizer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="toolbar">
+            <div id="breadcrumb"></div>
+            <input type="text" id="search" placeholder="Search modules, packages, classes, methods...  (/ to focus)" autocomplete="off">
+            <div id="search-results"></div>
+        </div>
+        <div id="controls">
+            <div class="control-group">
+                <span class="control-label">Mode</span>
+                <div id="mode-selector"></div>
+            </div>
+            <div class="control-group">
+                <span class="control-label">Layers</span>
+                <div id="layers"></div>
+            </div>
+            <div class="control-group">
+                <span class="control-label">Filters</span>
+                <div id="filters"></div>
+            </div>
+            <div class="control-group">
+                <span class="control-label">Focus depth</span>
+                <div id="focus-depth-control">
+                    <input type="range" id="focus-depth" min="0" max="4" value="2" step="1">
+                    <span id="focus-depth-value">2</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <span class="control-label">Expand depth</span>
+                <div id="expand-depth-control">
+                    <input type="range" id="expand-depth" min="0" max="6" value="3" step="1">
+                    <span id="expand-depth-value">3</span>
+                </div>
+            </div>
+            <div class="control-group" id="radial-spacing-control" style="display:none">
+                <span class="control-label">Radial spacing</span>
+                <div id="radial-spacing-control-inner">
+                    <input type="range" id="radial-spacing" min="3" max="30" value="10" step="1">
+                    <span id="radial-spacing-value">1.0</span>
+                </div>
+            </div>
+            <div class="control-group">
+                <span class="control-label">&nbsp;</span>
+                <div id="buttons">
+                    <button id="fit-view" title="Fit all visible nodes in view (F)">Fit View</button>
+                    <button id="collapse-all" title="Collapse all expanded nodes">Collapse All</button>
+                    <button id="reset-layout" title="Reset user positions and re-layout">Reset Layout</button>
+                </div>
+            </div>
+        </div>
+        <canvas id="graph-canvas"></canvas>
+        <canvas id="minimap"></canvas>
+        <div id="tooltip"></div>
+        <div id="context-menu" class="hidden"></div>
+        <div id="detail-panel"></div>
+    </div>
+    <script src="graph-data.js"></script>
+    <script src="app.constants.js"></script>
+    <script src="app.indices.js"></script>
+    <script src="app.layout.tree.js"></script>
+    <script src="app.layout.radial.js"></script>
+    <script src="app.layout.cluster.js"></script>
+    <script src="app.focus.js"></script>
+    <script src="app.render.js"></script>
+    <script src="app.interact.js"></script>
+    <script src="app.ui.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

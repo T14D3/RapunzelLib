@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "rapunzellib_platform_fabric",
+  "id": "rapunzellib",
   "version": "${version}",
-  "name": "RapunzelLib (Fabric Platform)",
-  "description": "Fabric startup companion mod for RapunzelLib.",
+  "name": "RapunzelLib",
+  "description": "RapunzelLib - cross-platform Minecraft library.",
   "authors": [
     "t14d3"
   ],

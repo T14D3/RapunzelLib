@@ -26,6 +26,9 @@ class GenerateRNbtSchemaTaskFunctionalTest {
             }
 
             rapunzellib {
+                contextWrapper {
+                    enabled.set(false)
+                }
                 rNbtSchema {
                     packageName.set('com.example.nbt')
                     className.set('GeneratedEntityNbt')
@@ -99,6 +102,12 @@ class GenerateRNbtSchemaTaskFunctionalTest {
             plugins {
                 id 'java'
                 id 'de.t14d3.rapunzellib'
+            }
+
+            rapunzellib {
+                contextWrapper {
+                    enabled.set(false)
+                }
             }
 
             def generatedDir = layout.projectDirectory.dir('src/generated/java')

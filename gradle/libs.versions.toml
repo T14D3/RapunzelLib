@@ -44,6 +44,7 @@ neoforge-moddev = { id = "net.neoforged.moddev" }
 fabric-loom = { id = "net.fabricmc.fabric-loom" }
 mixin = { id = "org.spongepowered.mixin", version.ref = "mixin-plugin" }
 rapunzellib = { id = "de.t14d3.rapunzellib" }
+rapunzellib-visualizer = { id = "de.t14d3.rapunzellib.visualizer" }
 
 
 root-subproject-conventions = { id = "de.t14d3.rapunzellib.root-subproject-conventions" }

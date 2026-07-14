@@ -39,6 +39,10 @@ pluginManagement {
         name = "gradle-plugin-build"
     }
 
+    includeBuild("visualizer") {
+        name = "visualizer-build"
+    }
+
     resolutionStrategy {
         eachPlugin {
             when (requested.id.id) {

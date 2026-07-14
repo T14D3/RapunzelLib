@@ -27,6 +27,9 @@ class GenerateKeyCatalogTaskFunctionalTest {
             }
 
             rapunzellib {
+                contextWrapper {
+                    enabled.set(false)
+                }
                 keyCatalog {
                     packageName.set('com.example.catalog')
                     className.set('GeneratedKeys')
@@ -80,6 +83,9 @@ class GenerateKeyCatalogTaskFunctionalTest {
             }
 
             rapunzellib {
+                contextWrapper {
+                    enabled.set(false)
+                }
                 keyCatalog {
                     packageName.set('com.example.catalog')
                     className.set('GeneratedKeys')
