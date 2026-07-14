@@ -392,8 +392,8 @@
         };
     }
 
-    RV.computeBounds = computeBounds;
-    RV.render = render;
-    RV.renderMinimap = renderMinimap;
-    RV.minimapToWorld = minimapToWorld;
+    RV.computeBounds2d = computeBounds;
+    RV._render2d = render;
+    RV.renderMinimap2d = renderMinimap;
+    RV.minimapToWorld2d = minimapToWorld;
 })(window.RV = window.RV || {});

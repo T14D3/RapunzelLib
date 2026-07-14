@@ -36,7 +36,12 @@ public final class JsonWriter {
     private final Gson gson;
 
     public JsonWriter() {
-        this.gson = new GsonBuilder().setPrettyPrinting().create();
+        // Compact (non-pretty) output: pretty-printing wastes ~16% of the
+        // payload on whitespace for large graphs. The binary format
+        // (BinaryGraphWriter) is the primary transport; this JSON is kept
+        // only for programmatic/HTTP consumers and human inspection, so
+        // compactness matters more than readability.
+        this.gson = new GsonBuilder().create();
     }
 
     public String writeJson(Graph graph) {

@@ -355,6 +355,7 @@
         RV.recomputeFocusLayer();
         RV.showDetailPanel(id);
         RV.updateBreadcrumb();
+        if (RV.markRenderDirty) RV.markRenderDirty();
         RV.render();
     }
 

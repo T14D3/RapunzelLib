@@ -81,6 +81,7 @@
                 cb.type = 'checkbox';
                 cb.addEventListener('change', function () {
                     S.filters[f.key] = cb.checked;
+                    if (RV.markRenderDirty) RV.markRenderDirty();
                     RV.computeLayout();
                     RV.computeBounds();
                     RV.render();
@@ -106,6 +107,7 @@
                 cb.checked = S.visibleLayers[group] !== false;
                 cb.addEventListener('change', function () {
                     S.visibleLayers[group] = cb.checked;
+                    if (RV.markRenderDirty) RV.markRenderDirty();
                     RV.render();
                 });
                 label.appendChild(cb);

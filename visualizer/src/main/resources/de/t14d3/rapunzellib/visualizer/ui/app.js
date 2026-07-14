@@ -94,6 +94,7 @@
             RV.layouts.cluster();
         }
         RV.computeBounds();
+        if (RV.markRenderDirty) RV.markRenderDirty();
     };
 
     // ---- Persistence -------------------------------------------------------
@@ -167,21 +168,16 @@
     // ---- Init --------------------------------------------------------------
 
     function init() {
-        if (window.__GRAPH_DATA__) {
-            S.graph = window.__GRAPH_DATA__;
+        RV.loadGraph().then(function (data) {
+            S.graph = data;
             start();
-        } else {
-            fetch('graph.json')
-                .then(function (r) { return r.json(); })
-                .then(function (data) { S.graph = data; start(); })
-                .catch(function () {
-                    document.body.innerHTML =
-                        '<div style="padding:40px;color:#c9d1d9;font-family:sans-serif">' +
-                        '<h2>Failed to load graph data</h2>' +
-                        '<p>If you opened this file directly, make sure <code>graph-data.js</code> is present next to <code>index.html</code>.</p>' +
-                        '</div>';
-                });
-        }
+        }).catch(function () {
+            document.body.innerHTML =
+                '<div style="padding:40px;color:#c9d1d9;font-family:sans-serif">' +
+                '<h2>Failed to load graph data</h2>' +
+                '<p>If you opened this file directly, make sure <code>graph-data.js</code> is present next to <code>index.html</code>.</p>' +
+                '</div>';
+        });
     }
 
     function start() {
