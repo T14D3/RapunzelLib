@@ -45,6 +45,7 @@
         visibleLayers: {},
         layerAlpha: {},
         filters: { hideExternal: false, hideTest: false, hidePrivate: false },
+        excludePathPatterns: [],
 
         focusDepth: 2,
         expandDepth: 3,
@@ -190,6 +191,7 @@
         RV.setupInteraction();
         RV.setupSearch();
         RV.setupFilters();
+        RV.setupExcludePaths();
         RV.setupLayerToggles();
         RV.setupModeSelector();
         RV.setupDepthSliders();

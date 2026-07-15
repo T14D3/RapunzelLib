@@ -93,6 +93,25 @@
         }
     }
 
+    // ---- Exclude paths ----------------------------------------------------
+
+    function setupExcludePaths() {
+        S = RV.state;
+        var input = document.getElementById('exclude-paths');
+        if (!input) return;
+        var timer = null;
+        input.addEventListener('input', function () {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(function () {
+                RV.updateExcludePatterns(input.value);
+                if (RV.markRenderDirty) RV.markRenderDirty();
+                RV.computeLayout();
+                RV.computeBounds();
+                RV.render();
+            }, 200);
+        });
+    }
+
     // ---- Layer toggles + opacity sliders -----------------------------------
 
     function setupLayerToggles() {
@@ -604,6 +623,7 @@
 
     RV.setupSearch = setupSearch;
     RV.setupFilters = setupFilters;
+    RV.setupExcludePaths = setupExcludePaths;
     RV.setupLayerToggles = setupLayerToggles;
     RV.setupModeSelector = setupModeSelector;
     RV.setMode = setMode;

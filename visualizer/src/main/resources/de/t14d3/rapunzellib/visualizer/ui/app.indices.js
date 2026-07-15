@@ -130,8 +130,61 @@
         if (S.filters.hideExternal && node.properties && node.properties.external) return false;
         if (S.filters.hideTest && isTestNode(node)) return false;
         if (S.filters.hidePrivate && hasModifier(node, 'private')) return false;
+        if (S.excludePathPatterns.length > 0 && node.sourceFile && matchesExcludePath(node.sourceFile)) return false;
         return true;
     }
+
+    function matchesExcludePath(path) {
+        // Normalize to forward slashes for matching.
+        var p = path.replace(/\\/g, '/');
+        for (var i = 0; i < S.excludePathPatterns.length; i++) {
+            if (S._excludeRegexes[i].test(p)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Convert a glob pattern to a RegExp. Supports:
+     *   **  - matches any sequence of characters (including /)
+     *   *   - matches any sequence except /
+     *   ?   - matches a single character except /
+     */
+    RV.globToRegex = function (glob) {
+        var s = glob.trim();
+        var out = '';
+        var i = 0;
+        while (i < s.length) {
+            var c = s.charAt(i);
+            if (c === '*' && i + 1 < s.length && s.charAt(i + 1) === '*') {
+                out += '.*';
+                i += 2;
+            } else if (c === '*') {
+                out += '[^/]*';
+                i++;
+            } else if (c === '?') {
+                out += '[^/]';
+                i++;
+            } else if ('.+()[]{}^$|\\'.indexOf(c) >= 0) {
+                out += '\\' + c;
+                i++;
+            } else {
+                out += c;
+                i++;
+            }
+        }
+        return new RegExp(out, 'i');
+    };
+
+    /**
+     * Update the exclude-path patterns from a comma-separated string.
+     * Compiles regexes once and stores them in S._excludeRegexes.
+     */
+    RV.updateExcludePatterns = function (csv) {
+        S = RV.state;
+        var parts = (csv || '').split(',').map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
+        S.excludePathPatterns = parts;
+        S._excludeRegexes = parts.map(function (p) { return RV.globToRegex(p); });
+    };
 
     function isEdgeVisible(edge) {
         var group = RV.EDGE_GROUPS[edge.type];
@@ -192,4 +245,5 @@
     RV.isEdgeVisible = isEdgeVisible;
     RV.ancestorPath = ancestorPath;
     RV.getDescendantIds = getDescendantIds;
+    RV.matchesExcludePath = matchesExcludePath;
 })(window.RV = window.RV || {});

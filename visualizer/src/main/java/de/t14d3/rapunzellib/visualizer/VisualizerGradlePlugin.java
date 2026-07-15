@@ -39,6 +39,7 @@ public final class VisualizerGradlePlugin implements Plugin<Project> {
                 );
                 t.getOutputDir().convention(extension.getOutputDir());
                 t.getIncludeTestSources().convention(extension.getIncludeTestSources());
+                t.getExcludePaths().convention(extension.getExcludePaths());
             }
         );
 

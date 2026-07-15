@@ -27,6 +27,12 @@
                 <div id="filters"></div>
             </div>
             <div class="control-group">
+                <span class="control-label">Exclude paths</span>
+                <div id="exclude-paths-control">
+                    <input type="text" id="exclude-paths" placeholder="glob patterns, comma-separated (e.g. **/generated/**)" autocomplete="off">
+                </div>
+            </div>
+            <div class="control-group">
                 <span class="control-label">Focus depth</span>
                 <div id="focus-depth-control">
                     <input type="range" id="focus-depth" min="0" max="4" value="2" step="1">

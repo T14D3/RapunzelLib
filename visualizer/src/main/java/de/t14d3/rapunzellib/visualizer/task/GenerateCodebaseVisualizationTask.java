@@ -3,6 +3,7 @@ package de.t14d3.rapunzellib.visualizer.task;
 import de.t14d3.rapunzellib.visualizer.VisualizerExtension;
 import de.t14d3.rapunzellib.visualizer.collector.GraphBuilder;
 import de.t14d3.rapunzellib.visualizer.collector.JavacSourceCollector;
+import de.t14d3.rapunzellib.visualizer.collector.SourceCollector;
 import de.t14d3.rapunzellib.visualizer.model.Graph;
 import de.t14d3.rapunzellib.visualizer.renderer.HtmlGenerator;
 import de.t14d3.rapunzellib.visualizer.renderer.JsonWriter;
@@ -10,6 +11,7 @@ import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
+import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.Input;
@@ -20,6 +22,8 @@ import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.TaskAction;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Gradle task that analyses the entire multi-module Java project and generates
@@ -48,16 +52,23 @@ public abstract class GenerateCodebaseVisualizationTask extends DefaultTask {
     @Input
     public abstract Property<Boolean> getIncludeTestSources();
 
+    @Input
+    public abstract ListProperty<String> getExcludePaths();
+
     @OutputDirectory
     public abstract DirectoryProperty getOutputDir();
 
     @TaskAction
     public void generate() {
         boolean includeTest = getIncludeTestSources().getOrElse(false);
+        List<String> excludePatterns = getExcludePaths().getOrElse(List.of());
+        PathMatcher matcher = new PathMatcher(excludePatterns);
+
         GraphBuilder builder = new GraphBuilder(
             getProject().getRootProject(),
             new JavacSourceCollector(),
-            includeTest
+            includeTest,
+            matcher
         );
         Graph graph = builder.build();
 
@@ -66,11 +77,13 @@ public abstract class GenerateCodebaseVisualizationTask extends DefaultTask {
         File outputDir = getOutputDir().get().getAsFile();
         htmlGenerator.generate(graph, jsonWriter, outputDir);
 
+        int excluded = matcher.getExcludedCount();
         getLogger().lifecycle(
-            "Generated codebase visualization report at {} ({} nodes, {} edges)",
+            "Generated codebase visualization report at {} ({} nodes, {} edges{})",
             getProject().relativePath(outputDir),
             graph.nodeCount(),
-            graph.edgeCount()
+            graph.edgeCount(),
+            excluded > 0 ? ", " + excluded + " source files excluded" : ""
         );
 
         if (graph.nodeCount() <= 1) {

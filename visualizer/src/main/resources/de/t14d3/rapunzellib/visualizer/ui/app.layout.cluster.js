@@ -1,5 +1,12 @@
 /* =====================================================================
  * Codebase Visualizer - cluster layout (force-directed, module grouping)
+ *
+ * Uses a numerically stable force simulation with:
+ *   - a spatial-hash-grid O(N) repulsion approximation (scales to 20k+ nodes)
+ *   - bounded per-step displacement (prevents NaN explosions)
+ *   - contains-springs to keep parent/child proximity
+ *   - module-center gravity to group modules
+ *   - a cooling schedule (alpha decay) that converges
  * ===================================================================== */
 (function (RV) {
     'use strict';
@@ -13,7 +20,7 @@
         applyUserPositions();
         if (!S.sim) S.sim = newSim();
         S.sim.init();
-        S.sim.run(220);
+        S.sim.run(300);
     }
 
     function seed() {
@@ -50,6 +57,12 @@
         }
     }
 
+    // ---- Force simulation --------------------------------------------------
+
+    var MAX_DISPLACEMENT = 50;   // cap per-step movement to prevent explosions
+    var REPULSION_RADIUS = 120;  // grid cell size for spatial hash
+    var REPULSION_STRENGTH = 800;
+
     function newSim() {
         var nodes = [];
         var nodeIndex = {};
@@ -68,6 +81,11 @@
                 var node = S.nodesById[id];
                 if (!node) continue;
                 var p = S.positions[id];
+                // Guard against NaN/Inf from a previous broken run.
+                if (!isFinite(p.x) || !isFinite(p.y) || isNaN(p.x) || isNaN(p.y)) {
+                    p = { x: (Math.random() - 0.5) * 200, y: (Math.random() - 0.5) * 200 };
+                    S.positions[id] = p;
+                }
                 var entry = {
                     id: id, x: p.x, y: p.y, vx: 0, vy: 0,
                     fixed: !!S.pinned[id] || !!S.userPositions[id],
@@ -108,27 +126,58 @@
             alpha = 1;
         }
 
-        function step() {
+        // O(N) repulsion via a spatial hash grid. Each node only repels
+        // nodes in its own cell and the 8 neighbouring cells, giving
+        // near-linear time and bounded forces.
+        function applyRepulsion() {
             var N = nodes.length;
-            var cap = Math.min(N, 1500);
-            for (var i = 0; i < cap; i++) {
-                var a = nodes[i];
-                for (var j = i + 1; j < cap; j++) {
-                    var b = nodes[j];
-                    var dx = a.x - b.x;
-                    var dy = a.y - b.y;
-                    var d2 = dx * dx + dy * dy + 0.01;
-                    var d = Math.sqrt(d2);
-                    var rep = 1400 / d2;
-                    var fx = (dx / d) * rep;
-                    var fy = (dy / d) * rep;
-                    a.vx += fx; a.vy += fy;
-                    b.vx -= fx; b.vy -= fy;
+            var cell = REPULSION_RADIUS;
+            var grid = {};
+            // Bin all nodes.
+            for (var i = 0; i < N; i++) {
+                var nd = nodes[i];
+                var gx = Math.floor(nd.x / cell);
+                var gy = Math.floor(nd.y / cell);
+                var key = gx + ',' + gy;
+                if (!grid[key]) grid[key] = [];
+                grid[key].push(nd);
+            }
+            // For each node, check its cell + 8 neighbours.
+            for (var n = 0; n < N; n++) {
+                var a = nodes[n];
+                var agx = Math.floor(a.x / cell);
+                var agy = Math.floor(a.y / cell);
+                for (var dx = -1; dx <= 1; dx++) {
+                    for (var dy = -1; dy <= 1; dy++) {
+                        var bucket = grid[(agx + dx) + ',' + (agy + dy)];
+                        if (!bucket) continue;
+                        for (var b = 0; b < bucket.length; b++) {
+                            var other = bucket[b];
+                            if (other === a) continue;
+                            var ddx = a.x - other.x;
+                            var ddy = a.y - other.y;
+                            var d2 = ddx * ddx + ddy * ddy;
+                            if (d2 > cell * cell) continue; // too far
+                            if (d2 < 1) d2 = 1; // clamp to prevent explosion
+                            var d = Math.sqrt(d2);
+                            var force = REPULSION_STRENGTH / d2;
+                            // Clamp force to prevent numerical explosion.
+                            if (force > 20) force = 20;
+                            var fx = (ddx / d) * force;
+                            var fy = (ddy / d) * force;
+                            a.vx += fx; a.vy += fy;
+                        }
+                    }
                 }
             }
+        }
+
+        function step() {
+            applyRepulsion();
             for (var s = 0; s < containsSprings.length; s++) applySpring(containsSprings[s]);
             for (var t = 0; t < crossSprings.length; t++) applySpring(crossSprings[t]);
 
+            // Module-center gravity.
             for (var mId in moduleCenters) {
                 if (!moduleCenters.hasOwnProperty(mId)) continue;
                 var c = moduleCenters[mId];
@@ -140,14 +189,25 @@
                     ent.vy += (c.y - ent.y) * 0.002 * alpha;
                 }
             }
-            for (var n = 0; n < N; n++) {
+
+            // Integrate with velocity clamping.
+            for (var n = 0; n < nodes.length; n++) {
                 var nd = nodes[n];
                 if (nd.fixed) { nd.vx = 0; nd.vy = 0; continue; }
                 nd.vx *= 0.85; nd.vy *= 0.85;
+                // Clamp velocity to prevent huge jumps.
+                var speed = Math.sqrt(nd.vx * nd.vx + nd.vy * nd.vy);
+                if (speed > MAX_DISPLACEMENT) {
+                    nd.vx = (nd.vx / speed) * MAX_DISPLACEMENT;
+                    nd.vy = (nd.vy / speed) * MAX_DISPLACEMENT;
+                }
                 nd.x += nd.vx * alpha;
                 nd.y += nd.vy * alpha;
+                // Guard against NaN.
+                if (isNaN(nd.x) || !isFinite(nd.x)) nd.x = 0;
+                if (isNaN(nd.y) || !isFinite(nd.y)) nd.y = 0;
             }
-            alpha *= 0.99;
+            alpha *= 0.985;
         }
 
         function applySpring(sp) {

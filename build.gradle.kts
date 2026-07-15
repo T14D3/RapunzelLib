@@ -343,3 +343,7 @@ tasks.register("javadoc") {
     description = "Generates unified HTML documentation via Dokka"
     dependsOn("dokkaGenerate")
 }
+
+codebaseVisualizer {
+    excludePaths.set(listOf("**/generated-sources/**"))
+}
