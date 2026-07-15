@@ -82,9 +82,7 @@
                 cb.addEventListener('change', function () {
                     S.filters[f.key] = cb.checked;
                     if (RV.markRenderDirty) RV.markRenderDirty();
-                    RV.computeLayout();
-                    RV.computeBounds();
-                    RV.render();
+                    RV.relayoutAndRender();
                 });
                 label.appendChild(cb);
                 label.appendChild(document.createTextNode(' ' + f.label));
@@ -105,9 +103,7 @@
             timer = setTimeout(function () {
                 RV.updateExcludePatterns(input.value);
                 if (RV.markRenderDirty) RV.markRenderDirty();
-                RV.computeLayout();
-                RV.computeBounds();
-                RV.render();
+                RV.relayoutAndRender();
             }, 200);
         });
     }
@@ -186,11 +182,11 @@
             radialCtrl.style.display = (key === 'radial') ? '' : 'none';
         }
         if (key !== 'cluster') S.sim = null;
-        RV.computeLayout();
-        RV.computeBounds();
-        RV.fitToView();
-        RV.render();
-        RV.persistState();
+        RV.computeLayout().then(function () {
+            RV.fitToView();
+            RV.render();
+            RV.persistState();
+        });
     }
 
     function setupRadialSpacing() {
@@ -210,9 +206,7 @@
             S.radialSpacing = parseInt(slider.value, 10) / 10;
             valueDisplay.textContent = S.radialSpacing.toFixed(1);
             if (S.mode === 'radial') {
-                RV.computeLayout();
-                RV.computeBounds();
-                RV.render();
+                RV.relayoutAndRender();
             }
         });
         slider.addEventListener('change', function () {
@@ -250,11 +244,11 @@
         });
         ed.addEventListener('change', function () {
             RV.initExpansion();
-            RV.computeLayout();
-            RV.computeBounds();
-            RV.fitToView();
-            RV.render();
-            RV.persistState();
+            RV.computeLayout().then(function () {
+                RV.fitToView();
+                RV.render();
+                RV.persistState();
+            });
         });
     }
 
@@ -268,20 +262,20 @@
         });
         document.getElementById('collapse-all').addEventListener('click', function () {
             RV.initExpansion();
-            RV.computeLayout();
-            RV.computeBounds();
-            RV.fitToView();
-            RV.render();
+            RV.computeLayout().then(function () {
+                RV.fitToView();
+                RV.render();
+            });
         });
         document.getElementById('reset-layout').addEventListener('click', function () {
             S.userPositions = {};
             S.pinned = {};
             S.sim = null;
-            RV.computeLayout();
-            RV.computeBounds();
-            RV.fitToView();
-            RV.render();
-            RV.persistState();
+            RV.computeLayout().then(function () {
+                RV.fitToView();
+                RV.render();
+                RV.persistState();
+            });
         });
     }
 
@@ -317,17 +311,18 @@
         S = RV.state;
         RV.expandAncestors(id);
         S.selected = id;
-        RV.computeLayout();
-        var pos = S.positions[id];
-        if (pos) {
-            S.camera.x = pos.x;
-            S.camera.y = pos.y;
-            S.zoom = Math.max(S.zoom, 1.2);
-        }
-        RV.recomputeFocusLayer();
-        RV.showDetailPanel(id);
-        RV.updateBreadcrumb();
-        RV.render();
+        RV.computeLayout().then(function () {
+            var pos = S.positions[id];
+            if (pos) {
+                S.camera.x = pos.x;
+                S.camera.y = pos.y;
+                S.zoom = Math.max(S.zoom, 1.2);
+            }
+            RV.recomputeFocusLayer();
+            RV.showDetailPanel(id);
+            RV.updateBreadcrumb();
+            RV.render();
+        });
     }
 
     // ---- Breadcrumb --------------------------------------------------------
@@ -467,24 +462,19 @@
             items.push({ label: 'Collapse all', action: function () {
                 delete S.expanded[nodeId];
                 RV.collapseDescendants(nodeId);
-                RV.computeLayout();
-                RV.computeBounds();
-                RV.recomputeFocusLayer();
-                RV.render();
+                RV.relayoutAndThen(function () {
+                    RV.recomputeFocusLayer();
+                });
             } });
             if (S.expanded[nodeId]) {
                 items.push({ label: 'Expand all', action: function () {
                     RV.expandDescendants(nodeId);
-                    RV.computeLayout();
-                    RV.computeBounds();
-                    RV.render();
+                    RV.relayoutAndRender();
                 } });
             } else {
                 items.push({ label: 'Expand', action: function () {
                     S.expanded[nodeId] = true;
-                    RV.computeLayout();
-                    RV.computeBounds();
-                    RV.render();
+                    RV.relayoutAndRender();
                 } });
             }
         }
@@ -493,9 +483,10 @@
             items.push({ label: 'Unpin position', action: function () {
                 delete S.userPositions[nodeId];
                 delete S.pinned[nodeId];
-                RV.computeLayout();
-                RV.render();
-                RV.persistState();
+                RV.computeLayout().then(function () {
+                    RV.render();
+                    RV.persistState();
+                });
             } });
             if ((S.childrenByParent[nodeId] || []).length > 0) {
                 items.push({ label: 'Recalculate children', action: function () {
@@ -518,37 +509,35 @@
                         delete S.pinned[descendants[di]];
                     }
 
-                    RV.computeLayout();
+                    RV.computeLayout().then(function () {
+                        // The layout has now placed everything relative to the root.
+                        // Compute the polar delta between where the layout put the parent
+                        // and where the user placed it, then apply that delta to the
+                        // entire subtree (parent + descendants) using polar coordinates,
+                        // so the circular "arch" around the root is preserved.
+                        if (parentPos && S.positions[nodeId]) {
+                            var newLayoutPos = S.positions[nodeId];
+                            var newParentR = Math.sqrt(newLayoutPos.x * newLayoutPos.x + newLayoutPos.y * newLayoutPos.y);
+                            var newParentA = Math.atan2(newLayoutPos.y, newLayoutPos.x);
+                            var rRatio = newParentR > 0 ? oldParentR / newParentR : 1;
+                            var aDelta = oldParentA - newParentA;
 
-                    // The layout has now placed everything relative to the root.
-                    // Compute the polar delta between where the layout put the parent
-                    // and where the user placed it, then apply that delta to the
-                    // entire subtree (parent + descendants) using polar coordinates,
-                    // so the circular "arch" around the root is preserved.
-                    if (parentPos && S.positions[nodeId]) {
-                        var newLayoutPos = S.positions[nodeId];
-                        var newParentR = Math.sqrt(newLayoutPos.x * newLayoutPos.x + newLayoutPos.y * newLayoutPos.y);
-                        var newParentA = Math.atan2(newLayoutPos.y, newLayoutPos.x);
-                        var rRatio = newParentR > 0 ? oldParentR / newParentR : 1;
-                        var aDelta = oldParentA - newParentA;
-
-                        var allSubtree = [nodeId].concat(descendants);
-                        for (var si = 0; si < allSubtree.length; si++) {
-                            var p = S.positions[allSubtree[si]];
-                            if (!p) continue;
-                            var cr = Math.sqrt(p.x * p.x + p.y * p.y);
-                            var ca = Math.atan2(p.y, p.x);
-                            var nr = cr * rRatio;
-                            var na = ca + aDelta;
-                            S.positions[allSubtree[si]] = { x: nr * Math.cos(na), y: nr * Math.sin(na) };
-                            // Do NOT pin - the transformation is relative, so future
-                            // parent moves will still affect children correctly.
+                            var allSubtree = [nodeId].concat(descendants);
+                            for (var si = 0; si < allSubtree.length; si++) {
+                                var p = S.positions[allSubtree[si]];
+                                if (!p) continue;
+                                var cr = Math.sqrt(p.x * p.x + p.y * p.y);
+                                var ca = Math.atan2(p.y, p.x);
+                                var nr = cr * rRatio;
+                                var na = ca + aDelta;
+                                S.positions[allSubtree[si]] = { x: nr * Math.cos(na), y: nr * Math.sin(na) };
+                            }
                         }
-                    }
 
-                    RV.computeBounds();
-                    RV.render();
-                    RV.persistState();
+                        RV.computeBounds();
+                        RV.render();
+                        RV.persistState();
+                    });
                 } });
             }
         }

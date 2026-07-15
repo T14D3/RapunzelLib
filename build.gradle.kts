@@ -345,5 +345,5 @@ tasks.register("javadoc") {
 }
 
 codebaseVisualizer {
-    excludePaths.set(listOf("**/generated-sources/**"))
+    //excludePaths.set(listOf("**/generated-sources/**"))
 }

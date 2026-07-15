@@ -7,6 +7,13 @@
  * overlay draws labels only for the (culled) visible nodes - typically a
  * few hundred - so text cost stays bounded regardless of graph size.
  *
+ * KEY PERFORMANCE PRINCIPLE: GPU buffers are NEVER rebuilt during camera
+ * interaction (pan/zoom). The full visible set is uploaded once when the
+ * graph loads or when expand/collapse/filter/layout changes. The GPU
+ * clips off-screen geometry for free via its built-in NDC clipping.
+ * This eliminates the ~1.7MB/-frame buffer upload that was the primary
+ * rendering bottleneck.
+ *
  * Exposes the same RV.render / RV.computeBounds / RV.renderMinimap /
  * RV.minimapToWorld API as the old renderer, so app.js and app.interact.js
  * work unchanged.
@@ -52,18 +59,16 @@
     var edgeBuffers = null;
     var overlayCanvas = null;
     var overlayCtx = null;
+    var labelCacheCanvas = null;
+    var labelCacheCtx = null;
+    var labelCacheValid = false;
 
-    // Per-instance node attributes (SoA layout for cache efficiency).
-    var nodeInstanceData = null;   // Float32Array
-    var edgeInstanceData = null;    // Float32Array
+    // Persistent GPU buffers are uploaded once and left untouched during
+    // camera interaction. They contain ALL filter-visible nodes/edges
+    // regardless of viewport position. The GPU clips.
     var nodeInstanceCount = 0;
     var edgeInstanceCount = 0;
-
-    // Cached node/edge index maps so we can rebuild instance buffers only
-    // when the visible set changes (expand/collapse/filter), not every frame.
-    var visibleNodeIds = null;
-    var visibleEdgeIdxs = null;
-    var dirty = true; // rebuild instance buffers on next render
+    var dirty = true; // rebuild full buffers on next render
 
     // ---- Shaders ----------------------------------------------------------
 
@@ -74,18 +79,16 @@
         'uniform vec2 uCamera;',
         'uniform float uZoom;',
         'uniform float uDpr;',
-        // Per-vertex quad corner in [-1,1] x [-1,1] (a quad built in the VS).
         'const vec2 corners[4] = vec2[4](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0));',
-        'in vec2 aCorner;          // 0..3',
-        // Per-instance attributes.
-        'in vec2 aCenter;          // world coords',
-        'in vec2 aHalfSize;        // half width/height in world units',
-        'in vec4 aColor;           // fill rgba 0..1',
-        'in vec4 aBorderColor;     // border rgba 0..1',
-        'in float aBorderWidth;    // in px',
-        'in float aBright;         // focus brightness 0..1',
-        'in float aRadius;         // corner radius in world units',
-        'out vec2 vLocal;          // local coords in [-halfSize, +halfSize]',
+        'in float aCorner;',
+        'in vec2 aCenter;',
+        'in vec2 aHalfSize;',
+        'in vec4 aColor;',
+        'in vec4 aBorderColor;',
+        'in float aBorderWidth;',
+        'in float aBright;',
+        'in float aRadius;',
+        'out vec2 vLocal;',
         'out vec4 vFillColor;',
         'out vec4 vBorderColor;',
         'out float vBorderWidth;',
@@ -93,10 +96,9 @@
         'out float vRadius;',
         'out vec2 vHalfSize;',
         'void main() {',
-        '  vec2 corner = corners[int(aCorner.x)];',
+        '  vec2 corner = corners[int(aCorner)];',
         '  vec2 local = corner * aHalfSize;',
         '  vec2 world = aCenter + local;',
-        '  // world -> screen px: (world - camera) * zoom, then to NDC.',
         '  vec2 px = (world - uCamera) * uZoom;',
         '  vec2 ndc = px / uHalfView;',
         '  gl_Position = vec4(ndc, 0.0, 1.0);',
@@ -122,20 +124,14 @@
         'in float vRadius;',
         'in vec2 vHalfSize;',
         'out vec4 fragColor;',
-        '',
-        // Signed-distance field for a rounded rectangle centered at origin
-        // with half-extents `h` and corner radius `r`.
         'float sdRoundedBox(vec2 p, vec2 h, float r) {',
         '  vec2 q = abs(p) - h + vec2(r);',
         '  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;',
         '}',
         'void main() {',
         '  float dist = sdRoundedBox(vLocal, vHalfSize, vRadius);',
-        '  // Anti-alias over ~1px. Convert 1px to world units via 1/uZoom.',
         '  float aaWorld = 1.0 / max(0.05, uZoom);',
-        '  // Fill: inside (dist < 0) with a 1px anti-aliased edge.',
         '  float fillAlpha = 1.0 - smoothstep(-aaWorld, aaWorld, dist);',
-        '  // Border band of vBorderWidth px, centered on the edge (dist==0).',
         '  float bwWorld = vBorderWidth / max(0.05, uZoom);',
         '  float borderAlpha = (1.0 - smoothstep(-aaWorld, aaWorld, dist + bwWorld * 0.5))',
         '                     - (1.0 - smoothstep(-aaWorld, aaWorld, dist - bwWorld * 0.5));',
@@ -147,32 +143,30 @@
         '}'
     ].join('\n');
 
-    // Edge shader: instanced thick line segments with per-instance color.
     var EDGE_VS = [
         '#version 300 es',
         'precision highp float;',
         'uniform vec2 uHalfView;',
         'uniform vec2 uCamera;',
         'uniform float uZoom;',
-        'in vec2 aCorner;          // quad corner 0..3',
-        'in vec2 aSrc;             // world coords',
+        'in float aCorner;',
+        'in vec2 aSrc;',
         'in vec2 aTgt;',
         'in vec4 aColor;',
-        'in float aWidth;          // px',
+        'in float aWidth;',
         'in float aBright;',
         'out vec4 vColor;',
         'void main() {',
         '  vec2 d = aTgt - aSrc;',
         '  float len = length(d);',
-        '  vec2 dir = len > 0.0001 ? d / len : vec2(1.0, 0.0);',
-        '  vec2 nrm = vec2(-dir.y, dir.x);',
-        '  // Build a quad along the segment: corners in [-len/2, +len/2] x [-w/2, +w/2].',
-        '  vec2 corners[4] = vec2[4](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0));',
-        '  vec2 c = corners[int(aCorner.x)];',
-        '  // Width in world units: px / zoom.',
         '  float wWorld = aWidth / max(0.05, uZoom);',
+        // If edge is very short or zoomed way out, skip it by moving off-screen.
+        '  if (len < 1.0 || wWorld < 0.5) { gl_Position = vec4(2.0, 2.0, 0.0, 1.0); return; }',
+        '  vec2 dir = d / len;',
+        '  vec2 nrm = vec2(-dir.y, dir.x);',
+        '  vec2 corners[4] = vec2[4](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0));',
+        '  vec2 c = corners[int(aCorner)];',
         '  vec2 local = vec2(c.x * len * 0.5, c.y * wWorld * 0.5);',
-        '  // Rotate local by dir/nrm and translate to segment midpoint.',
         '  vec2 mid = (aSrc + aTgt) * 0.5;',
         '  vec2 world = mid + dir * local.x + nrm * local.y;',
         '  vec2 px = (world - uCamera) * uZoom;',
@@ -225,10 +219,7 @@
     function loc(prog, name) { return gl.getAttribLocation(prog, name); }
     function uloc(prog, name) { return gl.getUniformLocation(prog, name); }
 
-    // ---- Color helpers ----------------------------------------------------
-
     function hexToRgb01(hex) {
-        // "#rrggbb" -> [r,g,b] in 0..1
         var h = hex.replace('#', '');
         return [
             parseInt(h.substring(0, 2), 16) / 255,
@@ -242,23 +233,19 @@
     function setupGl() {
         S = RV.state;
         var canvas = S.canvas;
-        // Try WebGL2; fall back to the 2D renderer if unavailable.
         gl = canvas.getContext('webgl2', { antialias: true, premultipliedAlpha: false });
-        if (!gl) {
-            RV._useFallbackRenderer = true;
-            return false;
-        }
+        if (!gl) { RV._useFallbackRenderer = true; return false; }
         try {
             nodeProg = linkProgram(NODE_VS, NODE_FS);
             edgeProg = linkProgram(EDGE_VS, EDGE_FS);
         } catch (e) {
-            console.error('WebGL2 program setup failed, falling back to 2D:', e);
+            console.error('WebGL2 setup failed, falling back to 2D:', e);
             RV._useFallbackRenderer = true;
             gl = null;
             return false;
         }
 
-        // Overlay canvas for labels (sits on top of the GL canvas).
+        // Overlay canvas for labels (sits on top of GL canvas).
         if (!overlayCanvas) {
             overlayCanvas = document.createElement('canvas');
             overlayCanvas.id = 'label-overlay';
@@ -270,38 +257,36 @@
             overlayCtx = overlayCanvas.getContext('2d');
         }
 
-        buildNodeGeometry();
-        buildEdgeGeometry();
+        // Offscreen cache for label rendering (only redrawn when dirty).
+        labelCacheCanvas = document.createElement('canvas');
+        labelCacheCtx = labelCacheCanvas.getContext('2d');
+        labelCacheValid = false;
+
+        buildGeometry();
         return true;
     }
 
-    // Quad corner index buffer (shared by nodes and edges).
     var cornerBuffer = null;
 
     function buildCornerBuffer() {
         if (cornerBuffer) return;
         cornerBuffer = gl.createBuffer();
-        // Four corner indices (0,1,2,3) as floats, one per vertex of the quad.
-        // We draw as TRIANGLE_STRIP with 4 vertices; the VS maps each index
-        // to a 2D corner via the corners[] array.
         gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 1, 2, 3]), gl.STATIC_DRAW);
     }
 
-    function buildNodeGeometry() {
+    function buildGeometry() {
         buildCornerBuffer();
+
+        // Node VAO
         nodeVao = gl.createVertexArray();
         gl.bindVertexArray(nodeVao);
-
-        // aCorner
         gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuffer);
-        var aCorner = loc(nodeProg, 'aCorner');
-        gl.enableVertexAttribArray(aCorner);
-        gl.vertexAttribPointer(aCorner, 1, gl.FLOAT, false, 0, 0);
-        // Instanced: one per instance.
-        gl.vertexAttribDivisor(aCorner, 0);
+        var a = loc(nodeProg, 'aCorner');
+        gl.enableVertexAttribArray(a);
+        gl.vertexAttribPointer(a, 1, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribDivisor(a, 0);
 
-        // Per-instance buffers (filled on rebuildInstanceBuffers).
         nodeBuffers = {
             center: gl.createBuffer(),
             halfSize: gl.createBuffer(),
@@ -318,19 +303,16 @@
         bindInstanceAttr(nodeProg, 'aBorderWidth', nodeBuffers.borderWidth, 1);
         bindInstanceAttr(nodeProg, 'aBright', nodeBuffers.bright, 1);
         bindInstanceAttr(nodeProg, 'aRadius', nodeBuffers.radius, 1);
-
         gl.bindVertexArray(null);
-    }
 
-    function buildEdgeGeometry() {
+        // Edge VAO
         edgeVao = gl.createVertexArray();
         gl.bindVertexArray(edgeVao);
-
         gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuffer);
-        var aCorner = loc(edgeProg, 'aCorner');
-        gl.enableVertexAttribArray(aCorner);
-        gl.vertexAttribPointer(aCorner, 1, gl.FLOAT, false, 0, 0);
-        gl.vertexAttribDivisor(aCorner, 0);
+        var ea = loc(edgeProg, 'aCorner');
+        gl.enableVertexAttribArray(ea);
+        gl.vertexAttribPointer(ea, 1, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribDivisor(ea, 0);
 
         edgeBuffers = {
             src: gl.createBuffer(),
@@ -344,7 +326,6 @@
         bindInstanceAttr(edgeProg, 'aColor', edgeBuffers.color, 4);
         bindInstanceAttr(edgeProg, 'aWidth', edgeBuffers.width, 1);
         bindInstanceAttr(edgeProg, 'aBright', edgeBuffers.bright, 1);
-
         gl.bindVertexArray(null);
     }
 
@@ -357,36 +338,25 @@
         gl.vertexAttribDivisor(l, 1);
     }
 
-    // ---- Instance buffer rebuild -----------------------------------------
+    // ---- Full buffer rebuild (only on dirty) -----------------------------
 
-    function rebuildInstanceBuffers() {
+    function rebuildFullBuffers() {
         S = RV.state;
-        // Collect visible nodes (culled to viewport).
-        var viewW = S.cssW / S.zoom;
-        var viewH = S.cssH / S.zoom;
-        var vl = S.camera.x - viewW / 2 - RV.NODE_W;
-        var vr = S.camera.x + viewW / 2 + RV.NODE_W;
-        var vt = S.camera.y - viewH / 2 - RV.NODE_H;
-        var vb = S.camera.y + viewH / 2 + RV.NODE_H;
+        dirty = false;
 
-        // First pass: count visible nodes & edges.
-        var nCount = 0;
+        // Collect ALL filter-visible nodes (no viewport culling - GPU handles that).
         var ids = [];
         for (var id in S.positions) {
             if (!S.positions.hasOwnProperty(id)) continue;
             var node = S.nodesById[id];
             if (!RV.isNodeVisible(node)) continue;
-            var p = S.positions[id];
-            if (p.x < vl || p.x > vr || p.y < vt || p.y > vb) continue;
             ids.push(id);
-            nCount++;
         }
+        var nCount = ids.length;
         visibleNodeIds = ids;
 
-        // Edges: contains + cross, culled.
-        var eCount = 0;
+        // Collect ALL and filter-visible edges.
         var edgeList = [];
-        // Contains edges.
         for (var i = 0; i < S.graph.edges.length; i++) {
             var edge = S.graph.edges[i];
             if (edge.type !== 'contains') continue;
@@ -394,29 +364,23 @@
             var sp = S.positions[edge.source];
             var tp = S.positions[edge.target];
             if (!sp || !tp) continue;
-            if (!edgeInView(sp, tp, vl, vr, vt, vb)) continue;
             edgeList.push(edge);
-            eCount++;
         }
-        // Cross edges.
         for (var j = 0; j < S.crossEdges.length; j++) {
             var ce = S.crossEdges[j];
             if (!RV.isEdgeVisible(ce)) continue;
             var csp = S.positions[ce.source];
             var ctp = S.positions[ce.target];
             if (!csp || !ctp) continue;
-            if (!edgeInView(csp, ctp, vl, vr, vt, vb)) continue;
             edgeList.push(ce);
-            eCount++;
         }
+        var eCount = edgeList.length;
         visibleEdgeIdxs = edgeList;
 
-        // Allocate SoA arrays.
-        // Node: center(2) halfSize(2) color(4) borderColor(4) borderWidth(1) bright(1) radius(1) = 15 floats
+        // Build node instance data.
         var nStride = 15;
-        nodeInstanceData = new Float32Array(nCount * nStride);
+        var nodeData = new Float32Array(nCount * nStride);
         nodeInstanceCount = nCount;
-
         for (var k = 0; k < nCount; k++) {
             var nid = ids[k];
             var n = S.nodesById[nid];
@@ -430,35 +394,33 @@
             var bd = hexToRgb01(borderHex);
             var bw = selected ? 3 : (hovered ? 2 : 1);
             var off = k * nStride;
-            nodeInstanceData[off + 0] = pos.x;
-            nodeInstanceData[off + 1] = pos.y;
-            nodeInstanceData[off + 2] = RV.NODE_W / 2;
-            nodeInstanceData[off + 3] = RV.NODE_H / 2;
-            nodeInstanceData[off + 4] = bg[0];
-            nodeInstanceData[off + 5] = bg[1];
-            nodeInstanceData[off + 6] = bg[2];
-            nodeInstanceData[off + 7] = 1.0;
-            nodeInstanceData[off + 8] = bd[0];
-            nodeInstanceData[off + 9] = bd[1];
-            nodeInstanceData[off + 10] = bd[2];
-            nodeInstanceData[off + 11] = selected || hovered ? 1.0 : 0.15;
-            nodeInstanceData[off + 12] = bw;
-            nodeInstanceData[off + 13] = bright;
-            nodeInstanceData[off + 14] = 6; // corner radius in world units
+            nodeData[off + 0] = pos.x;
+            nodeData[off + 1] = pos.y;
+            nodeData[off + 2] = RV.NODE_W / 2;
+            nodeData[off + 3] = RV.NODE_H / 2;
+            nodeData[off + 4] = bg[0];
+            nodeData[off + 5] = bg[1];
+            nodeData[off + 6] = bg[2];
+            nodeData[off + 7] = 1.0;
+            nodeData[off + 8] = bd[0];
+            nodeData[off + 9] = bd[1];
+            nodeData[off + 10] = bd[2];
+            nodeData[off + 11] = selected || hovered ? 1.0 : 0.15;
+            nodeData[off + 12] = bw;
+            nodeData[off + 13] = bright;
+            nodeData[off + 14] = 6;
         }
+        uploadInstanceBuffer(nodeBuffers.center, nodeData, nCount, 15, 0, 2);
+        uploadInstanceBuffer(nodeBuffers.halfSize, nodeData, nCount, 15, 2, 2);
+        uploadInstanceBuffer(nodeBuffers.color, nodeData, nCount, 15, 4, 4);
+        uploadInstanceBuffer(nodeBuffers.borderColor, nodeData, nCount, 15, 8, 4);
+        uploadInstanceBuffer(nodeBuffers.borderWidth, nodeData, nCount, 15, 12, 1);
+        uploadInstanceBuffer(nodeBuffers.bright, nodeData, nCount, 15, 13, 1);
+        uploadInstanceBuffer(nodeBuffers.radius, nodeData, nCount, 15, 14, 1);
 
-        // Upload node buffers (interleaved SoA -> separate buffers).
-        uploadInstanceBuffer(nodeBuffers.center, nodeInstanceData, nCount, 15, 0, 2);
-        uploadInstanceBuffer(nodeBuffers.halfSize, nodeInstanceData, nCount, 15, 2, 2);
-        uploadInstanceBuffer(nodeBuffers.color, nodeInstanceData, nCount, 15, 4, 4);
-        uploadInstanceBuffer(nodeBuffers.borderColor, nodeInstanceData, nCount, 15, 8, 4);
-        uploadInstanceBuffer(nodeBuffers.borderWidth, nodeInstanceData, nCount, 15, 12, 1);
-        uploadInstanceBuffer(nodeBuffers.bright, nodeInstanceData, nCount, 15, 13, 1);
-        uploadInstanceBuffer(nodeBuffers.radius, nodeInstanceData, nCount, 15, 14, 1);
-
-        // Edge: src(2) tgt(2) color(4) width(1) bright(1) = 10 floats
+        // Build edge instance data.
         var eStride = 10;
-        edgeInstanceData = new Float32Array(eCount * eStride);
+        var edgeData = new Float32Array(eCount * eStride);
         edgeInstanceCount = eCount;
         for (var m = 0; m < eCount; m++) {
             var ed = edgeList[m];
@@ -473,28 +435,27 @@
             var width = ed.type === 'contains' ? 1 : (isHovered ? 2.5 : 1.4);
             var alpha = isHovered ? Math.min(1, baseAlpha + 0.4) : baseAlpha;
             var off2 = m * eStride;
-            edgeInstanceData[off2 + 0] = esp.x;
-            edgeInstanceData[off2 + 1] = esp.y;
-            edgeInstanceData[off2 + 2] = etp.x;
-            edgeInstanceData[off2 + 3] = etp.y;
-            edgeInstanceData[off2 + 4] = ec[0];
-            edgeInstanceData[off2 + 5] = ec[1];
-            edgeInstanceData[off2 + 6] = ec[2];
-            edgeInstanceData[off2 + 7] = alpha;
-            edgeInstanceData[off2 + 8] = width;
-            edgeInstanceData[off2 + 9] = 1.0;
+            edgeData[off2 + 0] = esp.x;
+            edgeData[off2 + 1] = esp.y;
+            edgeData[off2 + 2] = etp.x;
+            edgeData[off2 + 3] = etp.y;
+            edgeData[off2 + 4] = ec[0];
+            edgeData[off2 + 5] = ec[1];
+            edgeData[off2 + 6] = ec[2];
+            edgeData[off2 + 7] = alpha;
+            edgeData[off2 + 8] = width;
+            edgeData[off2 + 9] = 1.0;
         }
-        uploadInstanceBuffer(edgeBuffers.src, edgeInstanceData, eCount, 10, 0, 2);
-        uploadInstanceBuffer(edgeBuffers.tgt, edgeInstanceData, eCount, 10, 2, 2);
-        uploadInstanceBuffer(edgeBuffers.color, edgeInstanceData, eCount, 10, 4, 4);
-        uploadInstanceBuffer(edgeBuffers.width, edgeInstanceData, eCount, 10, 8, 1);
-        uploadInstanceBuffer(edgeBuffers.bright, edgeInstanceData, eCount, 10, 9, 1);
+        uploadInstanceBuffer(edgeBuffers.src, edgeData, eCount, 10, 0, 2);
+        uploadInstanceBuffer(edgeBuffers.tgt, edgeData, eCount, 10, 2, 2);
+        uploadInstanceBuffer(edgeBuffers.color, edgeData, eCount, 10, 4, 4);
+        uploadInstanceBuffer(edgeBuffers.width, edgeData, eCount, 10, 8, 1);
+        uploadInstanceBuffer(edgeBuffers.bright, edgeData, eCount, 10, 9, 1);
 
-        dirty = false;
+        labelCacheValid = false; // force label cache rebuild
     }
 
     function uploadInstanceBuffer(buf, data, count, stride, offset, size) {
-        // Extract a sub-view for this attribute.
         var sub = new Float32Array(count * size);
         for (var i = 0; i < count; i++) {
             for (var j = 0; j < size; j++) {
@@ -505,20 +466,11 @@
         gl.bufferData(gl.ARRAY_BUFFER, sub, gl.DYNAMIC_DRAW);
     }
 
-    function edgeInView(sp, tp, vl, vr, vt, vb) {
-        var minX = Math.min(sp.x, tp.x) - RV.NODE_W;
-        var maxX = Math.max(sp.x, tp.x) + RV.NODE_W;
-        var minY = Math.min(sp.y, tp.y) - RV.NODE_H;
-        var maxY = Math.max(sp.y, tp.y) + RV.NODE_H;
-        return !(maxX < vl || minX > vr || maxY < vt || minY > vb);
-    }
-
-    // ---- Main render ------------------------------------------------------
+    // ---- Render (runs every frame during interaction) ---------------------
 
     function render() {
         S = RV.state;
         if (RV._useFallbackRenderer) {
-            // Delegate to the legacy canvas-2D renderer.
             RV.computeBounds = RV.computeBounds2d;
             RV.render = RV._render2d;
             RV.renderMinimap = RV.renderMinimap2d;
@@ -526,10 +478,7 @@
             return RV._render2d();
         }
         if (!gl) {
-            if (!setupGl()) {
-                // setupGl already set _useFallbackRenderer; recurse to use 2D.
-                return render();
-            }
+            if (!setupGl()) return render();
         }
 
         var canvas = S.canvas;
@@ -537,13 +486,19 @@
         var w = canvas.width;
         var h = canvas.height;
 
-        // Resize overlay to match.
+        // Resize overlays to match canvas.
         if (overlayCanvas.width !== w || overlayCanvas.height !== h) {
             overlayCanvas.width = w;
             overlayCanvas.height = h;
             overlayCanvas.style.width = S.cssW + 'px';
             overlayCanvas.style.height = S.cssH + 'px';
+            labelCacheCanvas.width = w;
+            labelCacheCanvas.height = h;
+            labelCacheValid = false;
         }
+
+        // Rebuild GPU buffers only when the visible set changes.
+        if (dirty) rebuildFullBuffers();
 
         gl.viewport(0, 0, w, h);
         gl.clearColor(0, 0, 0, 0);
@@ -551,14 +506,7 @@
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-        // Rebuild instance buffers when the visible set changes.
-        // We mark dirty on expand/collapse/filter/pan/zoom via markDirty().
-        // For pan/zoom we rebuild every frame (cheap relative to 2D's per-shape cost).
-        if (dirty || cameraChanged()) {
-            rebuildInstanceBuffers();
-        }
-
-        // Draw edges first.
+        // Draw edges (one draw call).
         if (edgeInstanceCount > 0) {
             gl.useProgram(edgeProg);
             setEdgeUniforms(edgeProg);
@@ -567,7 +515,7 @@
             gl.bindVertexArray(null);
         }
 
-        // Draw nodes on top.
+        // Draw nodes (one draw call).
         if (nodeInstanceCount > 0) {
             gl.useProgram(nodeProg);
             setNodeUniforms(nodeProg);
@@ -576,23 +524,11 @@
             gl.bindVertexArray(null);
         }
 
-        // Labels on the 2D overlay (only visible nodes).
-        drawLabels();
+        // Draw labels from cache (only redrawn when dirty).
+        drawLabelsFromCache();
 
-        // Minimap (2D, cheap).
+        // Minimap.
         renderMinimap();
-    }
-
-    var _lastCam = { x: NaN, y: NaN, zoom: NaN, cssW: NaN, cssH: NaN };
-    function cameraChanged() {
-        var c = _lastCam;
-        var changed = c.x !== S.camera.x || c.y !== S.camera.y ||
-            c.zoom !== S.zoom || c.cssW !== S.cssW || c.cssH !== S.cssH;
-        if (changed) {
-            c.x = S.camera.x; c.y = S.camera.y;
-            c.zoom = S.zoom; c.cssW = S.cssW; c.cssH = S.cssH;
-        }
-        return changed;
     }
 
     function setNodeUniforms(prog) {
@@ -601,18 +537,22 @@
         gl.uniform1f(uloc(prog, 'uZoom'), S.zoom);
         gl.uniform1f(uloc(prog, 'uDpr'), S.dpr);
     }
+
     function setEdgeUniforms(prog) {
         gl.uniform2f(uloc(prog, 'uHalfView'), S.cssW / 2, S.cssH / 2);
         gl.uniform2f(uloc(prog, 'uCamera'), S.camera.x, S.camera.y);
         gl.uniform1f(uloc(prog, 'uZoom'), S.zoom);
     }
 
-    // ---- Labels (2D overlay) ----------------------------------------------
+    // ---- Label cache (2D overlay, only re-rendered when dirty) -----------
 
-    function drawLabels() {
-        var ctx = overlayCtx;
+    function rebuildLabelCache() {
+        S = RV.state;
+        var ctx = labelCacheCtx;
+        var w = labelCacheCanvas.width;
+        var h = labelCacheCanvas.height;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        ctx.clearRect(0, 0, w, h);
         ctx.scale(S.dpr, S.dpr);
         ctx.translate(S.cssW / 2, S.cssH / 2);
         ctx.scale(S.zoom, S.zoom);
@@ -629,17 +569,14 @@
             var pos = S.positions[id];
             var bright = RV.nodeBrightness(id);
             var textColor = RV.NODE_TEXT_COLORS[node.type] || '#fff';
-            // Glyph.
             ctx.globalAlpha = bright;
             ctx.fillStyle = textColor;
             ctx.textAlign = 'left';
             var glyph = RV.NODE_GLYPH[node.type] || '';
             if (glyph) ctx.fillText(glyph, pos.x - RV.NODE_W / 2 + 6, pos.y);
-            // Label.
             ctx.textAlign = 'center';
             var label = node.simpleName || node.id;
-            drawWrappedLabel(ctx, label, pos.x + 6, pos.y, RV.NODE_W - 24, bright, textColor);
-            // Child badge.
+            drawLabelWrapped(ctx, label, pos.x + 6, pos.y, RV.NODE_W - 24, bright, textColor);
             var hasChildren = (S.childrenByParent[id] || []).length > 0;
             if (hasChildren) {
                 var expanded = S.expanded[id];
@@ -656,9 +593,17 @@
             }
         }
         ctx.globalAlpha = 1;
+        labelCacheValid = true;
     }
 
-    function drawWrappedLabel(ctx, text, cx, cy, maxW, alpha, color) {
+    function drawLabelsFromCache() {
+        if (!labelCacheValid) rebuildLabelCache();
+        overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        overlayCtx.drawImage(labelCacheCanvas, 0, 0);
+    }
+
+    function drawLabelWrapped(ctx, text, cx, cy, maxW, alpha, color) {
         ctx.fillStyle = color;
         ctx.globalAlpha = alpha;
         if (ctx.measureText(text).width <= maxW) {

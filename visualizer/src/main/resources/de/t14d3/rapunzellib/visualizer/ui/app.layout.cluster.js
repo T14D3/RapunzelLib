@@ -7,11 +7,21 @@
  *   - contains-springs to keep parent/child proximity
  *   - module-center gravity to group modules
  *   - a cooling schedule (alpha decay) that converges
+ *
+ * KEY: The simulation runs asynchronously via requestAnimationFrame to
+ * avoid blocking the main thread for seconds. A loading overlay is
+ * shown during computation. The compute() function returns a Promise
+ * that resolves when layout is complete.
  * ===================================================================== */
 (function (RV) {
     'use strict';
 
     var S;
+
+    // How many simulation steps per requestAnimationFrame batch.
+    var STEPS_PER_FRAME = 15;
+    // Total iterations (reduced from 300 - with faster decay, 150 is enough).
+    var TOTAL_ITERATIONS = 150;
 
     function compute() {
         S = RV.state;
@@ -20,7 +30,51 @@
         applyUserPositions();
         if (!S.sim) S.sim = newSim();
         S.sim.init();
-        S.sim.run(300);
+
+        // Show loading overlay.
+        showLoading();
+
+        // Run asynchronously via RAF.
+        var stepsDone = 0;
+        return new Promise(function (resolve) {
+            function batch() {
+                var start = performance.now();
+                // Run as many steps as we can in ~8ms to leave time for paint.
+                var budget = 8; // ms
+                while (stepsDone < TOTAL_ITERATIONS && (performance.now() - start) < budget) {
+                    S.sim.step();
+                    stepsDone++;
+                }
+                if (stepsDone >= TOTAL_ITERATIONS) {
+                    S.sim.commit();
+                    hideLoading();
+                    resolve();
+                } else {
+                    requestAnimationFrame(batch);
+                }
+            }
+            requestAnimationFrame(batch);
+        });
+    }
+
+    function showLoading() {
+        var el = document.getElementById('layout-loading');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'layout-loading';
+            el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);' +
+                'color:#c9d1d9;font-family:sans-serif;font-size:14px;' +
+                'background:rgba(13,17,23,0.85);padding:16px 24px;border-radius:8px;' +
+                'border:1px solid #30363d;z-index:1000;pointer-events:none;';
+            el.textContent = 'Processing cluster layout\u2026';
+            document.body.appendChild(el);
+        }
+        el.style.display = '';
+    }
+
+    function hideLoading() {
+        var el = document.getElementById('layout-loading');
+        if (el) el.style.display = 'none';
     }
 
     function seed() {
@@ -59,8 +113,8 @@
 
     // ---- Force simulation --------------------------------------------------
 
-    var MAX_DISPLACEMENT = 50;   // cap per-step movement to prevent explosions
-    var REPULSION_RADIUS = 120;  // grid cell size for spatial hash
+    var MAX_DISPLACEMENT = 50;
+    var REPULSION_RADIUS = 120;
     var REPULSION_STRENGTH = 800;
 
     function newSim() {
@@ -81,7 +135,6 @@
                 var node = S.nodesById[id];
                 if (!node) continue;
                 var p = S.positions[id];
-                // Guard against NaN/Inf from a previous broken run.
                 if (!isFinite(p.x) || !isFinite(p.y) || isNaN(p.x) || isNaN(p.y)) {
                     p = { x: (Math.random() - 0.5) * 200, y: (Math.random() - 0.5) * 200 };
                     S.positions[id] = p;
@@ -126,14 +179,10 @@
             alpha = 1;
         }
 
-        // O(N) repulsion via a spatial hash grid. Each node only repels
-        // nodes in its own cell and the 8 neighbouring cells, giving
-        // near-linear time and bounded forces.
         function applyRepulsion() {
             var N = nodes.length;
             var cell = REPULSION_RADIUS;
             var grid = {};
-            // Bin all nodes.
             for (var i = 0; i < N; i++) {
                 var nd = nodes[i];
                 var gx = Math.floor(nd.x / cell);
@@ -142,7 +191,6 @@
                 if (!grid[key]) grid[key] = [];
                 grid[key].push(nd);
             }
-            // For each node, check its cell + 8 neighbours.
             for (var n = 0; n < N; n++) {
                 var a = nodes[n];
                 var agx = Math.floor(a.x / cell);
@@ -157,15 +205,14 @@
                             var ddx = a.x - other.x;
                             var ddy = a.y - other.y;
                             var d2 = ddx * ddx + ddy * ddy;
-                            if (d2 > cell * cell) continue; // too far
-                            if (d2 < 1) d2 = 1; // clamp to prevent explosion
+                            if (d2 > cell * cell) continue;
+                            if (d2 < 1) d2 = 1;
                             var d = Math.sqrt(d2);
                             var force = REPULSION_STRENGTH / d2;
-                            // Clamp force to prevent numerical explosion.
                             if (force > 20) force = 20;
                             var fx = (ddx / d) * force;
                             var fy = (ddy / d) * force;
-                            a.vx += fx; a.vy += fy;
+                            if (!a.fixed) { a.vx += fx; a.vy += fy; }
                         }
                     }
                 }
@@ -177,7 +224,6 @@
             for (var s = 0; s < containsSprings.length; s++) applySpring(containsSprings[s]);
             for (var t = 0; t < crossSprings.length; t++) applySpring(crossSprings[t]);
 
-            // Module-center gravity.
             for (var mId in moduleCenters) {
                 if (!moduleCenters.hasOwnProperty(mId)) continue;
                 var c = moduleCenters[mId];
@@ -190,12 +236,10 @@
                 }
             }
 
-            // Integrate with velocity clamping.
             for (var n = 0; n < nodes.length; n++) {
                 var nd = nodes[n];
                 if (nd.fixed) { nd.vx = 0; nd.vy = 0; continue; }
                 nd.vx *= 0.85; nd.vy *= 0.85;
-                // Clamp velocity to prevent huge jumps.
                 var speed = Math.sqrt(nd.vx * nd.vx + nd.vy * nd.vy);
                 if (speed > MAX_DISPLACEMENT) {
                     nd.vx = (nd.vx / speed) * MAX_DISPLACEMENT;
@@ -203,11 +247,10 @@
                 }
                 nd.x += nd.vx * alpha;
                 nd.y += nd.vy * alpha;
-                // Guard against NaN.
                 if (isNaN(nd.x) || !isFinite(nd.x)) nd.x = 0;
                 if (isNaN(nd.y) || !isFinite(nd.y)) nd.y = 0;
             }
-            alpha *= 0.985;
+            alpha *= 0.97; // faster decay than 0.985, converges in ~150 steps
         }
 
         function applySpring(sp) {
@@ -222,11 +265,6 @@
             if (!b.fixed) { b.vx -= fx; b.vy -= fy; }
         }
 
-        function run(iters) {
-            for (var i = 0; i < iters; i++) step();
-            commit();
-        }
-
         function commit() {
             for (var i = 0; i < nodes.length; i++) {
                 var nd = nodes[i];
@@ -234,7 +272,7 @@
             }
         }
 
-        return { init: init, step: step, run: run, commit: commit };
+        return { init: init, step: step, commit: commit };
     }
 
     RV.layouts = RV.layouts || {};

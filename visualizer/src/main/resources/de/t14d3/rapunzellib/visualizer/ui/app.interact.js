@@ -342,21 +342,20 @@
         } else {
             S.expanded[id] = true;
         }
-        RV.computeLayout();
-
-        // Restore position after re-layout.
-        if (savedPos) {
-            S.positions[id] = savedPos;
-            S.userPositions[id] = savedPos;
-            S.pinned[id] = true;
-        }
-
-        RV.computeBounds();
-        RV.recomputeFocusLayer();
-        RV.showDetailPanel(id);
-        RV.updateBreadcrumb();
         if (RV.markRenderDirty) RV.markRenderDirty();
-        RV.render();
+        RV.computeLayout().then(function () {
+            // Restore position after re-layout.
+            if (savedPos) {
+                S.positions[id] = savedPos;
+                S.userPositions[id] = savedPos;
+                S.pinned[id] = true;
+            }
+            RV.computeBounds();
+            RV.recomputeFocusLayer();
+            RV.showDetailPanel(id);
+            RV.updateBreadcrumb();
+            RV.render();
+        });
     }
 
     /** Handle a click on a node - dispatches to expand-toggle or focus. */

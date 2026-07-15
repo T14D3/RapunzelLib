@@ -89,13 +89,30 @@
         S.positions = {};
         if (S.mode === 'tree') {
             RV.layouts.tree();
+            RV.computeBounds();
+            if (RV.markRenderDirty) RV.markRenderDirty();
+            return Promise.resolve();
         } else if (S.mode === 'radial') {
             RV.layouts.radial();
+            RV.computeBounds();
+            if (RV.markRenderDirty) RV.markRenderDirty();
+            return Promise.resolve();
         } else if (S.mode === 'cluster') {
-            RV.layouts.cluster();
+            var prom = RV.layouts.cluster();
+            return prom.then(function () {
+                RV.computeBounds();
+                if (RV.markRenderDirty) RV.markRenderDirty();
+            });
         }
-        RV.computeBounds();
-        if (RV.markRenderDirty) RV.markRenderDirty();
+        return Promise.resolve();
+    };
+
+    // Async-friendly helpers that chain computeLayout -> optional fn -> render.
+    RV.relayoutAndRender = function () {
+        return RV.computeLayout().then(function () { RV.render(); });
+    };
+    RV.relayoutAndThen = function (fn) {
+        return RV.computeLayout().then(function () { fn(); RV.render(); });
     };
 
     // ---- Persistence -------------------------------------------------------
@@ -185,7 +202,6 @@
         loadPersistedState();
         RV.buildIndices();
         RV.initExpansion();
-        RV.computeLayout();
         setupCanvas();
         setupMinimap();
         RV.setupInteraction();
@@ -197,10 +213,14 @@
         RV.setupDepthSliders();
         RV.setupRadialSpacing();
         RV.setupButtons();
-        RV.recomputeFocusLayer();
-        RV.updateBreadcrumb();
-        RV.fitToView();
-        RV.render();
+
+        // Layout is async for cluster mode (runs via requestAnimationFrame).
+        RV.computeLayout().then(function () {
+            RV.recomputeFocusLayer();
+            RV.updateBreadcrumb();
+            RV.fitToView();
+            RV.render();
+        });
     }
 
     // ---- Go ---------------------------------------------------------------
