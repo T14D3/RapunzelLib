@@ -293,6 +293,34 @@ html, body {
     color: var(--accent);
 }
 
+/* ---- Renderer badge ---- */
+#renderer-badge {
+    position: absolute;
+    left: 12px;
+    bottom: 12px;
+    z-index: 5;
+    font-size: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: 3px 8px;
+    border-radius: 4px;
+    pointer-events: none;
+    opacity: 0.7;
+    letter-spacing: 0.3px;
+    font-weight: 600;
+}
+
+#renderer-badge.webgl2 {
+    background: rgba(38, 139, 65, 0.2);
+    color: #56d364;
+    border: 1px solid rgba(38, 139, 65, 0.4);
+}
+
+#renderer-badge.canvas2d {
+    background: rgba(205, 134, 0, 0.2);
+    color: #d29922;
+    border: 1px solid rgba(205, 134, 0, 0.4);
+}
+
 /* ---- Canvas ---- */
 #graph-canvas {
     grid-area: canvas;

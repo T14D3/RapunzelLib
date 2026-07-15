@@ -157,7 +157,10 @@
     function setupCanvas() {
         var canvas = document.getElementById('graph-canvas');
         S.canvas = canvas;
-        S.ctx = canvas.getContext('2d');
+        // NOTE: Do NOT call getContext('2d') here.  A canvas can only have one
+        // context type - calling getContext('2d') first would permanently lock
+        // it and cause getContext('webgl2') to return null in app.webgl.js.
+        // The 2D context is obtained lazily by the fallback renderer if needed.
 
         var resizeTimer = null;
         function resize() {

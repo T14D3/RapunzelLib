@@ -43,8 +43,10 @@
 
     function render() {
         S = RV.state;
-        var ctx = S.ctx;
         var canvas = S.canvas;
+        // Lazily acquire the 2D context (only when the fallback is used).
+        if (!S.ctx) S.ctx = canvas.getContext('2d');
+        var ctx = S.ctx;
         var dpr = S.dpr;
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);

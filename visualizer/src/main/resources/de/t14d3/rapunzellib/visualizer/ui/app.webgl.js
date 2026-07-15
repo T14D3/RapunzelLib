@@ -59,9 +59,6 @@
     var edgeBuffers = null;
     var overlayCanvas = null;
     var overlayCtx = null;
-    var labelCacheCanvas = null;
-    var labelCacheCtx = null;
-    var labelCacheValid = false;
 
     // Persistent GPU buffers are uploaded once and left untouched during
     // camera interaction. They contain ALL filter-visible nodes/edges
@@ -230,20 +227,35 @@
 
     // ---- Setup ------------------------------------------------------------
 
+    function setBadge(useWebGL2) {
+        var badge = document.getElementById('renderer-badge');
+        if (!badge) return;
+        if (useWebGL2) {
+            badge.className = 'webgl2';
+            badge.textContent = 'WebGL2';
+        } else {
+            badge.className = 'canvas2d';
+            badge.textContent = 'Canvas2D';
+        }
+    }
+
     function setupGl() {
         S = RV.state;
         var canvas = S.canvas;
         gl = canvas.getContext('webgl2', { antialias: true, premultipliedAlpha: false });
-        if (!gl) { RV._useFallbackRenderer = true; return false; }
+        if (!gl) { RV._useFallbackRenderer = true; setBadge(false); return false; }
         try {
             nodeProg = linkProgram(NODE_VS, NODE_FS);
             edgeProg = linkProgram(EDGE_VS, EDGE_FS);
         } catch (e) {
             console.error('WebGL2 setup failed, falling back to 2D:', e);
             RV._useFallbackRenderer = true;
+            setBadge(false);
             gl = null;
             return false;
         }
+
+        setBadge(true);
 
         // Overlay canvas for labels (sits on top of GL canvas).
         if (!overlayCanvas) {
@@ -256,11 +268,6 @@
             canvas.parentElement.appendChild(overlayCanvas);
             overlayCtx = overlayCanvas.getContext('2d');
         }
-
-        // Offscreen cache for label rendering (only redrawn when dirty).
-        labelCacheCanvas = document.createElement('canvas');
-        labelCacheCtx = labelCacheCanvas.getContext('2d');
-        labelCacheValid = false;
 
         buildGeometry();
         return true;
@@ -451,8 +458,6 @@
         uploadInstanceBuffer(edgeBuffers.color, edgeData, eCount, 10, 4, 4);
         uploadInstanceBuffer(edgeBuffers.width, edgeData, eCount, 10, 8, 1);
         uploadInstanceBuffer(edgeBuffers.bright, edgeData, eCount, 10, 9, 1);
-
-        labelCacheValid = false; // force label cache rebuild
     }
 
     function uploadInstanceBuffer(buf, data, count, stride, offset, size) {
@@ -486,15 +491,12 @@
         var w = canvas.width;
         var h = canvas.height;
 
-        // Resize overlays to match canvas.
+        // Resize overlay to match canvas.
         if (overlayCanvas.width !== w || overlayCanvas.height !== h) {
             overlayCanvas.width = w;
             overlayCanvas.height = h;
             overlayCanvas.style.width = S.cssW + 'px';
             overlayCanvas.style.height = S.cssH + 'px';
-            labelCacheCanvas.width = w;
-            labelCacheCanvas.height = h;
-            labelCacheValid = false;
         }
 
         // Rebuild GPU buffers only when the visible set changes.
@@ -524,8 +526,8 @@
             gl.bindVertexArray(null);
         }
 
-        // Draw labels from cache (only redrawn when dirty).
-        drawLabelsFromCache();
+        // Draw labels (per-frame, viewport-culled, screen coordinates).
+        drawLabels();
 
         // Minimap.
         renderMinimap();
@@ -544,39 +546,65 @@
         gl.uniform1f(uloc(prog, 'uZoom'), S.zoom);
     }
 
-    // ---- Label cache (2D overlay, only re-rendered when dirty) -----------
+    // ---- Labels (2D overlay, drawn per-frame in screen coordinates) --------
+    // Only on-screen nodes are labelled, so cost is bounded by viewport, not
+    // graph size.  This replaces the previous world-coordinate label cache
+    // which was broken during pan/zoom (labels didn't move with the world).
 
-    function rebuildLabelCache() {
+    function drawLabels() {
         S = RV.state;
-        var ctx = labelCacheCtx;
-        var w = labelCacheCanvas.width;
-        var h = labelCacheCanvas.height;
+        var ctx = overlayCtx;
+        var w = overlayCanvas.width;
+        var h = overlayCanvas.height;
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, w, h);
         ctx.scale(S.dpr, S.dpr);
-        ctx.translate(S.cssW / 2, S.cssH / 2);
-        ctx.scale(S.zoom, S.zoom);
-        ctx.translate(-S.camera.x, -S.camera.y);
 
-        ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+
+        // Screen-space viewport bounds (CSS pixels).
+        var halfW = S.cssW / 2;
+        var halfH = S.cssH / 2;
+        var margin = RV.NODE_W; // generous margin so partially-visible labels show
 
         var ids = visibleNodeIds || [];
         for (var i = 0; i < ids.length; i++) {
             var id = ids[i];
-            var node = S.nodesById[id];
             var pos = S.positions[id];
+            if (!pos) continue;
+            // World -> screen (CSS pixels).
+            var sx = (pos.x - S.camera.x) * S.zoom + halfW;
+            var sy = (pos.y - S.camera.y) * S.zoom + halfH;
+            // Viewport cull: skip nodes whose bounding box is fully off-screen.
+            if (sx < -margin || sx > S.cssW + margin ||
+                sy < -margin || sy > S.cssH + margin) continue;
+
+            var node = S.nodesById[id];
             var bright = RV.nodeBrightness(id);
             var textColor = RV.NODE_TEXT_COLORS[node.type] || '#fff';
+
+            // Node box in screen pixels.
+            var boxW = RV.NODE_W * S.zoom;
+            var boxH = RV.NODE_H * S.zoom;
+            var left = sx - boxW / 2;
+            // var top = sy - boxH / 2;  // not needed for text baseline
+
             ctx.globalAlpha = bright;
-            ctx.fillStyle = textColor;
+
+            // Glyph (left side).
             ctx.textAlign = 'left';
+            ctx.fillStyle = textColor;
             var glyph = RV.NODE_GLYPH[node.type] || '';
-            if (glyph) ctx.fillText(glyph, pos.x - RV.NODE_W / 2 + 6, pos.y);
-            ctx.textAlign = 'center';
+            if (glyph) ctx.fillText(glyph, left + 6 * S.zoom, sy);
+
+            // Label (center, truncated to fit).
             var label = node.simpleName || node.id;
-            drawLabelWrapped(ctx, label, pos.x + 6, pos.y, RV.NODE_W - 24, bright, textColor);
+            var maxLabelW = boxW - 24 * S.zoom;
+            ctx.textAlign = 'center';
+            drawLabelWrapped(ctx, label, sx + 6 * S.zoom, sy, maxLabelW, bright, textColor);
+
+            // Expand/collapse badge (right side).
             var hasChildren = (S.childrenByParent[id] || []).length > 0;
             if (hasChildren) {
                 var expanded = S.expanded[id];
@@ -584,23 +612,15 @@
                 ctx.font = 'bold 10px -apple-system, sans-serif';
                 ctx.fillStyle = expanded ? '#ffffff' : 'rgba(255,255,255,0.5)';
                 if (expanded) {
-                    ctx.fillText('\u2212', pos.x + RV.NODE_W / 2 - 4, pos.y);
+                    ctx.fillText('\u2212', sx + boxW / 2 - 4 * S.zoom, sy);
                 } else {
                     var count = (S.childrenByParent[id] || []).length;
-                    ctx.fillText('+' + count, pos.x + RV.NODE_W / 2 - 4, pos.y);
+                    ctx.fillText('+' + count, sx + boxW / 2 - 4 * S.zoom, sy);
                 }
                 ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
             }
         }
         ctx.globalAlpha = 1;
-        labelCacheValid = true;
-    }
-
-    function drawLabelsFromCache() {
-        if (!labelCacheValid) rebuildLabelCache();
-        overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
-        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-        overlayCtx.drawImage(labelCacheCanvas, 0, 0);
     }
 
     function drawLabelWrapped(ctx, text, cx, cy, maxW, alpha, color) {
@@ -618,7 +638,11 @@
         ctx.globalAlpha = 1;
     }
 
-    // ---- Minimap (2D, same as before) -------------------------------------
+    // ---- Minimap (2D, content cached, viewport rect drawn per-frame) -------
+
+    var minimapCacheCanvas = null;
+    var minimapCacheCtx = null;
+    var minimapCacheValid = false;
 
     function renderMinimap() {
         S = RV.state;
@@ -631,10 +655,55 @@
         if (mm.width !== w * dpr || mm.height !== h * dpr) {
             mm.width = w * dpr;
             mm.height = h * dpr;
+            minimapCacheValid = false;
         }
+
+        // Lazily create the offscreen content cache.
+        if (!minimapCacheCanvas) {
+            minimapCacheCanvas = document.createElement('canvas');
+            minimapCacheCtx = minimapCacheCanvas.getContext('2d');
+        }
+        if (minimapCacheCanvas.width !== mm.width || minimapCacheCanvas.height !== mm.height) {
+            minimapCacheCanvas.width = mm.width;
+            minimapCacheCanvas.height = mm.height;
+            minimapCacheValid = false;
+        }
+
+        // Rebuild the cached content only when the visible set changes.
+        if (!minimapCacheValid || dirty) {
+            rebuildMinimapCache(w, h, dpr);
+        }
+
+        // Blit cached content.
         mctx.setTransform(1, 0, 0, 1, 0, 0);
         mctx.clearRect(0, 0, mm.width, mm.height);
-        mctx.scale(dpr, dpr);
+        mctx.drawImage(minimapCacheCanvas, 0, 0);
+
+        // Draw viewport rectangle (changes every frame).
+        var b = S.bounds;
+        var bw = Math.max(1, b.maxX - b.minX);
+        var bh = Math.max(1, b.maxY - b.minY);
+        var scale = Math.min(w / bw, h / bh) * 0.9;
+        var offX = (w - bw * scale) / 2;
+        var offY = (h - bh * scale) / 2;
+        var viewW = S.cssW / S.zoom;
+        var viewH = S.cssH / S.zoom;
+        mctx.strokeStyle = '#58a6ff';
+        mctx.lineWidth = 1;
+        mctx.strokeRect(
+            offX + (S.camera.x - viewW / 2 - b.minX) * scale,
+            offY + (S.camera.y - viewH / 2 - b.minY) * scale,
+            viewW * scale,
+            viewH * scale
+        );
+    }
+
+    function rebuildMinimapCache(w, h, dpr) {
+        S = RV.state;
+        var ctx = minimapCacheCtx;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, minimapCacheCanvas.width, minimapCacheCanvas.height);
+        ctx.scale(dpr, dpr);
 
         var b = S.bounds;
         var bw = Math.max(1, b.maxX - b.minX);
@@ -643,7 +712,8 @@
         var offX = (w - bw * scale) / 2;
         var offY = (h - bh * scale) / 2;
 
-        mctx.fillStyle = 'rgba(88,166,255,0.08)';
+        // Module blobs.
+        ctx.fillStyle = 'rgba(88,166,255,0.08)';
         for (var mId in S.moduleMembers) {
             if (!S.moduleMembers.hasOwnProperty(mId)) continue;
             var members = S.moduleMembers[mId];
@@ -657,7 +727,7 @@
                 if (p.y > mMaxY) mMaxY = p.y;
             }
             if (mMinX === Infinity) continue;
-            mctx.fillRect(
+            ctx.fillRect(
                 offX + (mMinX - b.minX) * scale,
                 offY + (mMinY - b.minY) * scale,
                 Math.max(2, (mMaxX - mMinX) * scale),
@@ -665,30 +735,21 @@
             );
         }
 
-        mctx.fillStyle = 'rgba(201,209,217,0.6)';
+        // Node dots.
         for (var id in S.positions) {
             if (!S.positions.hasOwnProperty(id)) continue;
             var node = S.nodesById[id];
             if (!RV.isNodeVisible(node)) continue;
             var pos = S.positions[id];
-            mctx.fillStyle = RV.NODE_COLORS[node.type] || '#888';
-            mctx.fillRect(
+            ctx.fillStyle = RV.NODE_COLORS[node.type] || '#888';
+            ctx.fillRect(
                 offX + (pos.x - b.minX) * scale - 1,
                 offY + (pos.y - b.minY) * scale - 1,
                 2, 2
             );
         }
 
-        var viewW = S.cssW / S.zoom;
-        var viewH = S.cssH / S.zoom;
-        mctx.strokeStyle = '#58a6ff';
-        mctx.lineWidth = 1;
-        mctx.strokeRect(
-            offX + (S.camera.x - viewW / 2 - b.minX) * scale,
-            offY + (S.camera.y - viewH / 2 - b.minY) * scale,
-            viewW * scale,
-            viewH * scale
-        );
+        minimapCacheValid = true;
     }
 
     function minimapToWorld(mx, my) {
