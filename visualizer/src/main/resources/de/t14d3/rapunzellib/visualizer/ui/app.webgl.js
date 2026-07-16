@@ -607,7 +607,7 @@
             if (glyph) ctx.fillText(glyph, left + 6 * S.zoom, sy);
 
             // Label (center, truncated to fit).
-            var label = node.simpleName || node.id;
+            var label = RV.getDisplayLabel ? (RV.getDisplayLabel(id) || node.simpleName || node.id) : (node.simpleName || node.id);
             var maxLabelW = boxW - 24 * S.zoom;
             ctx.textAlign = 'center';
             drawLabelWrapped(ctx, label, sx + 6 * S.zoom, sy, maxLabelW, bright, textColor);

@@ -248,7 +248,7 @@
         ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        var label = node.simpleName || node.id;
+        var label = RV.getDisplayLabel ? (RV.getDisplayLabel(node.id) || node.simpleName || node.id) : (node.simpleName || node.id);
         drawWrappedLabel(ctx, label, pos.x + 6, pos.y, RV.NODE_W - 24, bright, textColor);
 
         // Expand/collapse indicator + child count badge.
