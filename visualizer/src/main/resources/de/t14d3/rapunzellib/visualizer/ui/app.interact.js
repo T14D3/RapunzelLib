@@ -131,6 +131,7 @@
                     S.userPositions[draggingNode] = { x: world.x, y: world.y };
                     S.positions[draggingNode] = { x: world.x, y: world.y };
                     RV.computeBounds();
+                    if (RV.markRenderDirty) RV.markRenderDirty();
                     RV.render();
                 } else if (isDragging) {
                     S.camera.x = dragStart.camX - dx / S.zoom;
@@ -151,6 +152,7 @@
                 }
                 if (S.hoveredNode !== prevNode || S.hoveredEdge !== prevEdge) {
                     updateTooltip(e.clientX, e.clientY);
+                    if (RV.markRenderDirty) RV.markRenderDirty();
                     RV.render();
                 } else if (S.hoveredNode || S.hoveredEdge) {
                     updateTooltip(e.clientX, e.clientY);

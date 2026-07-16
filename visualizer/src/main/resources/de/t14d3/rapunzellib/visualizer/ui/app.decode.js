@@ -217,21 +217,38 @@
      * Returns a Promise resolving to the decoded graph object.
      */
     function loadGraph() {
+        console.log('[RV] loadGraph: __GRAPH_BIN__ exists?', !!window.__GRAPH_BIN__,
+            window.__GRAPH_BIN__ ? ('len=' + window.__GRAPH_BIN__.length) : '');
         if (window.__GRAPH_BIN__) {
             try {
+                console.log('[RV] Decoding binary graph...');
                 var bytes = decodeBase64(window.__GRAPH_BIN__);
+                console.log('[RV] Base64 decoded, bytes=' + bytes.length);
                 var graph = decode(bytes);
-                // Free the base64 string to allow GC.
+                console.log('[RV] Decode OK: nodes=' + graph.nodes.length + ' edges=' + graph.edges.length);
                 window.__GRAPH_BIN__ = null;
                 return Promise.resolve(graph);
             } catch (e) {
-                console.error('Binary graph decode failed, falling back to JSON:', e);
+                console.error('[RV] Binary graph decode FAILED:', e.message, e.stack);
             }
         }
+        console.log('[RV] __GRAPH_DATA__ exists?', !!window.__GRAPH_DATA__);
         if (window.__GRAPH_DATA__) {
+            console.log('[RV] Using inline JSON data');
             return Promise.resolve(window.__GRAPH_DATA__);
         }
-        return fetch('graph.json').then(function (r) { return r.json(); });
+        console.log('[RV] Fetching graph.json...');
+        return fetch('graph.json').then(function (r) {
+            console.log('[RV] graph.json response status:', r.status, r.ok);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        }).then(function (data) {
+            console.log('[RV] graph.json parsed: nodes=' + data.nodes.length);
+            return data;
+        }).catch(function (e) {
+            console.error('[RV] graph.json fetch/parse FAILED:', e.message);
+            throw e;
+        });
     }
 
     RV.decodeGraph = decode;

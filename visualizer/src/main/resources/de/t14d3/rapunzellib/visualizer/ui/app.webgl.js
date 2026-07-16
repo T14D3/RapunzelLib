@@ -66,6 +66,8 @@
     var nodeInstanceCount = 0;
     var edgeInstanceCount = 0;
     var dirty = true; // rebuild full buffers on next render
+    var visibleNodeIds = [];
+    var visibleEdgeIdxs = [];
 
     // ---- Shaders ----------------------------------------------------------
 
@@ -97,7 +99,8 @@
         '  vec2 local = corner * aHalfSize;',
         '  vec2 world = aCenter + local;',
         '  vec2 px = (world - uCamera) * uZoom;',
-        '  vec2 ndc = px / uHalfView;',
+        // Flip Y: NDC has +Y up, but our world/canvas coords have +Y down.
+        '  vec2 ndc = vec2(px.x / uHalfView.x, -px.y / uHalfView.y);',
         '  gl_Position = vec4(ndc, 0.0, 1.0);',
         '  vLocal = local;',
         '  vFillColor = aColor;',
@@ -167,7 +170,8 @@
         '  vec2 mid = (aSrc + aTgt) * 0.5;',
         '  vec2 world = mid + dir * local.x + nrm * local.y;',
         '  vec2 px = (world - uCamera) * uZoom;',
-        '  vec2 ndc = px / uHalfView;',
+        // Flip Y: NDC has +Y up, but our world/canvas coords have +Y down.
+        '  vec2 ndc = vec2(px.x / uHalfView.x, -px.y / uHalfView.y);',
         '  gl_Position = vec4(ndc, 0.0, 1.0);',
         '  vColor = vec4(aColor.rgb, aColor.a * aBright);',
         '}'
@@ -262,8 +266,6 @@
             overlayCanvas = document.createElement('canvas');
             overlayCanvas.id = 'label-overlay';
             overlayCanvas.style.position = 'absolute';
-            overlayCanvas.style.left = '0';
-            overlayCanvas.style.top = '0';
             overlayCanvas.style.pointerEvents = 'none';
             canvas.parentElement.appendChild(overlayCanvas);
             overlayCtx = overlayCanvas.getContext('2d');
@@ -491,7 +493,13 @@
         var w = canvas.width;
         var h = canvas.height;
 
-        // Resize overlay to match canvas.
+        // Position and resize overlay to exactly match the graph canvas.
+        // The canvas is in a grid cell, so we sync the overlay's position
+        // to the canvas's bounding rect each frame.
+        var canvasRect = canvas.getBoundingClientRect();
+        var parentRect = canvas.parentElement.getBoundingClientRect();
+        overlayCanvas.style.left = (canvasRect.left - parentRect.left) + 'px';
+        overlayCanvas.style.top = (canvasRect.top - parentRect.top) + 'px';
         if (overlayCanvas.width !== w || overlayCanvas.height !== h) {
             overlayCanvas.width = w;
             overlayCanvas.height = h;

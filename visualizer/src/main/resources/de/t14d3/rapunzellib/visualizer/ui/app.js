@@ -190,13 +190,17 @@
 
     function init() {
         RV.loadGraph().then(function (data) {
+            console.log('[RV] init: graph loaded, starting app');
             S.graph = data;
             start();
-        }).catch(function () {
+        }).catch(function (err) {
+            console.error('[RV] init: loadGraph FAILED:', err);
             document.body.innerHTML =
                 '<div style="padding:40px;color:#c9d1d9;font-family:sans-serif">' +
                 '<h2>Failed to load graph data</h2>' +
                 '<p>If you opened this file directly, make sure <code>graph-data.js</code> is present next to <code>index.html</code>.</p>' +
+                '<pre style="margin-top:12px;color:#f85149;font-size:12px;white-space:pre-wrap">' +
+                (err && err.message ? err.message : String(err)) + '</pre>' +
                 '</div>';
         });
     }
