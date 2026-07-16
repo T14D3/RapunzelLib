@@ -195,6 +195,8 @@
     function drawNodes(ctx, vl, vr, vt, vb) {
         for (var id in S.positions) {
             if (!S.positions.hasOwnProperty(id)) continue;
+            // Skip collapsed nodes - they merge into their parent visually.
+            if (RV.isCollapsed && RV.isCollapsed(id)) continue;
             var node = S.nodesById[id];
             if (!RV.isNodeVisible(node)) continue;
             var pos = S.positions[id];

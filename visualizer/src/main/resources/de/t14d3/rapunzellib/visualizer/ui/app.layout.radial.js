@@ -240,13 +240,11 @@
     }
 
     function placeCollapsedRecursive(id, px, py) {
-        // Truly remove collapsed nodes from the graph - they get no position,
-        // their children are absorbed by their display parent.
         var children = RV.getChildren(id);
         for (var i = 0; i < children.length; i++) {
             var cid = children[i].id;
             if (collapsed[cid]) {
-                // Do NOT set S.positions[cid] - collapsed nodes vanish.
+                S.positions[cid] = { x: px, y: py };
                 placeCollapsedRecursive(cid, px, py);
             }
         }
@@ -346,10 +344,28 @@
         }
     }
 
-    // ---- Chart layout helpers -----------------------------------------------
+    // ---- Exposed helpers ----------------------------------------------------
 
     RV.getDisplayLabel = function (id) {
         return displayLabel[id] || null;
+    };
+
+    RV.isCollapsed = function (id) {
+        return collapsed[id] || null;   // returns the display-parent id, or null
+    };
+
+    // Called during drag to reposition a module and all its descendants live.
+    RV.radialDragNode = function (id, x, y, spacing) {
+        if (S.mode !== 'radial') return;
+        if (typeof spacing === 'undefined') spacing = S.radialSpacing || 1.0;
+        S.positions[id] = { x: x, y: y };
+        placeCollapsedRecursive(id, x, y);
+        placeLocalChildren(id, x, y, spacing);
+        for (var did in collapsed) {
+            if (collapsed[did] === id) {
+                S.positions[did] = { x: x, y: y };
+            }
+        }
     };
 
     function applyUserPositions() {

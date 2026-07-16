@@ -579,6 +579,8 @@
         var ids = visibleNodeIds || [];
         for (var i = 0; i < ids.length; i++) {
             var id = ids[i];
+            // Skip nodes collapsed into their parent (they merge visually).
+            if (RV.isCollapsed && RV.isCollapsed(id)) continue;
             var pos = S.positions[id];
             if (!pos) continue;
             // World -> screen (CSS pixels).
@@ -784,33 +786,4 @@
     RV.renderMinimap = renderMinimap;
     RV.minimapToWorld = minimapToWorld;
     RV.markRenderDirty = function () { dirty = true; };
-
-    // Fast-path: update a single node's position in the GPU buffer and all
-    // connected edge endpoints.  Avoids a full `rebuildFullBuffers()` during
-    // interactive dragging.
-    RV.updateNodePosition = function (id, x, y) {
-        if (!gl) return;
-        // Update node centre.
-        var nIdx = visibleNodeIds.indexOf(id);
-        if (nIdx >= 0) {
-            gl.bindBuffer(gl.ARRAY_BUFFER, nodeBuffers.center);
-            gl.bufferSubData(gl.ARRAY_BUFFER, nIdx * 8, new Float32Array([x, y]));
-        }
-        // Update connected edge endpoints.
-        var srcBuf = edgeBuffers ? edgeBuffers.src : null;
-        var tgtBuf = edgeBuffers ? edgeBuffers.tgt : null;
-        if (!srcBuf) return;
-        for (var ei = 0; ei < visibleEdgeIdxs.length; ei++) {
-            var edge = S.crossEdges[visibleEdgeIdxs[ei]];
-            if (!edge) continue;
-            if (edge.source === id) {
-                gl.bindBuffer(gl.ARRAY_BUFFER, srcBuf);
-                gl.bufferSubData(gl.ARRAY_BUFFER, ei * 8, new Float32Array([x, y]));
-            }
-            if (edge.target === id) {
-                gl.bindBuffer(gl.ARRAY_BUFFER, tgtBuf);
-                gl.bufferSubData(gl.ARRAY_BUFFER, ei * 8, new Float32Array([x, y]));
-            }
-        }
-    };
 })(window.RV = window.RV || {});
