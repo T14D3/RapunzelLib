@@ -1,24 +1,25 @@
 /* =====================================================================
- * Codebase Visualizer - radial layout (collapsed chains + local circles)
+ * Codebase Visualizer - radial layout (physics bubble-packing)
  *
- * Single-child chains (e.g., module -> sourceSet) are collapsed into a
- * single displayed node.  Only branch points and leaves remain visible.
- * The root's children are placed on a concentric ring; everything deeper
- * uses local circles around the parent.
+ * Each node's subtree is surrounded by a "bubble" (a circle whose
+ * radius equals the farthest distance from the node to any descendant).
+ * A simple physics simulation pushes overlapping bubbles apart while
+ * a centering force keeps the graph compact.
  *
- * ┌─ root
- * │   ├─ module::api (package A1, package A2, …)    ← sourceSet collapsed
- * │   ├─ module::commands (package B1, package B2)   ← sourceSet collapsed
- * │   └─ …
- * └──
+ * This produces a natural, organic layout where:
+ *   - Large subtrees (many packages) are placed farther from centre
+ *   - Small subtrees sit closer to centre
+ *   - No wasted space between concentric rings
+ *   - No cross-subtree overlap
+ *   - The spacing slider controls overall tightness
  * ===================================================================== */
 (function (RV) {
     'use strict';
 
     var S;
     var FULL_CIRCLE = 2 * Math.PI;
-    var collapsed = {};       // child id -> display-parent id this child merges into
-    var displayLabel = {};    // display-parent id -> combined label text
+    var collapsed = {};
+    var displayLabel = {};
 
     // ---- public entry point ------------------------------------------------
 
@@ -44,68 +45,138 @@
 
         var spacing = S.radialSpacing || 1.0;
 
-        // ---- Concentric ring for root children (modules) ------------------
-        // Compute ring radius from the number of modules.
-        var R1 = Math.max(
-            rootChildren.length * (RV.NODE_W + RV.GAP) / FULL_CIRCLE,
-            RV.NODE_W + RV.GAP
+        // ---- Phase 1: compute subtree bubble radii -----------------------
+
+        var bubble = {};  // id -> farthest distance from node to any descendant
+
+        function computeBubble(id) {
+            if (bubble[id] !== undefined) return bubble[id];
+            var kids = getDisplayChildren(id);
+            if (kids.length === 0) {
+                bubble[id] = Math.max(RV.NODE_W, RV.NODE_H) / 2 + RV.GAP;
+                return bubble[id];
+            }
+            // Local circle radius for direct children.
+            var localR = kids.length * (RV.NODE_W + RV.GAP) / FULL_CIRCLE;
+            localR = Math.max(localR, Math.max(RV.NODE_W, RV.NODE_H) + RV.GAP) * spacing;
+            // Find farthest child.
+            var maxChild = 0;
+            for (var i = 0; i < kids.length; i++) {
+                var cb = computeBubble(kids[i].id);
+                // Distance from this node to farthest descendant through child i.
+                var d = localR + cb;
+                if (d > maxChild) maxChild = d;
+            }
+            bubble[id] = Math.max(localR, maxChild);
+            return bubble[id];
+        }
+
+        // Compute bubbles for all root children (modules).
+        var childBubbles = [];    // { id, r, angle }
+        for (var i = 0; i < rootChildren.length; i++) {
+            var r = computeBubble(rootChildren[i].id);
+            childBubbles.push({ id: rootChildren[i].id, r: r, angle: 0, x: 0, y: 0 });
+        }
+
+        // ---- Phase 2: physics simulation to place modules -----------------
+
+        // Heuristic: total angular space needed is sum of (2*bubble[i]) / avg_r.
+        // We use this to set initial radii and run a simple simulation.
+        var simIter = 80;
+        var minDist = RV.NODE_W + RV.GAP;  // minimum centre-to-centre distance
+
+        // Initialise: place modules evenly on a circle tight enough that
+        // they must push apart.
+        var totalR = 0;
+        for (var i = 0; i < childBubbles.length; i++) totalR += childBubbles[i].r;
+        var initRadius = Math.max(
+            totalR / childBubbles.length * 0.6,
+            childBubbles.length * minDist / FULL_CIRCLE
         ) * spacing;
 
-        // Enlarge R1 so that packages on the inward side of their local
-        // circle don't overlap modules in adjacent sectors.
-        var maxLocalR = 0;
-        for (var i = 0; i < rootChildren.length; i++) {
-            var kids = getDisplayChildren(rootChildren[i].id);
-            if (kids.length > 0) {
-                var lr = kids.length * (RV.NODE_W + RV.GAP) / FULL_CIRCLE;
-                lr = Math.max(lr, Math.max(RV.NODE_W, RV.NODE_H) + RV.GAP) * spacing;
-                if (lr > maxLocalR) maxLocalR = lr;
+        // Spread modules evenly around the initial circle.
+        for (var i = 0; i < childBubbles.length; i++) {
+            var a = -Math.PI / 2 + i * FULL_CIRCLE / childBubbles.length;
+            childBubbles[i].angle = a;
+            childBubbles[i].x = Math.cos(a) * initRadius;
+            childBubbles[i].y = Math.sin(a) * initRadius;
+        }
+
+        // Physics simulation.
+        for (var iter = 0; iter < simIter; iter++) {
+            var fx = new Array(childBubbles.length).fill(0);
+            var fy = new Array(childBubbles.length).fill(0);
+            var maxMove = 0;
+
+            // Repulsion between every pair.
+            for (var i = 0; i < childBubbles.length; i++) {
+                for (var j = i + 1; j < childBubbles.length; j++) {
+                    var bi = childBubbles[i], bj = childBubbles[j];
+                    var dx = bj.x - bi.x;
+                    var dy = bj.y - bi.y;
+                    var dist = Math.sqrt(dx * dx + dy * dy);
+                    var desired = bi.r + bj.r + minDist;
+                    if (dist < desired && dist > 0.01) {
+                        var overlap = desired - dist;
+                        var force = overlap / desired * 0.5;  // normalised push
+                        var nx = dx / dist, ny = dy / dist;
+                        fx[i] -= nx * force;
+                        fy[i] -= ny * force;
+                        fx[j] += nx * force;
+                        fy[j] += ny * force;
+                    }
+                }
             }
-        }
-        if (maxLocalR > 0) {
-            R1 = Math.max(R1, (RV.NODE_W + maxLocalR) * spacing);
-        }
 
-        // ---- Allocate sectors to root children ----------------------------
-        var totalLeaves = 0;
-        var weights = [];
-        for (var w = 0; w < rootChildren.length; w++) {
-            var lw = 1;
-            var kids = getDisplayChildren(rootChildren[w].id);
-            for (var kw = 0; kw < kids.length; kw++) lw += 1;
-            weights.push(lw);
-            totalLeaves += lw;
-        }
-        if (totalLeaves === 0) totalLeaves = 1;
+            // Centering force (pull toward root).
+            for (var i = 0; i < childBubbles.length; i++) {
+                var bi = childBubbles[i];
+                var d = Math.sqrt(bi.x * bi.x + bi.y * bi.y);
+                if (d > 1) {
+                    var centerPull = d / (bi.r + initRadius) * 0.1;
+                    fx[i] -= (bi.x / d) * centerPull;
+                    fy[i] -= (bi.y / d) * centerPull;
+                }
+            }
 
-        var minNs = (RV.NODE_W + RV.GAP) / R1;
-        var rawSpans = [];
-        for (var ri = 0; ri < rootChildren.length; ri++) {
-            rawSpans.push((weights[ri] / totalLeaves) * FULL_CIRCLE);
-        }
-        clampSpans(rawSpans, weights, minNs, FULL_CIRCLE);
+            // Damping: reduce as simulation progresses.
+            var damping = Math.max(0.05, 1 - iter / simIter);
+            var moveScale = Math.max(initRadius, 1) * damping;
 
-        // ---- Place nodes --------------------------------------------------
-        var angle = -Math.PI / 2;
-        var gap = Math.min(0.02, FULL_CIRCLE / rootChildren.length * 0.1);
+            // Apply forces.
+            for (var i = 0; i < childBubbles.length; i++) {
+                var bi = childBubbles[i];
+                var m = Math.sqrt(fx[i] * fx[i] + fy[i] * fy[i]);
+                if (m > 1) { fx[i] /= m; fy[i] /= m; }  // clamp magnitude
+                var mx = fx[i] * moveScale;
+                var my = fy[i] * moveScale;
+                bi.x += mx;
+                bi.y += my;
+                var move = Math.sqrt(mx * mx + my * my);
+                if (move > maxMove) maxMove = move;
+            }
 
-        for (var j = 0; j < rootChildren.length; j++) {
-            var endAngle = angle + rawSpans[j];
-            var mid = (angle + gap / 2 + endAngle - gap / 2) / 2;
-            var px = Math.cos(mid) * R1;
-            var py = Math.sin(mid) * R1;
-            S.positions[rootChildren[j].id] = { x: px, y: py };
+            // Recompute angles for the next iteration.
+            for (var i = 0; i < childBubbles.length; i++) {
+                childBubbles[i].angle = Math.atan2(childBubbles[i].y, childBubbles[i].x);
+            }
 
-            // Collapsed descendants get the same position.
-            placeCollapsedRecursive(rootChildren[j].id, px, py);
-
-            // Children (packages) go on a local circle around this module.
-            placeLocalChildren(rootChildren[j].id, px, py, spacing);
-
-            angle = endAngle;
+            if (maxMove < 0.5) break;  // converged
         }
 
-        // ---- Resolve overlaps with radial repulsion -----------------------
+        // ---- Phase 3: place all nodes ------------------------------------
+
+        // Place root children (modules) at their simulated positions.
+        for (var i = 0; i < childBubbles.length; i++) {
+            var cb = childBubbles[i];
+            S.positions[cb.id] = { x: cb.x, y: cb.y };
+            placeCollapsedRecursive(cb.id, cb.x, cb.y);
+
+            // Place this module's children locally.
+            placeLocalChildren(cb.id, cb.x, cb.y, spacing);
+        }
+
+        // ---- Post-pass: resolve any remaining overlaps --------------------
         resolveOverlaps();
 
         applyUserPositions();
@@ -113,56 +184,33 @@
     RV.layouts = RV.layouts || {};
     RV.layouts.radial = compute;
 
-    // ---- Chain collapsing --------------------------------------------------
+    // ---- Chain collapsing (unchanged) -------------------------------------
 
     function collapseChains() {
         collapsed = {};
         displayLabel = {};
-
         function walk(id, chain) {
-            // chain is a list of { id, label } leading up to (but not including) `id`.
             var node = S.nodesById[id];
             var label = node && node.label ? node.label : id;
-
-            if (!S.expanded[id]) {
-                assignCollapsed(chain);
-                return;
-            }
+            if (!S.expanded[id]) { assignCollapsed(chain); return; }
             var children = RV.getChildren(id);
-            if (children.length === 0) {
-                assignCollapsed(chain);
-                return;
-            }
+            if (children.length === 0) { assignCollapsed(chain); return; }
             if (children.length === 1 && id !== S.rootId) {
-                // Continue the chain.
                 walk(children[0].id, chain.concat([{ id: id, label: label }]));
             } else {
-                // Branch or leaf: the current node is the child of the last
-                // chain entry.  Collapse everything up to and including id.
                 assignCollapsed(chain, id);
-                // Recurse into children as new runs.
-                for (var i = 0; i < children.length; i++) {
-                    walk(children[i].id, []);
-                }
+                for (var i = 0; i < children.length; i++) walk(children[i].id, []);
             }
         }
-
         function assignCollapsed(chain, nextId) {
-            // chain = ancestors that form a single-child run (first = display parent)
-            // nextId = the node that follows the chain (optional)
             if (chain.length === 0 && !nextId) return;
-            if (chain.length === 0) {
-                // nextId is the first node - it's the display parent itself.
-                return;
-            }
+            if (chain.length === 0) return;
             var displayId = chain[0].id;
             var labels = [chain[0].label];
-            // Collapse chain tail into display parent.
             for (var i = 1; i < chain.length; i++) {
                 collapsed[chain[i].id] = displayId;
                 labels.push(chain[i].label);
             }
-            // Collapse nextId (the child that follows the chain) too.
             if (nextId) {
                 collapsed[nextId] = displayId;
                 var nn = S.nodesById[nextId];
@@ -170,25 +218,18 @@
             }
             displayLabel[displayId] = labels.join(' / ');
         }
-
         walk(S.rootId, []);
     }
 
-    // ---- Display-tree helpers ----------------------------------------------
+    // ---- Display-tree helpers ---------------------------------------------
 
     function getDisplayChildren(id) {
-        // NOTE: id may itself be collapsed (when called from a parent that
-        // is inlining its collapsed child's grandchildren).  We do NOT
-        // redirect to the display parent - that would create infinite
-        // recursion.  We just process this node's own visible children and
-        // skip any that are themselves collapsed.
         if (!S.expanded[id]) return [];
         var children = RV.getChildren(id);
         var out = [];
         for (var i = 0; i < children.length; i++) {
             var cid = children[i].id;
             if (collapsed[cid]) {
-                // cid merges into its parent - inline its effective children.
                 var grandkids = getDisplayChildren(cid);
                 for (var g = 0; g < grandkids.length; g++) out.push(grandkids[g]);
             } else {
@@ -197,8 +238,6 @@
         }
         return out;
     }
-
-    // ---- Position collapsed descendants at their display parent -----------
 
     function placeCollapsedRecursive(id, px, py) {
         var children = RV.getChildren(id);
@@ -213,35 +252,32 @@
 
     // ---- Local-circle placement (depth 2+) ---------------------------------
 
+    function localCircleRadius(n, spacing) {
+        var r = n * (RV.NODE_W + RV.GAP) / FULL_CIRCLE;
+        return Math.max(r, Math.max(RV.NODE_W, RV.NODE_H) + RV.GAP) * (spacing || 1);
+    }
+
     function placeLocalChildren(id, px, py, spacing) {
         if (!S.expanded[id]) return;
         var children = getDisplayChildren(id);
         var n = children.length;
         if (n === 0) return;
 
-        // Local circle radius.
-        var r = n * (RV.NODE_W + RV.GAP) / FULL_CIRCLE;
-        r = Math.max(r, Math.max(RV.NODE_W, RV.NODE_H) + RV.GAP) * spacing;
-
+        var r = localCircleRadius(n, spacing);
         var step = FULL_CIRCLE / n;
-        var a = -Math.PI / 2 + step / 2;   // centre first child at 12 o'clock
+        var a = -Math.PI / 2 + step / 2;
 
         for (var j = 0; j < n; j++) {
             var cx = px + Math.cos(a) * r;
             var cy = py + Math.sin(a) * r;
             S.positions[children[j].id] = { x: cx, y: cy };
-
-            // Collapsed descendants of this child get the same position.
             placeCollapsedRecursive(children[j].id, cx, cy);
-
-            // Recurse for this child's own children.
             placeLocalChildren(children[j].id, cx, cy, spacing);
-
             a += step;
         }
     }
 
-    // ---- Post-pass: resolve overlaps with radial repulsion -----------------
+    // ---- Post-pass: resolve remaining overlaps -----------------------------
 
     function resolveOverlaps() {
         var ids = Object.keys(S.positions);
@@ -249,7 +285,7 @@
         if (n < 2) return;
         var NW = RV.NODE_W, NH = RV.NODE_H;
 
-        for (var iter = 0; iter < 5; iter++) {
+        for (var iter = 0; iter < 8; iter++) {
             var moved = false;
             var pushX = {}, pushY = {};
             for (var i = 0; i < n; i++) pushX[ids[i]] = 0, pushY[ids[i]] = 0;
@@ -279,13 +315,14 @@
                             if (qid === pid) continue;
                             var qp = S.positions[qid];
                             if (!qp) continue;
-                            if (Math.abs(pp.x - qp.x) < NW && Math.abs(pp.y - qp.y) < NH) {
+                            var ddx = Math.abs(pp.x - qp.x);
+                            var ddy = Math.abs(pp.y - qp.y);
+                            if (ddx < NW && ddy < NH) {
                                 var pAngle = Math.atan2(pp.y, pp.x);
                                 var qAngle = Math.atan2(qp.y, qp.x);
-                                var overlapX = NW - Math.abs(pp.x - qp.x);
-                                var overlapY = NH - Math.abs(pp.y - qp.y);
+                                var overlapX = NW - ddx;
+                                var overlapY = NH - ddy;
                                 var push = Math.max(overlapX / NW, overlapY / NH) * 0.3;
-
                                 pushX[pid] += Math.cos(pAngle) * push * NW;
                                 pushY[pid] += Math.sin(pAngle) * push * NH;
                                 pushX[qid] -= Math.cos(qAngle) * push * NW;
@@ -307,40 +344,8 @@
         }
     }
 
-    // ---- Span clamping ----------------------------------------------------
+    // ---- Chart layout helpers -----------------------------------------------
 
-    function clampSpans(rawSpans, weights, minSpan, totalSpan) {
-        var n = rawSpans.length;
-        if (n === 0) return;
-        if (n * minSpan > totalSpan) {
-            var totalW = 0;
-            for (var wi = 0; wi < n; wi++) totalW += weights[wi];
-            if (totalW === 0) totalW = 1;
-            for (var si = 0; si < n; si++) rawSpans[si] = (weights[si] / totalW) * totalSpan;
-            return;
-        }
-        var clamped = new Array(n).fill(false);
-        for (;;) {
-            var unclampedWeight = 0;
-            for (var cj = 0; cj < n; cj++) if (!clamped[cj]) unclampedWeight += weights[cj];
-            if (unclampedWeight <= 0) break;
-            var minIdx = -1, minVal = Infinity;
-            for (var ck = 0; ck < n; ck++) {
-                if (clamped[ck]) continue;
-                if (rawSpans[ck] < minVal) { minVal = rawSpans[ck]; minIdx = ck; }
-            }
-            if (minIdx < 0 || minVal >= minSpan) break;
-            clamped[minIdx] = true;
-            rawSpans[minIdx] = minSpan;
-            var remaining = totalSpan;
-            for (var cr = 0; cr < n; cr++) if (clamped[cr]) remaining -= rawSpans[cr];
-            for (var cu = 0; cu < n; cu++) {
-                if (!clamped[cu]) rawSpans[cu] = (weights[cu] / unclampedWeight) * remaining;
-            }
-        }
-    }
-
-    // Expose display labels so the renderer can show combined names.
     RV.getDisplayLabel = function (id) {
         return displayLabel[id] || null;
     };
