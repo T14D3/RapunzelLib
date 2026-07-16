@@ -240,11 +240,13 @@
     }
 
     function placeCollapsedRecursive(id, px, py) {
+        // Truly remove collapsed nodes from the graph - they get no position,
+        // their children are absorbed by their display parent.
         var children = RV.getChildren(id);
         for (var i = 0; i < children.length; i++) {
             var cid = children[i].id;
             if (collapsed[cid]) {
-                S.positions[cid] = { x: px, y: py };
+                // Do NOT set S.positions[cid] - collapsed nodes vanish.
                 placeCollapsedRecursive(cid, px, py);
             }
         }

@@ -130,8 +130,15 @@
                     var world = screenToWorld(mx, my);
                     S.userPositions[draggingNode] = { x: world.x, y: world.y };
                     S.positions[draggingNode] = { x: world.x, y: world.y };
-                    RV.computeBounds();
-                    if (RV.markRenderDirty) RV.markRenderDirty();
+                    // Fast GPU update during drag - update only this node's
+                    // position and connected edge endpoints in the buffer,
+                    // avoiding a full rebuildFullBuffers().
+                    if (RV.updateNodePosition) {
+                        RV.updateNodePosition(draggingNode, world.x, world.y);
+                    } else {
+                        RV.computeBounds();
+                        if (RV.markRenderDirty) RV.markRenderDirty();
+                    }
                     RV.render();
                 } else if (isDragging) {
                     S.camera.x = dragStart.camX - dx / S.zoom;
@@ -186,6 +193,10 @@
                     }
                 }
                 RV.persistState();
+                // Rebuild full buffers with final positions of all descendants.
+                RV.computeBounds();
+                if (RV.markRenderDirty) RV.markRenderDirty();
+                RV.render();
             } else if (!isDragging && mouseDown) {
                 var id = hitTestNode(mouseDown.x, mouseDown.y);
                 if (id) {
