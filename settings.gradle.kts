@@ -39,10 +39,6 @@ pluginManagement {
         name = "gradle-plugin-build"
     }
 
-    includeBuild("../visualizer") {
-        name = "visualizer-build"
-    }
-
     resolutionStrategy {
         eachPlugin {
             when (requested.id.id) {
@@ -64,6 +60,7 @@ pluginManagement {
     }
 
     repositories {
+        mavenLocal()
         gradlePluginPortal()
         mavenCentral()
         maven("https://repo.papermc.io/repository/maven-public/")

@@ -33,6 +33,8 @@ sponge-api = "11.0.0"
 mixin = "0.8.7"
 mixin-plugin = "0.8-SNAPSHOT"
 
+visualizer = "0.1.0"
+
 [plugins]
 shadow = { id = "com.gradleup.shadow" }
 idea-ext = { id = "org.jetbrains.gradle.plugin.idea-ext", version.ref = "idea-ext" }
@@ -44,8 +46,8 @@ neoforge-moddev = { id = "net.neoforged.moddev" }
 fabric-loom = { id = "net.fabricmc.fabric-loom" }
 mixin = { id = "org.spongepowered.mixin", version.ref = "mixin-plugin" }
 rapunzellib = { id = "de.t14d3.rapunzellib" }
-visualizer-collector-java = { id = "de.t14d3.visualizer.collector-java" }
-visualizer-bundler = { id = "de.t14d3.visualizer.bundler" }
+visualizer-collector-java = { id = "de.t14d3.visualizer.collector-java", version.ref = "visualizer" }
+visualizer-bundler = { id = "de.t14d3.visualizer.bundler", version.ref = "visualizer" }
 
 
 root-subproject-conventions = { id = "de.t14d3.rapunzellib.root-subproject-conventions" }
