@@ -16,7 +16,8 @@ plugins {
     alias(libs.plugins.root.subproject.conventions)
     alias(libs.plugins.root.publishing.conventions)
     alias(libs.plugins.dokka)
-    alias(libs.plugins.rapunzellib.visualizer)
+    alias(libs.plugins.visualizer.collector.java)
+    alias(libs.plugins.visualizer.bundler)
     alias(libs.plugins.userdev) apply false
     alias(libs.plugins.vanilla.gradle) apply false
 }
@@ -344,6 +345,11 @@ tasks.register("javadoc") {
     dependsOn("dokkaGenerate")
 }
 
-codebaseVisualizer {
+codebaseCollector {
     //excludePaths.set(listOf("**/generated-sources/**"))
+}
+
+codebaseBundler {
+    // graphFile defaults to build/visualizer/graph.json (from collector)
+    // outputDir defaults to build/reports/codebase
 }

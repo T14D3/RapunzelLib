@@ -39,7 +39,7 @@ pluginManagement {
         name = "gradle-plugin-build"
     }
 
-    includeBuild("visualizer") {
+    includeBuild("../visualizer") {
         name = "visualizer-build"
     }
 
