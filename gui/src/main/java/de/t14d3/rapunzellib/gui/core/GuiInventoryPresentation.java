@@ -79,7 +79,8 @@ public final class GuiInventoryPresentation {
 
     private static @NotNull Entry button(@NotNull ButtonElement button) {
         RItem baseItem = iconItem(button.icon(), DEFAULT_BUTTON_ITEM);
-        RItem displayed = appendDisplay(baseItem, button.label(), tooltip(button.tooltip()), !button.enabled());
+        boolean glow = !button.enabled() || button.glow();
+        RItem displayed = appendDisplay(baseItem, button.label(), tooltip(button.tooltip()), glow);
         return new Entry(displayed, false);
     }
 

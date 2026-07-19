@@ -60,6 +60,31 @@ public abstract class GenerateContextWrapperTask extends DefaultTask {
     private static final Pattern RAPUNZEL_REFERENCE =
         Pattern.compile("\\bRapunzel\\.", Pattern.MULTILINE);
 
+    /**
+     * Matches a standalone {@code PaperRapunzelBootstrap.acquire(…)} statement.
+     * Captures the argument expression (typically {@code this}).
+     */
+    private static final Pattern PAPER_ACQUIRE =
+        Pattern.compile(
+            "\\bPaperRapunzelBootstrap\\.acquire\\s*\\((?<arg>[^;]+)\\)\\s*;",
+            Pattern.MULTILINE);
+
+    /**
+     * Matches a standalone {@code FabricRapunzelBootstrap.bootstrap(…)} or
+     * {@code FabricRapunzelBootstrap.acquire(…)} statement. Both are rewritten
+     * to use {@code acquire()} and then init the wrapper. Using a single pattern
+     * prevents the {@code bootstrap->acquire} rewrite from being re-matched by
+     * a separate {@code acquire} pattern.
+     */
+    private static final Pattern FABRIC_ACQUIRE =
+        Pattern.compile(
+            "\\bFabricRapunzelBootstrap\\.(?:bootstrap|acquire)\\s*\\((?<args>[^;]+)\\)\\s*;",
+            Pattern.MULTILINE);
+
+    /** Import for BootstrapHandle (added when acquiring calls are transformed). */
+    private static final String BOOTSTRAP_HANDLE_IMPORT =
+        "import de.t14d3.rapunzellib.bootstrap.BootstrapHandle;";
+
     // -- Task inputs / outputs -------------------------------------------------------
 
     @Input
@@ -127,6 +152,19 @@ public abstract class GenerateContextWrapperTask extends DefaultTask {
 
     // -- Source transformation -------------------------------------------------------
 
+    /**
+     * Replacement string: turns a bare acquire call into a handle-capture +
+     * wrapper-init sequence. The {@code $arg} and {@code $cls} placeholders
+     * are replaced per-match.
+     */
+    private static final String PAPER_ACQUIRE_REPLACEMENT =
+        "BootstrapHandle __rl_handle = PaperRapunzelBootstrap.acquire($arg);\n" +
+        "        $cls.init(__rl_handle.context());";
+
+    private static final String FABRIC_ACQUIRE_REPLACEMENT =
+        "BootstrapHandle __rl_handle = FabricRapunzelBootstrap.acquire($args);\n" +
+        "        $cls.init(__rl_handle.context());";
+
     private void transformSourceFiles(String pkg, String cls, File sourceDir, File outputRoot) throws IOException {
         FileTree sourceFiles = getProject()
                 .fileTree(sourceDir)
@@ -146,30 +184,75 @@ public abstract class GenerateContextWrapperTask extends DefaultTask {
 
             String content = Files.readString(sourceFile.toPath(), StandardCharsets.UTF_8);
 
-            // Quick path: no Rapunzel reference at all -> copy unchanged
-            if (!content.contains("Rapunzel")) {
+            // Quick path: no Rapunzel reference and no bootstrap acquire call -> copy unchanged
+            boolean hasRapunzelRef = content.contains("Rapunzel");
+            boolean hasBootstrapRef = content.contains("Bootstrap")
+                || content.contains("PaperRapunzelBootstrap")
+                || content.contains("FabricRapunzelBootstrap");
+            if (!hasRapunzelRef && !hasBootstrapRef) {
                 Files.copy(sourceFile.toPath(), outputFile.toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 unchanged++;
                 continue;
             }
 
-            // Replace Rapunzel.method( -> cls.method( for redirectable methods
-            String rewritten = RAPUNZEL_CALL.matcher(content).replaceAll(cls + ".${method}(");
+            String rewritten = content;
 
-            // Check whether any Rapunzel. references remain (after the rewrite)
-            boolean hasRemainingRapunzel = RAPUNZEL_REFERENCE.matcher(rewritten).find();
+            // 1. Transform PaperRapunzelBootstrap.acquire(arg);
+            rewritten = PAPER_ACQUIRE.matcher(rewritten).replaceAll(match -> {
+                String arg = match.group("arg");
+                return PAPER_ACQUIRE_REPLACEMENT
+                    .replace("$arg", arg)
+                    .replace("$cls", cls);
+            });
 
-            if (!hasRemainingRapunzel) {
-                // All Rapunzel calls were redirected -> replace the import entirely
+            // 2. Transform FabricRapunzelBootstrap.bootstrap/acquire(args);
+            rewritten = FABRIC_ACQUIRE.matcher(rewritten).replaceAll(match -> {
+                String args = match.group("args");
+                return FABRIC_ACQUIRE_REPLACEMENT
+                    .replace("$args", args)
+                    .replace("$cls", cls);
+            });
+
+            // 3. Replace Rapunzel.method( -> cls.method( for redirectable methods
+            boolean hadRapunzelCalls = hasRapunzelRef;
+            if (hadRapunzelCalls) {
+                rewritten = RAPUNZEL_CALL.matcher(rewritten).replaceAll(cls + ".${method}(");
+            }
+
+            // 4. Manage imports - ensure all needed imports are present
+
+            // Collect imports that need to be added.
+            java.util.LinkedHashSet<String> neededImports = new java.util.LinkedHashSet<>();
+
+            boolean hasRemainingRapunzel = hadRapunzelCalls
+                && RAPUNZEL_REFERENCE.matcher(rewritten).find();
+
+            if (hadRapunzelCalls && !hasRemainingRapunzel) {
+                // All Rapunzel calls were redirected -> replace the Rapunzel
+                // import with the wrapper import.
                 rewritten = RAPUNZEL_IMPORT.matcher(rewritten)
                     .replaceFirst(Matcher.quoteReplacement(redirectImport));
             } else {
-                // Some Rapunzel calls remain (e.g. shutdown) -> add the new import alongside
+                // Either some Rapunzel calls remain OR there were no Rapunzel
+                // calls at all. In either case, keep the Rapunzel import (if
+                // present) and add additional imports as needed.
                 if (!rewritten.contains(redirectImport)) {
-                    rewritten = RAPUNZEL_IMPORT.matcher(rewritten)
-                        .replaceFirst(m -> m.group() + "\n" + redirectImport);
+                    neededImports.add(redirectImport);
                 }
+            }
+
+            if (rewritten.contains("BootstrapHandle")
+                && !rewritten.contains(BOOTSTRAP_HANDLE_IMPORT)) {
+                neededImports.add(BOOTSTRAP_HANDLE_IMPORT);
+            }
+
+            // Insert any needed imports after the package statement.
+            if (!neededImports.isEmpty()) {
+                String importBlock = "\n" + String.join("\n", neededImports);
+                rewritten = rewritten.replaceFirst(
+                    "(?m)^(package\\s+[^;]+;)\\s*$",
+                    "$1" + importBlock);
             }
 
             Files.writeString(outputFile.toPath(), rewritten, StandardCharsets.UTF_8);
@@ -178,7 +261,8 @@ public abstract class GenerateContextWrapperTask extends DefaultTask {
 
         if (transformed > 0) {
             getLogger().lifecycle(
-                "Transformed {} source files: rewrote Rapunzel.*() calls to {}.*()",
+                "Transformed {} source files: rewrote Rapunzel.*() calls to {}.*() " +
+                "and auto-initialised the wrapper on bootstrap acquire",
                 transformed, cls);
         }
         if (unchanged > 0) {
@@ -217,6 +301,7 @@ public abstract class GenerateContextWrapperTask extends DefaultTask {
             import org.jetbrains.annotations.NotNull;
             import org.slf4j.Logger;
             
+            import de.t14d3.rapunzellib.Rapunzel;
             import java.nio.file.Path;
             import java.util.Optional;
             
@@ -227,7 +312,12 @@ public abstract class GenerateContextWrapperTask extends DefaultTask {
              * project's own context so that static convenience methods resolve without
              * going through the ambiguous {@code Rapunzel.context()} resolution.</p>
              *
-             * <p>Usage after bootstrap:</p>
+             * <p>If {@link #init} has been called the wrapper returns that specific context
+             * (e.g. a {@code ConsumerView} scoped to the consumer plugin). Otherwise all
+             * methods delegate to the global {@link Rapunzel#context()}, so the wrapper is
+             * safe to use even without explicit initialisation.</p>
+             *
+             * <p>Explicit initialisation (recommended):</p>
              * <pre>{@code
              * BootstrapHandle handle = PaperRapunzelBootstrap.acquire(this);
              * $CLASS$.init(handle.context());
@@ -235,22 +325,44 @@ public abstract class GenerateContextWrapperTask extends DefaultTask {
              */
             public final class $CLASS$ {
             
-                private static RapunzelContext context;
+                private static volatile RapunzelContext context;
             
                 private $CLASS$() {
                 }
             
                 /**
-                 * Initialises the wrapper with the project's context.
-                 * Must be called once after bootstrap, before any other static method.
+                 * Initialises the wrapper with a project-specific context.
+                 * <p>
+                 * After this call all static methods delegate to the given context.
+                 * If this method is never called, methods fall back to the global
+                 * {@link Rapunzel#context()} automatically.
                  */
                 public static void init(@NotNull RapunzelContext ctx) {
                     context = ctx;
                 }
             
-                /** Returns the raw context, for access to methods not exposed here. */
+                /**
+                 * Returns the raw context.
+                 * <p>
+                 * If {@link #init} has been called, returns the initialised context.
+                 * Otherwise falls back to the global {@link Rapunzel#context()}.
+                 *
+                 * @throws IllegalStateException if no Rapunzel context has been
+                 *                               bootstrapped at all
+                 */
                 public static @NotNull RapunzelContext context() {
-                    return context;
+                    RapunzelContext ctx = context;
+                    if (ctx == null) {
+                        ctx = Rapunzel.context();
+                        if (ctx == null) {
+                            throw new IllegalStateException(
+                                "$CLASS$ has not been initialised and no global " +
+                                "Rapunzel context is available. Ensure a platform " +
+                                "bootstrap (e.g. PaperRapunzelBootstrap.acquire()) " +
+                                "has been called before using this wrapper.");
+                        }
+                    }
+                    return ctx;
                 }
             
                 // -- Accessors ------------------------------------------------------------------

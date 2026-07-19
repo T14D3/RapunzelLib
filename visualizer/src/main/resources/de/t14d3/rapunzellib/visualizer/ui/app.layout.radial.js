@@ -47,7 +47,7 @@
 
         // ---- Phase 1: compute subtree bubble radii -----------------------
 
-        var bubble = {};  // id -> farthest distance from node to any descendant
+        var bubble = {};  // id -> radius of the circle that encloses the entire subtree
 
         function computeBubble(id) {
             if (bubble[id] !== undefined) return bubble[id];
@@ -57,17 +57,17 @@
                 return bubble[id];
             }
             // Local circle radius for direct children.
-            var localR = kids.length * (RV.NODE_W + RV.GAP) / FULL_CIRCLE;
-            localR = Math.max(localR, Math.max(RV.NODE_W, RV.NODE_H) + RV.GAP) * spacing;
-            // Find farthest child.
-            var maxChild = 0;
+            var localR = localCircleRadius(kids.length, spacing);
+            // For each child, the farthest point of that child's subtree from
+            // THIS node is: localR (distance to child centre) + child's bubble
+            // radius (distance from child centre to its farthest descendant).
+            var maxExtent = localR;
             for (var i = 0; i < kids.length; i++) {
                 var cb = computeBubble(kids[i].id);
-                // Distance from this node to farthest descendant through child i.
-                var d = localR + cb;
-                if (d > maxChild) maxChild = d;
+                var extent = localR + cb;
+                if (extent > maxExtent) maxExtent = extent;
             }
-            bubble[id] = Math.max(localR, maxChild);
+            bubble[id] = maxExtent;
             return bubble[id];
         }
 
@@ -82,7 +82,7 @@
 
         // Heuristic: total angular space needed is sum of (2*bubble[i]) / avg_r.
         // We use this to set initial radii and run a simple simulation.
-        var simIter = 80;
+        var simIter = 200;
         var minDist = RV.NODE_W + RV.GAP;  // minimum centre-to-centre distance
 
         // Initialise: place modules evenly on a circle tight enough that
@@ -102,23 +102,25 @@
             childBubbles[i].y = Math.sin(a) * initRadius;
         }
 
-        // Physics simulation.
+        // Physics simulation: push overlapping bubbles apart.
         for (var iter = 0; iter < simIter; iter++) {
             var fx = new Array(childBubbles.length).fill(0);
             var fy = new Array(childBubbles.length).fill(0);
             var maxMove = 0;
 
-            // Repulsion between every pair.
+            // Repulsion between every pair of bubbles.
             for (var i = 0; i < childBubbles.length; i++) {
                 for (var j = i + 1; j < childBubbles.length; j++) {
                     var bi = childBubbles[i], bj = childBubbles[j];
                     var dx = bj.x - bi.x;
                     var dy = bj.y - bi.y;
                     var dist = Math.sqrt(dx * dx + dy * dy);
+                    // Bubbles must not overlap: desired = sum of radii + gap.
                     var desired = bi.r + bj.r + minDist;
                     if (dist < desired && dist > 0.01) {
                         var overlap = desired - dist;
-                        var force = overlap / desired * 0.5;  // normalised push
+                        // Stronger force: proportional to overlap, not normalised.
+                        var force = overlap * 0.5;
                         var nx = dx / dist, ny = dy / dist;
                         fx[i] -= nx * force;
                         fy[i] -= ny * force;
@@ -128,28 +130,29 @@
                 }
             }
 
-            // Centering force (pull toward root).
+            // Centering force (pull toward root) - weak, to keep compact.
             for (var i = 0; i < childBubbles.length; i++) {
                 var bi = childBubbles[i];
                 var d = Math.sqrt(bi.x * bi.x + bi.y * bi.y);
                 if (d > 1) {
-                    var centerPull = d / (bi.r + initRadius) * 0.1;
-                    fx[i] -= (bi.x / d) * centerPull;
-                    fy[i] -= (bi.y / d) * centerPull;
+                    var centerPull = 0.02;
+                    fx[i] -= (bi.x / d) * centerPull * d;
+                    fy[i] -= (bi.y / d) * centerPull * d;
                 }
             }
 
             // Damping: reduce as simulation progresses.
             var damping = Math.max(0.05, 1 - iter / simIter);
-            var moveScale = Math.max(initRadius, 1) * damping;
 
             // Apply forces.
             for (var i = 0; i < childBubbles.length; i++) {
                 var bi = childBubbles[i];
-                var m = Math.sqrt(fx[i] * fx[i] + fy[i] * fy[i]);
-                if (m > 1) { fx[i] /= m; fy[i] /= m; }  // clamp magnitude
-                var mx = fx[i] * moveScale;
-                var my = fy[i] * moveScale;
+                var mx = fx[i] * damping;
+                var my = fy[i] * damping;
+                // Clamp max move per iteration to avoid oscillation.
+                var maxStep = bi.r * 0.25;
+                var m = Math.sqrt(mx * mx + my * my);
+                if (m > maxStep) { mx = mx / m * maxStep; my = my / m * maxStep; }
                 bi.x += mx;
                 bi.y += my;
                 var move = Math.sqrt(mx * mx + my * my);
@@ -161,7 +164,7 @@
                 childBubbles[i].angle = Math.atan2(childBubbles[i].y, childBubbles[i].x);
             }
 
-            if (maxMove < 0.5) break;  // converged
+            if (maxMove < 0.1) break;  // converged
         }
 
         // ---- Phase 3: place all nodes ------------------------------------
@@ -177,7 +180,7 @@
         }
 
         // ---- Post-pass: resolve any remaining overlaps --------------------
-        resolveOverlaps();
+        resolveOverlaps(childBubbles, spacing);
 
         applyUserPositions();
     }
@@ -278,20 +281,31 @@
     }
 
     // ---- Post-pass: resolve remaining overlaps -----------------------------
+    // Instead of pushing individual nodes (which destroys local-circle
+    // structure), we detect overlaps between nodes of DIFFERENT subtrees
+    // and push the corresponding module (subtree root) apart, then re-place
+    // children.  This preserves the circular structure within each subtree.
 
-    function resolveOverlaps() {
-        var ids = Object.keys(S.positions);
-        var n = ids.length;
-        if (n < 2) return;
+    function resolveOverlaps(childBubbles, spacing) {
+        // Build a map: node id -> module id (the root child that owns it).
+        var ownerModule = {};
+        for (var i = 0; i < childBubbles.length; i++) {
+            var modId = childBubbles[i].id;
+            ownerModule[modId] = modId;
+            var desc = RV.getDescendantIds(modId);
+            for (var d = 0; d < desc.length; d++) ownerModule[desc[d]] = modId;
+        }
+
+        var moduleById = {};
+        for (var i = 0; i < childBubbles.length; i++) moduleById[childBubbles[i].id] = childBubbles[i];
+
         var NW = RV.NODE_W, NH = RV.NODE_H;
+        var ids = Object.keys(S.positions);
 
-        for (var iter = 0; iter < 8; iter++) {
-            var moved = false;
-            var pushX = {}, pushY = {};
-            for (var i = 0; i < n; i++) pushX[ids[i]] = 0, pushY[ids[i]] = 0;
-
+        for (var iter = 0; iter < 10; iter++) {
+            // Grid for broad-phase overlap detection.
             var grid = {};
-            for (var i = 0; i < n; i++) {
+            for (var i = 0; i < ids.length; i++) {
                 var p = S.positions[ids[i]];
                 if (!p) continue;
                 var key = Math.floor(p.x / NW) + ',' + Math.floor(p.y / NH);
@@ -299,10 +313,21 @@
                 grid[key].push(ids[i]);
             }
 
-            for (var i = 0; i < n; i++) {
+            // Accumulate push vectors per module.
+            var modPushX = {}, modPushY = {};
+            for (var i = 0; i < childBubbles.length; i++) {
+                modPushX[childBubbles[i].id] = 0;
+                modPushY[childBubbles[i].id] = 0;
+            }
+
+            var anyOverlap = false;
+
+            for (var i = 0; i < ids.length; i++) {
                 var pid = ids[i];
                 var pp = S.positions[pid];
                 if (!pp) continue;
+                var modI = ownerModule[pid];
+                if (!modI) continue;
                 var gx = Math.floor(pp.x / NW);
                 var gy = Math.floor(pp.y / NH);
 
@@ -313,34 +338,46 @@
                         for (var k = 0; k < bucket.length; k++) {
                             var qid = bucket[k];
                             if (qid === pid) continue;
+                            var modQ = ownerModule[qid];
+                            if (!modQ || modQ === modI) continue;  // same subtree: skip
                             var qp = S.positions[qid];
                             if (!qp) continue;
-                            var ddx = Math.abs(pp.x - qp.x);
-                            var ddy = Math.abs(pp.y - qp.y);
-                            if (ddx < NW && ddy < NH) {
-                                var pAngle = Math.atan2(pp.y, pp.x);
-                                var qAngle = Math.atan2(qp.y, qp.x);
-                                var overlapX = NW - ddx;
-                                var overlapY = NH - ddy;
-                                var push = Math.max(overlapX / NW, overlapY / NH) * 0.3;
-                                pushX[pid] += Math.cos(pAngle) * push * NW;
-                                pushY[pid] += Math.sin(pAngle) * push * NH;
-                                pushX[qid] -= Math.cos(qAngle) * push * NW;
-                                pushY[qid] -= Math.sin(qAngle) * push * NH;
+                            var ddx = pp.x - qp.x;
+                            var ddy = pp.y - qp.y;
+                            var adx = Math.abs(ddx), ady = Math.abs(ddy);
+                            if (adx < NW && ady < NH) {
+                                anyOverlap = true;
+                                var overlapX = NW - adx;
+                                var overlapY = NH - ady;
+                                // Push the two modules apart along the axis of least resistance.
+                                if (overlapX < overlapY) {
+                                    var sign = ddx >= 0 ? 1 : -1;
+                                    modPushX[modI] += sign * overlapX * 0.5;
+                                    modPushX[modQ] -= sign * overlapX * 0.5;
+                                } else {
+                                    var sign = ddy >= 0 ? 1 : -1;
+                                    modPushY[modI] += sign * overlapY * 0.5;
+                                    modPushY[modQ] -= sign * overlapY * 0.5;
+                                }
                             }
                         }
                     }
                 }
             }
 
-            for (var i = 0; i < n; i++) {
-                var id = ids[i];
-                if (pushX[id] !== 0 || pushY[id] !== 0) {
-                    var p = S.positions[id];
-                    if (p) { p.x += pushX[id]; p.y += pushY[id]; moved = true; }
-                }
+            if (!anyOverlap) break;
+
+            // Apply pushes to modules and re-place their children.
+            for (var i = 0; i < childBubbles.length; i++) {
+                var cb = childBubbles[i];
+                var px = modPushX[cb.id], py = modPushY[cb.id];
+                if (px === 0 && py === 0) continue;
+                cb.x += px;
+                cb.y += py;
+                S.positions[cb.id] = { x: cb.x, y: cb.y };
+                placeCollapsedRecursive(cb.id, cb.x, cb.y);
+                placeLocalChildren(cb.id, cb.x, cb.y, spacing);
             }
-            if (!moved) break;
         }
     }
 
@@ -354,16 +391,26 @@
         return collapsed[id] || null;   // returns the display-parent id, or null
     };
 
-    // Called during drag to reposition a module and all its descendants live.
+    // Called during drag to reposition a node and all its descendants live.
     RV.radialDragNode = function (id, x, y, spacing) {
         if (S.mode !== 'radial') return;
         if (typeof spacing === 'undefined') spacing = S.radialSpacing || 1.0;
         S.positions[id] = { x: x, y: y };
+        // Reposition collapsed children (they share our position) AND their
+        // non-collapsed children (which sit on a local circle around the
+        // collapsed node, which is now at our position).
         placeCollapsedRecursive(id, x, y);
+        // Place our own display children on a local circle.
         placeLocalChildren(id, x, y, spacing);
-        for (var did in collapsed) {
-            if (collapsed[did] === id) {
-                S.positions[did] = { x: x, y: y };
+        // Place children of collapsed nodes (they inherit our position, so
+        // their children must be placed relative to us).
+        var children = RV.getChildren(id);
+        for (var i = 0; i < children.length; i++) {
+            var cid = children[i].id;
+            if (collapsed[cid]) {
+                // This child is collapsed into us - its children need to be
+                // placed on a local circle around OUR position.
+                placeLocalChildren(cid, x, y, spacing);
             }
         }
     };

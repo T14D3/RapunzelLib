@@ -19,7 +19,20 @@ public interface ButtonElement extends GuiElement {
     default boolean enabled() {
         return true;
     }
-    
+
+    /**
+     * Whether the button's icon should render with an enchanted glint override.
+     *
+     * <p>Defaults to {@code false}. When {@code true}, the platform renderer applies
+     * an enchantment glint to the displayed item (via {@code enchantment_glint_override}
+     * on modern Minecraft versions, or a hidden enchantment on legacy versions).</p>
+     *
+     * @return {@code true} if the button should glow
+     */
+    default boolean glow() {
+        return false;
+    }
+
     @Override
     default @NotNull ElementType type() {
         return ElementType.BUTTON;

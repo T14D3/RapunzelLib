@@ -80,6 +80,8 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
                     .orElse(null);
 
                 if (sourceDir != null && extension.getContextWrapper().getTransformSources().get()) {
+                    // Source transformation mode: replace original source with
+                    // transformed output (Rapunzel.*() calls rewritten to Wrapper.*()).
                     final File sourceDirFinal = sourceDir;
                     ctxWrapper.configure(task -> task.getSourceDir().set(sourceDirFinal));
 

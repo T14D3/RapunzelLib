@@ -168,28 +168,11 @@
         canvas.addEventListener('mouseup', function () {
             canvas.classList.remove('dragging-node');
             if (draggingNode && isDragging) {
-                // On drop, apply the move as a angular/radial transformation
-                // around the global center (root), so the subtree keeps its
-                // circular structure relative to the root.
-                if (dragNodeOrigin && S.positions[draggingNode]) {
-                    var finalPos = S.positions[draggingNode];
-                    var oldR = Math.sqrt(dragNodeOrigin.x * dragNodeOrigin.x + dragNodeOrigin.y * dragNodeOrigin.y);
-                    var oldA = Math.atan2(dragNodeOrigin.y, dragNodeOrigin.x);
-                    var newR = Math.sqrt(finalPos.x * finalPos.x + finalPos.y * finalPos.y);
-                    var newA = Math.atan2(finalPos.y, finalPos.x);
-                    var descendants = RV.getDescendantIds(draggingNode);
-                    for (var di = 0; di < descendants.length; di++) {
-                        if (S.pinned[descendants[di]]) continue;
-                        var cp = S.positions[descendants[di]];
-                        if (!cp) continue;
-                        var cr = Math.sqrt(cp.x * cp.x + cp.y * cp.y);
-                        var ca = Math.atan2(cp.y, cp.x);
-                        var nr = oldR > 0 ? cr * (newR / oldR) : cr;
-                        var na = ca + (newA - oldA);
-                        S.positions[descendants[di]] = { x: nr * Math.cos(na), y: nr * Math.sin(na) };
-                        S.userPositions[descendants[di]] = { x: nr * Math.cos(na), y: nr * Math.sin(na) };
-                    }
-                }
+                // On drop, just persist the dragged node's position.
+                // During drag, RV.radialDragNode already repositioned all
+                // descendants correctly (local circles around the dragged
+                // node).  No global polar transformation is needed - that
+                // would destroy the local-circle structure.
                 RV.persistState();
             } else if (!isDragging && mouseDown) {
                 var id = hitTestNode(mouseDown.x, mouseDown.y);

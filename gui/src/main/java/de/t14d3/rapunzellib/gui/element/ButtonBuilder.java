@@ -14,6 +14,7 @@ public class ButtonBuilder {
     private Icon icon;
     private Consumer<ClickContext> onClick;
     private boolean enabled = true;
+    private boolean glow = false;
     
     @NotNull
     public ButtonBuilder label(@NotNull Component label) {
@@ -64,6 +65,21 @@ public class ButtonBuilder {
         this.enabled = enabled;
         return this;
     }
+
+    /**
+     * Sets whether the button's icon should render with an enchanted glint.
+     *
+     * <p>Useful for highlighting entries that have a non-default state, e.g. a
+     * permission value that is currently allowed or denied.</p>
+     *
+     * @param glow {@code true} to render the glint
+     * @return this builder
+     */
+    @NotNull
+    public ButtonBuilder glow(boolean glow) {
+        this.glow = glow;
+        return this;
+    }
     
     @NotNull
     public ButtonElement build() {
@@ -95,6 +111,11 @@ public class ButtonBuilder {
             @Override
             public boolean enabled() {
                 return enabled;
+            }
+
+            @Override
+            public boolean glow() {
+                return glow;
             }
         };
     }
