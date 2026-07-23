@@ -1,11 +1,11 @@
 package de.t14d3.rapunzellib.livetest;
 
 import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.objects.RBlockPos;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
@@ -44,9 +44,12 @@ public class Bot implements AutoCloseable {
     // ── Factory ────────────────────────────────────────────────────────────
 
     private static BotService resolveService() {
-        Optional<BotService> contextService = Rapunzel.findContext()
-                .flatMap(ctx -> ctx.services().find(BotService.class));
-        return contextService.orElseGet(BotFactory::newConsoleService);
+        return Rapunzel.findContext()
+                .flatMap(ctx -> ctx.services().find(BotService.class))
+                .orElseThrow(() -> new IllegalStateException(
+                        "No BotService registered in the current Rapunzel context. " +
+                        "The RPC bot transport is only available when livetest is " +
+                        "installed by a platform that wires it (e.g. livetest-paper)."));
     }
 
     /**
@@ -90,12 +93,31 @@ public class Bot implements AutoCloseable {
         service.digBlock(name, x, y, z, direction);
     }
 
+    public void digBlock(@NotNull RBlockPos pos, @NotNull Direction direction) {
+        digBlock(pos.x(), pos.y(), pos.z(), direction);
+    }
+
     public void useItemOn(int x, int y, int z, @NotNull Hand hand, @NotNull Direction direction) {
         service.useItemOn(name, x, y, z, hand, direction);
     }
 
-    public void execute(@NotNull String command) {
-        service.execute(name, command);
+    public void useItemOn(@NotNull RBlockPos pos, @NotNull Hand hand, @NotNull Direction direction) {
+        useItemOn(pos.x(), pos.y(), pos.z(), hand, direction);
+    }
+
+    public CompletableFuture<Void> execute(@NotNull String command) {
+        return service.execute(name, command);
+    }
+
+    /**
+     * Sends a command and waits until the underlying transport has accepted it.
+     *
+     * @param command the command, with or without leading slash; transport semantics
+     *                are the same as for {@link #execute(String)}
+     * @throws Exception if the wait is interrupted or times out
+     */
+    public void executeSync(@NotNull String command, long timeoutMs) throws Exception {
+        service.execute(name, command).get(timeoutMs, TimeUnit.MILLISECONDS);
     }
 
     public void moveTo(int x, int y, int z) {
@@ -225,6 +247,162 @@ public class Bot implements AutoCloseable {
 
     public @NotNull CompletableFuture<Void> awaitServer(@NotNull String serverName, long timeoutMs) {
         return service.awaitServer(name, serverName, Duration.ofMillis(timeoutMs));
+    }
+
+    // ── Inventory async ────────────────────────────────────────────────────
+
+    /**
+     * Queries a container snapshot. {@code containerId == 0} always returns
+     * the player's own inventory; a positive id returns the open container
+     * currently shown to the bot.
+     */
+    public @NotNull CompletableFuture<BotInventory> queryInventory(int containerId, long timeoutMs) {
+        return service.queryInventory(name, containerId, Duration.ofMillis(timeoutMs));
+    }
+
+    /** Convenience: queries the player's own inventory (containerId 0). */
+    public @NotNull CompletableFuture<BotInventory> queryInventory(long timeoutMs) {
+        return service.queryInventory(name, 0, Duration.ofMillis(timeoutMs));
+    }
+
+    /** Awaits until the given container snapshot matches the supplied matcher. */
+    public @NotNull CompletableFuture<BotInventory> awaitInventory(int containerId,
+                                                                    @NotNull InventoryMatcher matcher,
+                                                                    long timeoutMs) {
+        return service.awaitInventory(name, containerId, matcher, Duration.ofMillis(timeoutMs));
+    }
+
+    /** Awaits the player's own inventory (containerId 0). */
+    public @NotNull CompletableFuture<BotInventory> awaitInventory(@NotNull InventoryMatcher matcher, long timeoutMs) {
+        return service.awaitInventory(name, 0, matcher, Duration.ofMillis(timeoutMs));
+    }
+
+    /** Performs a click in a container slot. */
+    public @NotNull CompletableFuture<Void> clickSlot(int containerId,
+                                                      int slot,
+                                                      int button,
+                                                      @NotNull BotInventory.ClickType clickType) {
+        return service.clickSlot(name, containerId, slot, button, clickType);
+    }
+
+    /** Awaits a change in the open container's inventory state. */
+    public @NotNull CompletableFuture<Void> closeContainer(int containerId) {
+        return service.closeContainer(name, containerId);
+    }
+
+    /** Drops the bot's currently held stack ({@code dropAll=true} for the whole stack). */
+    public @NotNull CompletableFuture<Void> dropHeldItem(boolean dropAll) {
+        return service.dropHeldItem(name, dropAll);
+    }
+
+    /**
+     * Places an item into a slot using the client's creative-mode slot packet
+     * (no effect out of creative mode).
+     */
+    public @NotNull CompletableFuture<Void> setCreativeSlot(int slot, @NotNull BotItemStack stack) {
+        return service.setCreativeSlot(name, slot, stack);
+    }
+
+    // ── Tab-completion (B) ────────────────────────────────────────────────
+
+    /**
+     * Requests tab-completion suggestions for the given text and blocks for the
+     * given timeout. Returns the list of suggestions (possibly empty).
+     */
+    public @NotNull java.util.List<BotSuggestion> queryTabComplete(@NotNull String text, long timeoutMs) throws Exception {
+        return service.queryTabComplete(name, text, Duration.ofMillis(timeoutMs))
+                .get(timeoutMs, TimeUnit.MILLISECONDS);
+    }
+
+    public @NotNull CompletableFuture<java.util.List<BotSuggestion>> queryTabCompleteAsync(@NotNull String text, long timeoutMs) {
+        return service.queryTabComplete(name, text, Duration.ofMillis(timeoutMs));
+    }
+
+    // ── Entity snapshots (B/C) ─────────────────────────────────────────────
+
+    /**
+     * Queries a snapshot of every tracked entity matching the given matcher.
+     */
+    public @NotNull CompletableFuture<java.util.List<BotEntity>> queryMatchingEntities(@NotNull EntityMatcher matcher, long timeoutMs) {
+        return service.queryMatchingEntities(name, matcher, Duration.ofMillis(timeoutMs));
+    }
+
+    /** Queries a single tracked entity by its entity id. */
+    public @NotNull CompletableFuture<BotEntity> queryEntity(int entityId, long timeoutMs) {
+        return service.queryEntity(name, entityId, Duration.ofMillis(timeoutMs));
+    }
+
+    /** Awaits until at least one entity matches the given matcher, then returns it. */
+    public @NotNull CompletableFuture<BotEntity> awaitEntity(@NotNull EntityMatcher matcher, long timeoutMs) {
+        return service.awaitEntity(name, matcher, Duration.ofMillis(timeoutMs));
+    }
+
+    /** Convenience: awaits the next tracked entity of the given type name. */
+    public @NotNull CompletableFuture<BotEntity> awaitEntity(@NotNull String typeName, long timeoutMs) {
+        return awaitEntity(EntityMatcher.ofType(typeName), timeoutMs);
+    }
+
+    /** Convenience: awaits the next tracked entity of any reachable type. */
+    public @NotNull CompletableFuture<BotEntity> awaitAnyEntity(long timeoutMs) {
+        return awaitEntity(EntityMatcher.any(), timeoutMs);
+    }
+
+    // ── Player self-state (C) ──────────────────────────────────────────────
+
+    public @NotNull CompletableFuture<BotAbilities> queryAbilities(long timeoutMs) {
+        return service.queryAbilities(name, Duration.ofMillis(timeoutMs));
+    }
+
+    public @NotNull CompletableFuture<Void> respawn() {
+        return service.respawn(name);
+    }
+
+    public @NotNull CompletableFuture<Void> setSneaking(boolean enable) {
+        return service.setSneaking(name, enable);
+    }
+
+    public @NotNull CompletableFuture<Void> setSprinting(boolean enable) {
+        return service.setSprinting(name, enable);
+    }
+
+    public @NotNull CompletableFuture<Void> setFlying(boolean enable) {
+        return service.setFlying(name, enable);
+    }
+
+    public @NotNull CompletableFuture<Void> useItem(@NotNull Hand hand) {
+        return service.useItem(name, hand);
+    }
+
+    // ── Block-change tracking ────────────────────────────────────────────
+
+    public CompletableFuture<Void> awaitBlock(int x, int y, int z, int expectedStateId) {
+        return service.awaitBlock(name, x, y, z, expectedStateId, 5_000);
+    }
+
+    public CompletableFuture<Void> awaitBlock(int x, int y, int z, int expectedStateId, long timeoutMs) {
+        return service.awaitBlock(name, x, y, z, expectedStateId, timeoutMs);
+    }
+
+    public CompletableFuture<List<BlockSnapshot>> queryBlocks() {
+        return service.queryBlocks(name);
+    }
+
+    public void clearBlocks() {
+        service.clearBlocks(name);
+    }
+
+    // ── Explosion tracking ────────────────────────────────────────────
+
+    public CompletableFuture<Void> awaitExplosion(float minRadius) {
+        return service.awaitExplosion(name, minRadius, 10_000);
+    }
+
+    public CompletableFuture<Void> awaitExplosion(float minRadius, long timeoutMs) {
+        return service.awaitExplosion(name, minRadius, timeoutMs);
+    }
+
+    public CompletableFuture<ExplosionSnapshot> queryExplosion() {
+        return service.queryExplosion(name);
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────

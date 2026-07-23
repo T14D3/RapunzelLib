@@ -132,6 +132,8 @@ val collectAllJars = tasks.register<Copy>("collectAllJars") {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+
+
 fun Project.setDefaultProjectProperty(name: String, value: String) {
     if (findProperty(name) == null) {
         extensions.extraProperties[name] = value
@@ -140,6 +142,7 @@ fun Project.setDefaultProjectProperty(name: String, value: String) {
 
 val activeTargetVersionDefaults = minecraftTargetMatrix.targetProperties(activeMinecraftTarget.get(), "version.")
 val activeFabricDefaults = minecraftTargetMatrix.targetProperties(activeMinecraftTarget.get(), "fabric.")
+
 
 allprojects {
     group = "de.t14d3.rapunzellib"
@@ -195,7 +198,7 @@ subprojects {
     }
 
     plugins.withId("java-base") {
-        apply(plugin = "org.jetbrains.dokka")
+        pluginManager.apply("org.jetbrains.dokka")
     }
 
     plugins.withId("org.jetbrains.dokka") {
@@ -208,27 +211,34 @@ subprojects {
     }
 
     tasks.withType<Javadoc>().configureEach {
-        val opts = options as org.gradle.external.javadoc.StandardJavadocDocletOptions
+        val opts = options as StandardJavadocDocletOptions
         opts.addStringOption("Xdoclint:none", "-quiet")
         opts.addBooleanOption("quiet", true)
         isFailOnError = false
     }
-
-    tasks.withType<Jar>().configureEach {
-        collectAllJars.configure {
-            dependsOn(this@configureEach)
-            from(archiveFile) {
-                // Use the archive's own base name (already CamelCase for platforms, lowercase for libs)
-                rename { archiveFileName.get() }
-            }
-        }
-    }
 }
-
+// Collect gradle-plugin JARs into the root build/libs/<version>/ directory
 collectAllJars.configure {
     from(layout.projectDirectory.dir("gradle-plugin/build/libs")) {
         include("*.jar")
         rename { "RapunzelLibGradlePlugin-$it" }
+    }
+}
+
+// After each Gradle build, aggregate all subproject JAR outputs into root build/libs/<version>/
+gradle.buildFinished {
+    val targetDir = rootProject.layout.buildDirectory.dir("libs/$collectedJarVersion").get().asFile
+    targetDir.mkdirs()
+    rootProject.subprojects.forEach { subproject ->
+        val buildLibs = File(subproject.buildDir, "libs")
+        if (buildLibs.isDirectory()) {
+            buildLibs.listFiles { f -> f.name.endsWith(".jar") }?.forEach { jarFile ->
+                val destFile = File(targetDir, jarFile.name)
+                if (!destFile.exists()) {
+                    jarFile.copyTo(destFile)
+                }
+            }
+        }
     }
 }
 

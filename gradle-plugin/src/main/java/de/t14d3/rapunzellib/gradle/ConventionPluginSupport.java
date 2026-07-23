@@ -26,6 +26,7 @@ import java.lang.reflect.Method;
 import java.util.Properties;
 
 import de.t14d3.rapunzellib.gradle.tasks.CheckReposiliteConfigTask;
+import org.gradle.plugins.signing.SigningExtension;
 
 public final class ConventionPluginSupport {
     private static final int JAVA_VERSION = 25;
@@ -68,8 +69,6 @@ public final class ConventionPluginSupport {
 
         MavenPublication publication = publishing.getPublications().create("mavenJava", MavenPublication.class);
         publication.from(project.getComponents().getByName("java"));
-        attachArtifactIfPresent(project, publication, "shadowJar");
-        attachArtifactIfPresent(project, publication, "remapShadowJar");
     }
 
     public static TaskProvider<CheckReposiliteConfigTask> registerReposiliteConfigCheck(Project rootProject) {
@@ -115,6 +114,98 @@ public final class ConventionPluginSupport {
             }
             task.dependsOn(checkReposiliteConfig);
         });
+    }
+
+    // ── Signing ────────────────────────────────────────────────────────────
+    /**
+     * Configures in-memory GPG signing for the project's Maven publications.
+     *
+     * <p>Reads the signing key from the {@code GPG_PRIVATE} environment variable
+     * (base64-encoded ASCII-armored private key). If the variable is not set,
+     * signing is skipped with a warning.</p>
+     *
+     * <p>An optional {@code GPG_PASSPHRASE} environment variable provides the
+     * key's passphrase. If not set, an empty passphrase is assumed.</p>
+     *
+     * <p>The signatory is configured in {@code afterEvaluate} so it is available
+     * when the signing tasks resolve their signatory at execution time.</p>
+     */
+    public static void configureSigning(Project project) {
+        String privateKey = optionalProperty(project, "gpgPrivateKey", "GPG_PRIVATE");
+        if (privateKey == null || privateKey.trim().isEmpty()) {
+            project.getLogger().warn("");
+            project.getLogger().warn("  ⚠  {} - Artifact signing DISABLED", project.getPath());
+            project.getLogger().warn("     Set GPG_PRIVATE environment variable (base64-armored private key).");
+            project.getLogger().warn("     Without signing, Maven Central will reject the upload.");
+            project.getLogger().warn("");
+            return;
+        }
+
+        String passphrase = optionalProperty(project, "gpgPassphrase", "GPG_PASSPHRASE");
+
+        // Apply the signing plugin and hook publications immediately
+        project.getPluginManager().apply("signing");
+        SigningExtension signing = project.getExtensions().getByType(SigningExtension.class);
+
+        PublishingExtension publishing = project.getExtensions().findByType(PublishingExtension.class);
+        if (publishing != null) {
+            signing.sign(publishing.getPublications());
+        }
+
+        // Gradle expects the raw ASCII-armored PGP key (with BEGIN/END markers),
+        // but the env var is base64-encoded (to keep it single-line). Decode first.
+        String armoredKey = decodeBase64OrPassthrough(privateKey);
+        if (armoredKey == null) {
+            project.getLogger().warn("  ⚠  {} - Signing key is not valid base64 or ASCII-armored PGP", project.getPath());
+            return;
+        }
+
+        // Set the actual signatory after project evaluation so it is guaranteed
+        // to be available when signing tasks execute.
+        String effectivePassphrase = passphrase != null ? passphrase : "";
+        project.afterEvaluate(p -> {
+            SigningExtension s = p.getExtensions().getByType(SigningExtension.class);
+            s.useInMemoryPgpKeys(armoredKey, effectivePassphrase);
+            s.setRequired(true);
+
+            // Gradle 9 requires explicit task dependencies when tasks consume
+            // the outputs of other tasks. Nmcp publish tasks read the .asc
+            // signature files produced by Sign tasks. Wire the dependency so
+            // Gradle doesn't flag the missing cross-task relationship.
+            p.getTasks().matching(task ->
+                task.getName().contains("ToNmcpRepository")
+            ).configureEach(nmcpTask ->
+                nmcpTask.dependsOn(p.getTasks().withType(org.gradle.plugins.signing.Sign.class))
+            );
+        });
+
+        project.getLogger().lifecycle(
+            "  ✓  {} - Signing configured ({} byte key loaded)",
+            project.getPath(), privateKey.length()
+        );
+    }
+
+    /**
+     * Decodes a base64-encoded ASCII-armored PGP key back to the armored text form.
+     * If the input is not valid base64, returns it as-is (passthrough for raw armored keys).
+     */
+    private static String decodeBase64OrPassthrough(String value) {
+        if (value == null || value.trim().isEmpty()) return null;
+        String trimmed = value.trim();
+        try {
+            byte[] decoded = java.util.Base64.getDecoder().decode(trimmed);
+            String result = new String(decoded, java.nio.charset.StandardCharsets.UTF_8);
+            // Sanity check: decoded text must contain PGP armor markers
+            if (result.contains("-----BEGIN PGP")) {
+                return result;
+            }
+            // Decoded OK but doesn't look like PGP - maybe it was already raw armored?
+            // Fall through to passthrough.
+        } catch (IllegalArgumentException ignored) {
+            // Not valid base64 - maybe already in raw armored form
+        }
+        // Passthrough
+        return trimmed;
     }
 
     public static void addLibraryDependency(Project project, String configuration, String alias) {
@@ -247,13 +338,6 @@ public final class ConventionPluginSupport {
 
     private static VersionCatalog libs(Project project) {
         return project.getExtensions().getByType(VersionCatalogsExtension.class).named("libs");
-    }
-
-    private static void attachArtifactIfPresent(Project project, MavenPublication publication, String taskName) {
-        Task task = project.getTasks().findByName(taskName);
-        if (task != null) {
-            publication.artifact(task);
-        }
     }
 
     private static Object library(Project project, String alias) {

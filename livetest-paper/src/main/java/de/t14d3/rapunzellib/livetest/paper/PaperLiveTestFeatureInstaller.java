@@ -15,11 +15,11 @@ import java.util.Objects;
 /**
  * Paper-specific implementation of {@link de.t14d3.rapunzellib.livetest.LiveTestFeatureInstaller}.
  * <p>
- * Registers the live test host, bot service, and the {@code /livetest} and
- * {@code /botcallback} commands via RapunzelLib's RLib command system.
- * Uses the TCP-based {@link RpcBotService} when the system property
- * {@code rapunzellib.bot.rpc.port} is set, otherwise falls back to the
- * console-based stdout protocol.
+ * Registers the live test host, bot service, and the {@code /livetest}
+ * command via RapunzelLib's RLib command system. Uses the TCP-based
+ * {@link RpcBotService} when the system property
+ * {@code rapunzellib.bot.rpc.port} is set, otherwise leaves bot support
+ * unregistered (test code that requests a bot will throw).
  * </p>
  */
 public final class PaperLiveTestFeatureInstaller extends AbstractSharedLiveTestFeatureInstaller {
@@ -40,10 +40,10 @@ public final class PaperLiveTestFeatureInstaller extends AbstractSharedLiveTestF
                 context.logger().info("[LIVETEST] Connecting to bot TCP server on port {}", port);
                 return new RpcBotService("127.0.0.1", port);
             } catch (Exception e) {
-                context.logger().warn("[LIVETEST] Failed to connect to bot TCP server, falling back to stdout: {}", e.getMessage());
+                context.logger().warn("[LIVETEST] Failed to connect to bot TCP server: {}", e.getMessage());
             }
         }
-        return null; // Use console-based fallback
+        return null;
     }
 
     @Override
@@ -57,9 +57,6 @@ public final class PaperLiveTestFeatureInstaller extends AbstractSharedLiveTestF
 
             // Register /livetest command via RLib
             commandService.registerRoot("rapunzellib-livetest", createLivetestNode(context));
-
-            // Register /botcallback command via RLib
-            commandService.registerRoot("rapunzellib-botcallback", createBotCallbackNode());
 
         } catch (Exception e) {
             context.logger().error("Failed to register livetest commands via RLib", e);

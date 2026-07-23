@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.gui.platform.module.conventions)
     alias(libs.plugins.fabric.module.conventions)
-    alias(libs.plugins.shadow)
 }
 
 dependencies {

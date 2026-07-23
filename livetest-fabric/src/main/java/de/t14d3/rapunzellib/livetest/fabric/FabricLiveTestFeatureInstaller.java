@@ -12,10 +12,10 @@ import java.util.Objects;
 /**
  * Fabric-specific implementation of {@link de.t14d3.rapunzellib.livetest.LiveTestFeatureInstaller}.
  * <p>
- * Registers the live test host, bot service, and the {@code /livetest} and
- * {@code /botcallback} commands via RapunzelLib's RLib command system.
- * Uses the console-based fallback (external bot process via stdout protocol)
- * for bot management.
+ * Registers the live test host and the {@code /livetest} command via
+ * RapunzelLib's RLib command system. Bot support is left unregistered
+ * on Fabric for now (the platform's command registration path requires
+ * additional wiring not present in livetest-fabric).
  * </p>
  */
 public final class FabricLiveTestFeatureInstaller extends AbstractSharedLiveTestFeatureInstaller {
@@ -36,9 +36,6 @@ public final class FabricLiveTestFeatureInstaller extends AbstractSharedLiveTest
 
             // Register /livetest command via RLib
             commandService.registerRoot("rapunzellib-livetest", createLivetestNode(context));
-
-            // Register /botcallback command via RLib
-            commandService.registerRoot("rapunzellib-botcallback", createBotCallbackNode());
 
         } catch (Exception e) {
             context.logger().error("Failed to register livetest commands via RLib", e);

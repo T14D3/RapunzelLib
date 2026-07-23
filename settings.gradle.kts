@@ -74,6 +74,16 @@ pluginManagement {
 
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version providers.gradleProperty("foojayResolverVersion")
+    id("com.gradleup.nmcp.settings") version providers.gradleProperty("nmcpVersion")
+}
+
+nmcpSettings {
+    centralPortal {
+        username = providers.environmentVariable("MAVEN_USER").orElse("").get()
+        password = providers.environmentVariable("MAVEN_PASSWORD").orElse("").get()
+        // Automatically publish releases - no manual click in web UI
+        publishingType = "AUTOMATIC"
+    }
 }
 
 rootProject.name = "RapunzelLib"

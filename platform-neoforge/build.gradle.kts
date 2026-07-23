@@ -22,6 +22,37 @@ dependencies {
     implementation(project(":inventory"))
     implementation(project(":inventory-shared"))
     implementation(project(":inventory-neoforge"))
+
+    // Also add to shadow configuration so they're included in the standalone JAR.
+    // shadow() deps are resolved with proper variant attributes (set in afterEvaluate)
+    // and won't include NeoForge/Minecraft transitive trees.
+    shadow(project(":events"))
+    shadow(project(":events-neoforge"))
+    shadow(project(":commands"))
+    shadow(project(":commands-shared"))
+    shadow(project(":commands-neoforge"))
+    shadow(project(":gui"))
+    shadow(project(":gui-shared"))
+    shadow(project(":gui-neoforge"))
+    shadow(project(":visuals"))
+    shadow(project(":visuals-shared"))
+    shadow(project(":visuals-neoforge"))
+    shadow(project(":nbt"))
+    shadow(project(":nbt-shared"))
+    shadow(project(":nbt-neoforge"))
+    shadow(project(":inventory"))
+    shadow(project(":inventory-shared"))
+    shadow(project(":inventory-neoforge"))
+}
+
+// Configure the shadow configuration to use the runtime classpath attributes,
+// so Gradle can resolve project dependencies without variant ambiguity.
+afterEvaluate {
+    configurations["shadow"].attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+    }
 }
 
 // Thin jar (lowercase default name)
@@ -29,22 +60,12 @@ tasks.jar {
     // Keep default project artifact naming: platform-neoforge-<version>.jar
 }
 
-// Full standalone mod (CamelCase)
+// Full standalone mod (CamelCase) - only bundles shadow configuration
 tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    configurations = listOf(project.configurations["shadow"])
     archiveBaseName.set("RapunzelLibNeoForge")
     archiveClassifier.set("standalone")
     mergeServiceFiles()
-    dependencies {
-        exclude(dependency("net.neoforged:neoforge"))
-        exclude(dependency("org.jetbrains:annotations"))
-    }
-    exclude("/net/minecraft/**")
-    exclude("/com/mojang/**")
-    exclude("/assets/minecraft/**")
-    exclude("/data/minecraft/**")
-    exclude("/log4j*.properties")
-    exclude("/log4j*.xml")
-    exclude("/LICENSE*")
 }
 
 tasks.build {

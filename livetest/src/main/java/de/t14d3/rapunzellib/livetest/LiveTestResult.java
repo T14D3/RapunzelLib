@@ -11,6 +11,13 @@ import java.util.Objects;
  * This is a value type used across the library, platform implementations,
  * and the Gradle plugin for reporting test outcomes.
  * </p>
+ * <p>
+ * Failures and errors may carry an optional <em>context snapshot</em> - a
+ * free-form diagnostic string that captures relevant bot state at the point
+ * of failure (e.g. the bot's last chat, latest inventory/container snapshot,
+ * or tracked entity ids). When non-null, this context is rendered alongside
+ * the failure message by {@link #format()}.
+ * </p>
  */
 public final class LiveTestResult {
 
@@ -28,17 +35,20 @@ public final class LiveTestResult {
     private final @NotNull Status status;
     private final long durationMs;
     private final @Nullable String message;
+    private final @Nullable String context;
 
     private LiveTestResult(
             @NotNull String name,
             @NotNull Status status,
             long durationMs,
-            @Nullable String message
+            @Nullable String message,
+            @Nullable String context
     ) {
         this.name = Objects.requireNonNull(name, "name");
         this.status = Objects.requireNonNull(status, "status");
         this.durationMs = durationMs;
         this.message = message;
+        this.context = context;
     }
 
     /**
@@ -49,7 +59,7 @@ public final class LiveTestResult {
      * @return the result
      */
     public static @NotNull LiveTestResult pass(@NotNull String name, long durationMs) {
-        return new LiveTestResult(name, Status.PASS, durationMs, null);
+        return new LiveTestResult(name, Status.PASS, durationMs, null, null);
     }
 
     /**
@@ -61,7 +71,20 @@ public final class LiveTestResult {
      * @return the result
      */
     public static @NotNull LiveTestResult fail(@NotNull String name, long durationMs, @Nullable String message) {
-        return new LiveTestResult(name, Status.FAIL, durationMs, message);
+        return new LiveTestResult(name, Status.FAIL, durationMs, message, null);
+    }
+
+    /**
+     * Creates a failing result with a context snapshot.
+     *
+     * @param name       the test name
+     * @param durationMs the test duration in milliseconds
+     * @param message    the failure message
+     * @param context    optional diagnostic snapshot (bot state at point of failure)
+     * @return the result
+     */
+    public static @NotNull LiveTestResult fail(@NotNull String name, long durationMs, @Nullable String message, @Nullable String context) {
+        return new LiveTestResult(name, Status.FAIL, durationMs, message, context);
     }
 
     /**
@@ -72,7 +95,7 @@ public final class LiveTestResult {
      * @return the result
      */
     public static @NotNull LiveTestResult skip(@NotNull String name, @Nullable String message) {
-        return new LiveTestResult(name, Status.SKIP, 0, message);
+        return new LiveTestResult(name, Status.SKIP, 0, message, null);
     }
 
     /**
@@ -84,7 +107,20 @@ public final class LiveTestResult {
      * @return the result
      */
     public static @NotNull LiveTestResult error(@NotNull String name, long durationMs, @Nullable String message) {
-        return new LiveTestResult(name, Status.ERROR, durationMs, message);
+        return new LiveTestResult(name, Status.ERROR, durationMs, message, null);
+    }
+
+    /**
+     * Creates an error result with a context snapshot.
+     *
+     * @param name       the test name
+     * @param durationMs the test duration in milliseconds
+     * @param message    the error message
+     * @param context    optional diagnostic snapshot (bot state at point of failure)
+     * @return the result
+     */
+    public static @NotNull LiveTestResult error(@NotNull String name, long durationMs, @Nullable String message, @Nullable String context) {
+        return new LiveTestResult(name, Status.ERROR, durationMs, message, context);
     }
 
     /**
@@ -121,6 +157,17 @@ public final class LiveTestResult {
      */
     public @Nullable String message() {
         return message;
+    }
+
+    /**
+     * Returns the optional diagnostic context snapshot captured at the point
+     * of failure. May be {@code null} for passing tests, or if the test host
+     * did not capture any context.
+     *
+     * @return the context snapshot, or null
+     */
+    public @Nullable String context() {
+        return context;
     }
 
     /**
@@ -161,6 +208,8 @@ public final class LiveTestResult {
 
     /**
      * Formats this result as a {@code [LIVETEST]} string for console or log output.
+     * For failures and errors with a context snapshot, the snapshot is included
+     * as an indented block beneath the result line.
      *
      * @return the formatted result string
      */
@@ -176,7 +225,11 @@ public final class LiveTestResult {
             return "[LIVETEST] " + statusStr + " " + name + suffix;
         }
         String payload = message != null ? message : String.valueOf(durationMs);
-        return "[LIVETEST] " + statusStr + " " + name + " (" + payload + ")";
+        String base = "[LIVETEST] " + statusStr + " " + name + " (" + payload + ")";
+        if (context == null || context.isBlank()) return base;
+        // Indent the context block so it stands apart visually.
+        String indented = context.indent(2);
+        return base + "\n" + indented;
     }
 
     @Override
@@ -186,12 +239,13 @@ public final class LiveTestResult {
         return durationMs == that.durationMs
                 && name.equals(that.name)
                 && status == that.status
-                && Objects.equals(message, that.message);
+                && Objects.equals(message, that.message)
+                && Objects.equals(context, that.context);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, status, durationMs, message);
+        return Objects.hash(name, status, durationMs, message, context);
     }
 
     @Override
@@ -201,6 +255,7 @@ public final class LiveTestResult {
                 ", status=" + status +
                 ", durationMs=" + durationMs +
                 ", message='" + message + '\'' +
+                ", context='" + context + '\'' +
                 '}';
     }
 }

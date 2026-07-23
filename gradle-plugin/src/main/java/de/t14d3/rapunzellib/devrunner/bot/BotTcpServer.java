@@ -1,6 +1,8 @@
 package de.t14d3.rapunzellib.devrunner.bot;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 
 import java.io.BufferedReader;
@@ -11,12 +13,13 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
  * TCP server that receives bot commands from the server-side {@code RpcBotService}
@@ -24,7 +27,16 @@ import java.util.function.Consumer;
  *
  * <p>Protocol: JSON lines over TCP. Each line is a complete JSON object.
  * Requests have an {@code "id"} field for correlation; responses echo it back.
- * The server runs on a configurable port and accepts multiple concurrent connections.</p>
+ * The server runs on a configurable port and accepts multiple concurrent
+ * connections.</p>
+ *
+ * <p>Besides request/response, the server also <em>pushes</em> events to every
+ * connected client: {@code "chat"} (bot received a chat message),
+ * {@code "disconnected"} (bot dropped its connection), {@code "server"}
+ * (bot finished arriving on a new server), {@code "inventory"} (bot's
+ * inventory state changed), {@code "entity"} (an entity snapshot was
+ * added/updated/removed), {@code "abilities"} (player ability flags
+ * changed). Clients route these through their event dispatcher.</p>
  */
 public class BotTcpServer implements AutoCloseable {
 
@@ -44,9 +56,8 @@ public class BotTcpServer implements AutoCloseable {
     private ServerSocket serverSocket;
     private volatile boolean running;
 
-    /** Registered response handlers keyed by request id. */
-    private final Map<Long, Consumer<JsonObject>> pendingResponses = new ConcurrentHashMap<>();
-    private long nextId;
+    /** Currently open client connections (so we can broadcast events). */
+    private final List<ClientConn> clients = new CopyOnWriteArrayList<>();
 
     public BotTcpServer(BotManager botManager, int port, ServerAddressResolver addressResolver) {
         this.botManager = botManager;
@@ -57,6 +68,21 @@ public class BotTcpServer implements AutoCloseable {
             t.setDaemon(true);
             return t;
         });
+        wireEventListeners();
+    }
+
+    private void wireEventListeners() {
+        botManager.setChatEventListener((botName, message) ->
+                broadcast(event("chat", botName, "message", safeString(message))));
+        botManager.setDisconnectListener((botName, reason) ->
+                broadcast(event("disconnected", botName, "message", reason != null ? reason : "")));
+        botManager.setServerJoinListener((botName, serverHost) ->
+                broadcast(event("server", botName, "message", serverHost != null ? serverHost : "")));
+        botManager.setInventoryListener(this::pushInventoryEvent);
+        botManager.setEntityListener((botName, ignored) -> pushEntityEvent(botName));
+        botManager.setAbilitiesListener(this::pushAbilitiesEvent);
+        botManager.setBlockListener((botName, ignored) -> pushBlockEvent(botName));
+        botManager.setExplosionListener((botName, ignored) -> pushExplosionEvent(botName));
     }
 
     /** Starts the server and returns the actual port it's listening on. */
@@ -84,12 +110,15 @@ public class BotTcpServer implements AutoCloseable {
 
     private void handleClient(Socket client) {
         String clientAddr = client.getRemoteSocketAddress().toString();
+        ClientConn conn = new ClientConn(client);
+        clients.add(conn);
         try (client;
              BufferedReader reader = new BufferedReader(
                      new InputStreamReader(client.getInputStream(), StandardCharsets.UTF_8));
              PrintWriter writer = new PrintWriter(
                      new OutputStreamWriter(client.getOutputStream(), StandardCharsets.UTF_8), true)) {
 
+            conn.writer = writer;
             String line;
             while (running && (line = reader.readLine()) != null) {
                 if (line.isBlank()) continue;
@@ -108,6 +137,8 @@ public class BotTcpServer implements AutoCloseable {
             if (running) {
                 System.err.println("[devrunner] Bot TCP client disconnected: " + clientAddr + " - " + e.getMessage());
             }
+        } finally {
+            clients.remove(conn);
         }
     }
 
@@ -126,8 +157,13 @@ public class BotTcpServer implements AutoCloseable {
                     }
                     String[] parts = address.split(":");
                     String host = parts[0];
-                    int port = Integer.parseInt(parts[1]);
-                    botManager.connectBot(botName, host, port);
+                    int p = Integer.parseInt(parts[1]);
+                    botManager.connectBot(botName, host, p);
+                    // Broadcast a "server" event with the logical server name so
+                    // that RpcBotService.awaitServer() can match it by name
+                    // (the BotManager's internal serverJoinListener broadcasts the
+                    // raw IP address, which is not what awaitServer expects).
+                    broadcast(event("server", botName, "message", server));
                     return ok(id);
                 }
                 case "disconnect" -> {
@@ -184,6 +220,168 @@ public class BotTcpServer implements AutoCloseable {
                     botManager.setHeldItemSlot(botName, slot);
                     return ok(id);
                 }
+                // ── Inventory read ──
+                case "query_inventory" -> {
+                    int containerId = request.get("containerId").getAsInt();
+                    BotClient.ContainerSnapshot snap = botManager.queryInventory(botName, containerId);
+                    if (snap == null) return error(id, "Bot not connected or container not tracked");
+                    return inventoryResponse(id, snap);
+                }
+                // ── Inventory write ──
+                case "click_slot" -> {
+                    int containerId = request.get("containerId").getAsInt();
+                    int slot = request.get("slot").getAsInt();
+                    int button = request.get("button").getAsInt();
+                    String clickType = request.get("clickType").getAsString();
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    botManager.clickContainer(botName, containerId, slot, button, clickType);
+                    return ok(id);
+                }
+                case "close_container" -> {
+                    int containerId = request.get("containerId").getAsInt();
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    botManager.closeContainer(botName, containerId);
+                    return ok(id);
+                }
+                case "drop_item" -> {
+                    boolean dropAll = request.get("dropAll").getAsBoolean();
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    botManager.dropHeldItem(botName, dropAll);
+                    return ok(id);
+                }
+                case "creative_slot" -> {
+                    int slot = request.get("slot").getAsInt();
+                    int itemId = request.get("itemId").getAsInt();
+                    int amount = request.get("amount").getAsInt();
+                    // componentsJson is intentionally ignored - the slim
+                    // transport carries only id+amount.
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    botManager.setCreativeSlot(botName, slot, itemId, amount);
+                    return ok(id);
+                }
+                // ── Tab-completion (B) ──
+                case "tab_complete" -> {
+                    String text = request.get("text").getAsString();
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    try {
+                        java.util.List<BotClient.Suggestion> suggestions =
+                                botManager.queryTabComplete(botName, text, 30_000);
+                        JsonObject res = new JsonObject();
+                        res.addProperty("type", "tab_complete");
+                        res.addProperty("id", id);
+                        JsonArray arr = new JsonArray();
+                        for (BotClient.Suggestion s : suggestions) {
+                            JsonObject o = new JsonObject();
+                            o.addProperty("match", s.match);
+                            if (s.tooltip != null) o.addProperty("tooltip", s.tooltip);
+                            arr.add(o);
+                        }
+                        res.add("suggestions", arr);
+                        return res;
+                    } catch (Exception ex) {
+                        return error(id, ex.getMessage() != null ? ex.getMessage() : ex.toString());
+                    }
+                }
+                // ── Entity snapshots (B/C) ──
+                case "query_entities_full" -> {
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    JsonObject res = new JsonObject();
+                    res.addProperty("type", "entities_full");
+                    res.addProperty("id", id);
+                    JsonArray arr = new JsonArray();
+                    for (BotClient.EntitySnapshot s : botManager.entitySnapshots(botName)) arr.add(entityJson(s));
+                    res.add("entities", arr);
+                    return res;
+                }
+                // ── Block snapshots ──
+                case "query_blocks" -> {
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    JsonObject res = new JsonObject();
+                    res.addProperty("type", "blocks");
+                    res.addProperty("id", id);
+                    JsonArray arr = new JsonArray();
+                    for (BotClient.BlockSnapshot s : botManager.blockSnapshots(botName)) arr.add(blockJson(s));
+                    res.add("blocks", arr);
+                    return res;
+                }
+                case "clear_blocks" -> {
+                    botManager.clearBlockSnapshots(botName);
+                    return ok(id);
+                }
+                case "query_explosion" -> {
+                    BotClient.ExplosionSnapshot snap = botManager.latestExplosion(botName);
+                    JsonObject res = new JsonObject();
+                    res.addProperty("type", "explosion");
+                    res.addProperty("id", id);
+                    if (snap != null) {
+                        res.addProperty("x", snap.x());
+                        res.addProperty("y", snap.y());
+                        res.addProperty("z", snap.z());
+                        res.addProperty("radius", snap.radius());
+                    }
+                    return res;
+                }
+                case "query_entity" -> {
+                    int entityId = request.get("entityId").getAsInt();
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    BotClient.EntitySnapshot s = botManager.entitySnapshot(botName, entityId);
+                    JsonObject res = new JsonObject();
+                    res.addProperty("type", "entity");
+                    res.addProperty("id", id);
+                    if (s != null) {
+                        res.add("entities", singleEntityArray(s));
+                    } else {
+                        res.add("entities", new JsonArray());
+                    }
+                    return res;
+                }
+                // ── Player self-state (C) ──
+                case "query_abilities" -> {
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    BotClient.AbilitiesSnapshot a = botManager.abilities(botName);
+                    JsonObject res = new JsonObject();
+                    res.addProperty("type", "abilities");
+                    res.addProperty("id", id);
+                    if (a != null) {
+                        res.addProperty("invincible", a.invincible);
+                        res.addProperty("canFly", a.canFly);
+                        res.addProperty("flying", a.flying);
+                        res.addProperty("creative", a.creative);
+                        res.addProperty("flySpeed", a.flySpeed);
+                        res.addProperty("walkSpeed", a.walkSpeed);
+                    }
+                    return res;
+                }
+                case "respawn" -> {
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    botManager.respawn(botName);
+                    return ok(id);
+                }
+                case "player_input" -> {
+                    boolean forward = bool(request, "forward");
+                    boolean backward = bool(request, "backward");
+                    boolean left = bool(request, "left");
+                    boolean right = bool(request, "right");
+                    boolean jump = bool(request, "jump");
+                    boolean sneak = bool(request, "sneak");
+                    boolean sprint = bool(request, "sprint");
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    botManager.sendPlayerInput(botName, forward, backward, left, right, jump, sneak, sprint);
+                    return ok(id);
+                }
+                case "set_flying" -> {
+                    boolean flying = request.get("flying").getAsBoolean();
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    botManager.setFlying(botName, flying);
+                    return ok(id);
+                }
+                case "use_item" -> {
+                    int hand = request.get("hand").getAsInt();
+                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    botManager.useItem(botName, hand);
+                    return ok(id);
+                }
+                // ── Existing read-only queries ──
                 case "query_position" -> {
                     double[] pos = botManager.queryPosition(botName);
                     if (pos == null) return error(id, "Bot not found");
@@ -239,7 +437,7 @@ public class BotTcpServer implements AutoCloseable {
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "entities");
                     res.addProperty("id", id);
-                    var arr = new com.google.gson.JsonArray();
+                    var arr = new JsonArray();
                     for (int eid : ids) arr.add(eid);
                     res.add("entityIds", arr);
                     return res;
@@ -249,7 +447,155 @@ public class BotTcpServer implements AutoCloseable {
                 }
             }
         } catch (Exception e) {
-            return error(id, e.getMessage());
+            return error(id, e.getMessage() != null ? e.getMessage() : e.toString());
+        }
+    }
+
+    // ── Event broadcasting ─────────────────────────────────────────────────
+
+    private static JsonObject event(String type, String botName, String key, String value) {
+        JsonObject o = new JsonObject();
+        o.addProperty("type", type);
+        o.addProperty("bot", botName);
+        if (value != null) o.addProperty(key, value);
+        return o;
+    }
+
+    private static String safeString(String s) {
+        return s == null ? "" : s;
+    }
+
+    private void pushInventoryEvent(String botName, int containerId) {
+        BotClient.ContainerSnapshot snap = botManager.queryInventory(botName, containerId);
+        if (snap == null) return;
+        JsonObject o = inventoryPayload(botName, snap);
+        broadcast(o);
+    }
+
+    private void pushEntityEvent(String botName) {
+        JsonObject o = new JsonObject();
+        o.addProperty("type", "entity");
+        o.addProperty("bot", botName);
+        JsonArray arr = new JsonArray();
+        for (BotClient.EntitySnapshot s : botManager.entitySnapshots(botName)) arr.add(entityJson(s));
+        o.add("entities", arr);
+        broadcast(o);
+    }
+
+    private void pushAbilitiesEvent(String botName, BotClient.AbilitiesSnapshot snap) {
+        JsonObject o = new JsonObject();
+        o.addProperty("type", "abilities");
+        o.addProperty("bot", botName);
+        if (snap != null) {
+            o.addProperty("invincible", snap.invincible);
+            o.addProperty("canFly", snap.canFly);
+            o.addProperty("flying", snap.flying);
+            o.addProperty("creative", snap.creative);
+            o.addProperty("flySpeed", snap.flySpeed);
+            o.addProperty("walkSpeed", snap.walkSpeed);
+        }
+        broadcast(o);
+    }
+
+    private void pushBlockEvent(String botName) {
+        JsonObject o = new JsonObject();
+        o.addProperty("type", "block");
+        o.addProperty("bot", botName);
+        JsonArray arr = new JsonArray();
+        for (BotClient.BlockSnapshot s : botManager.blockSnapshots(botName)) arr.add(blockJson(s));
+        o.add("blocks", arr);
+        broadcast(o);
+    }
+
+    private void pushExplosionEvent(String botName) {
+        BotClient.ExplosionSnapshot snap = botManager.latestExplosion(botName);
+        if (snap == null) return;
+        JsonObject o = new JsonObject();
+        o.addProperty("type", "explosion");
+        o.addProperty("bot", botName);
+        o.addProperty("x", snap.x());
+        o.addProperty("y", snap.y());
+        o.addProperty("z", snap.z());
+        o.addProperty("radius", snap.radius());
+        broadcast(o);
+    }
+
+    private static JsonObject blockJson(BotClient.BlockSnapshot s) {
+        JsonObject o = new JsonObject();
+        o.addProperty("x", s.x());
+        o.addProperty("y", s.y());
+        o.addProperty("z", s.z());
+        o.addProperty("stateId", s.blockStateId());
+        return o;
+    }
+
+    private static JsonObject entityJson(BotClient.EntitySnapshot s) {
+        JsonObject o = new JsonObject();
+        o.addProperty("entityId", s.entityId);
+        o.addProperty("typeId", s.typeId);
+        if (s.typeName != null) o.addProperty("typeName", s.typeName);
+        o.addProperty("x", s.x);
+        o.addProperty("y", s.y);
+        o.addProperty("z", s.z);
+        o.addProperty("yaw", s.yaw);
+        o.addProperty("pitch", s.pitch);
+        o.addProperty("headYaw", s.headYaw);
+        return o;
+    }
+
+    private static JsonArray singleEntityArray(BotClient.EntitySnapshot s) {
+        JsonArray arr = new JsonArray();
+        arr.add(entityJson(s));
+        return arr;
+    }
+
+    private static boolean bool(JsonObject request, String key) {
+        return request.has(key) && request.get(key).getAsBoolean();
+    }
+
+    private static JsonObject inventoryResponse(long id, BotClient.ContainerSnapshot snap) {
+        JsonObject res = inventoryPayload("", snap);
+        res.addProperty("id", id);
+        return res;
+    }
+
+    private static JsonObject inventoryPayload(String botName, BotClient.ContainerSnapshot snap) {
+        JsonObject o = new JsonObject();
+        o.addProperty("type", "inventory");
+        if (!botName.isEmpty()) o.addProperty("bot", botName);
+        o.addProperty("containerId", snap.containerId);
+        o.addProperty("stateId", snap.stateId);
+        JsonArray slots = new JsonArray();
+        if (snap.slots != null) {
+            for (org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack s : snap.slots) {
+                slots.add(itemToJson(s));
+            }
+        }
+        o.add("slots", slots);
+        o.add("cursorItem", itemToJson(snap.cursorItem));
+        return o;
+    }
+
+    private static com.google.gson.JsonElement itemToJson(
+            org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack s) {
+        if (s == null || s.getId() < 0 || s.getAmount() <= 0) return JsonNull.INSTANCE;
+        JsonObject o = new JsonObject();
+        o.addProperty("id", s.getId());
+        o.addProperty("amount", s.getAmount());
+        // dataComponentsPatch is intentionally not serialised here - the
+        // slim wire representation in livetest leaves componentsJson as null
+        // unless explicitly set. Tests that need component data should use
+        // a different verification channel.
+        return o;
+    }
+
+    private void broadcast(JsonObject msg) {
+        String json = GSON.toJson(msg);
+        for (ClientConn c : clients) {
+            try {
+                PrintWriter w = c.writer;
+                if (w != null) w.println(json);
+            } catch (Exception ignored) { /* client most likely dropped */ }
         }
     }
 
@@ -266,6 +612,14 @@ public class BotTcpServer implements AutoCloseable {
         res.addProperty("id", id);
         res.addProperty("message", message);
         return res;
+    }
+
+    /** Tracks the writer for each connected client so events can be broadcast. */
+    private static final class ClientConn {
+        final Socket socket;
+        volatile PrintWriter writer;
+
+        ClientConn(Socket socket) { this.socket = socket; }
     }
 
     @Override

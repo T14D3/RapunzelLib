@@ -5,7 +5,6 @@ plugins {
 }
 
 dependencies {
-    implementation(libs.fastutil)
     implementation(project(":nbt"))
 
     // Feature modules - shared + sponge-specific implementations

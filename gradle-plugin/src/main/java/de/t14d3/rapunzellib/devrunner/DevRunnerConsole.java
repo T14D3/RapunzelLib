@@ -126,14 +126,6 @@ public final class DevRunnerConsole {
             }
         }
 
-        // botcallback commands are always broadcast to all servers
-        if (line.startsWith("botcallback ")) {
-            for (String name : processes.keySet()) {
-                sendToServer(name, line);
-            }
-            return;
-        }
-
         // Bare input -> send to focused server
         if (focus != null) {
             sendToServer(focus, line);

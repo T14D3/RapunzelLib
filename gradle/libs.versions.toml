@@ -24,7 +24,6 @@ gson = "2.10.1"
 slf4j = "2.0.16"
 asm = "9.7.1"
 brigadier = "1.0.18"
-fastutil = "8.5.11"
 
 velocity-api = "3.4.0-SNAPSHOT"
 sponge-api = "11.0.0"
@@ -34,6 +33,7 @@ mixin = "0.8.7"
 mixin-plugin = "0.8-SNAPSHOT"
 
 visualizer = "0.1.0"
+nmcp = "1.6.1"
 
 [plugins]
 shadow = { id = "com.gradleup.shadow" }
@@ -48,7 +48,7 @@ mixin = { id = "org.spongepowered.mixin", version.ref = "mixin-plugin" }
 rapunzellib = { id = "de.t14d3.rapunzellib" }
 visualizer-collector-java = { id = "de.t14d3.visualizer.collector-java", version.ref = "visualizer" }
 visualizer-bundler = { id = "de.t14d3.visualizer.bundler", version.ref = "visualizer" }
-
+nmcp-settings = { id = "com.gradleup.nmcp.settings", version.ref = "nmcp" }
 
 root-subproject-conventions = { id = "de.t14d3.rapunzellib.root-subproject-conventions" }
 root-publishing-conventions = { id = "de.t14d3.rapunzellib.root-publishing-conventions" }
@@ -100,7 +100,6 @@ asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
 asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
 asm-analysis = { module = "org.ow2.asm:asm-analysis", version.ref = "asm" }
-fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
 
 paper-api = { module = "io.papermc.paper:paper-api" }
 

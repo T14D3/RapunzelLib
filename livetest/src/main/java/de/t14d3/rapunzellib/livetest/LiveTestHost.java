@@ -94,6 +94,9 @@ public interface LiveTestHost {
      */
     default @NotNull LiveTestResult runTest(@NotNull LiveTest test, @NotNull Duration timeout) {
         long start = System.currentTimeMillis();
+        // Reset the per-test diagnostic context so leftover entries from a
+        // previous run don't leak into this one.
+        LiveTestContext.reset();
         try {
             test.setupCommands();
             test.run();
@@ -103,10 +106,13 @@ public interface LiveTestHost {
             return LiveTestResult.skip(test.name(), e.getMessage());
         } catch (LiveTestAssertionError e) {
             long elapsed = System.currentTimeMillis() - start;
-            return LiveTestResult.fail(test.name(), elapsed, e.getMessage());
+            return LiveTestResult.fail(test.name(), elapsed, e.getMessage(), LiveTestContext.current().render());
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - start;
-            return LiveTestResult.error(test.name(), elapsed, e.getMessage());
+            String message = e.getMessage() != null ? e.getMessage() : e.toString();
+            return LiveTestResult.error(test.name(), elapsed, message, LiveTestContext.current().render());
+        } finally {
+            LiveTestContext.reset();
         }
     }
 }

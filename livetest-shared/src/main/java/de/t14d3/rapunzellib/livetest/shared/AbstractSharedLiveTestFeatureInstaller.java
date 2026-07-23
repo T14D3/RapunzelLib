@@ -29,9 +29,9 @@ import java.util.concurrent.CompletableFuture;
  * </p>
  * <p>
  * Subclasses should also override {@link #registerCommands(RapunzelContext)}
- * to register the {@code /livetest} and {@code /botcallback} commands using
- * the platform's command registration API. The shared handler methods in this
- * class can be used from command executors.
+ * to register the {@code /livetest} command using the platform's command
+ * registration API. The shared handler methods in this class can be used from
+ * command executors.
  * </p>
  */
 public abstract class AbstractSharedLiveTestFeatureInstaller implements LiveTestFeatureInstaller {
@@ -53,23 +53,23 @@ public abstract class AbstractSharedLiveTestFeatureInstaller implements LiveTest
     /**
      * Creates the platform-specific {@link BotService} for the given context.
      * <p>
-     * The default implementation returns {@code null}, which means the console-based
-     * fallback service will be used.
+     * The default implementation returns {@code null}, which means no bot
+     * service is registered. Test code that calls {@link Bot#connect} will
+     * throw {@link IllegalStateException} until a platform wires a service.
      * </p>
      *
      * @param context the Rapunzel context
-     * @return the bot service, or null to use the console-based fallback
+     * @return the bot service, or null to leave bot support unregistered
      */
     protected BotService createBotService(@NotNull RapunzelContext context) {
-        return null; // Use console-based fallback by default
+        return null;
     }
 
     /**
-     * Registers the {@code /livetest} and {@code /botcallback} commands for this
-     * platform.
+     * Registers the {@code /livetest} command for this platform.
      * <p>
      * Called during {@link #install(RapunzelContext)} after the host and registry
-     * are set up. Subclasses should override this to register the commands using
+     * are set up. Subclasses should override this to register the command using
      * the platform-specific command registration API. The default implementation
      * does nothing (commands will not be available until a platform module
      * registers them).
@@ -78,18 +78,7 @@ public abstract class AbstractSharedLiveTestFeatureInstaller implements LiveTest
      * @param context the Rapunzel context
      */
     protected void registerCommands(@NotNull RapunzelContext context) {
-        // Default: no-op. Subclasses should register /livetest and /botcallback.
-    }
-
-    /**
-     * Handles a bot callback event from the DevRunner.
-     *
-     * @param type    the event type (e.g., "READY", "CHAT", "POSITION")
-     * @param botName the bot name
-     * @param message the event payload
-     */
-    protected static void handleBotCallback(@NotNull String type, @NotNull String botName, @NotNull String message) {
-        BotFactory.addEvent(new BotFactory.BotEvent(type, botName, message != null ? message : ""));
+        // Default: no-op. Subclasses should register /livetest.
     }
 
     // ── Shared command handler logic ───────────────────────────────────────
@@ -240,43 +229,6 @@ public abstract class AbstractSharedLiveTestFeatureInstaller implements LiveTest
                 .then(listNode)
                 .then(runNode)
                 .then(runAllNode);
-    }
-
-    /**
-     * Creates an RLib command node for the {@code /botcallback} command tree.
-     *
-     * @return the root command node
-     */
-    protected static @NotNull RCommandNode<RCommandSource> createBotCallbackNode() {
-        // /botcallback <type> <botName> [message]
-        RStringArgument<RCommandSource> typeArg = RStringArgument.word("type");
-        RStringArgument<RCommandSource> botNameArg = RStringArgument.word("botName");
-        RStringArgument<RCommandSource> messageArg = RStringArgument.greedy("message");
-
-        return RCommandNode.<RCommandSource>literal("botcallback")
-                .then(RCommandNode.argument(typeArg)
-                        .then(RCommandNode.argument(botNameArg)
-                                .then(RCommandNode.argument(messageArg)
-                                        .executes((source, args) -> {
-                                            String type = args.getString("type").orElse("");
-                                            String botName = args.getString("botName").orElse("");
-                                            String message = args.getString("message").orElse("");
-                                            handleBotCallback(type, botName, message);
-                                            source.sendMessage(Component.text(
-                                                    "Bot event queued: " + type + " " + botName,
-                                                    NamedTextColor.GRAY));
-                                            return RCommandResult.SUCCESS;
-                                        }))
-                                // /botcallback <type> <botName> (no message)
-                                .executes((source, args) -> {
-                                    String type = args.getString("type").orElse("");
-                                    String botName = args.getString("botName").orElse("");
-                                    handleBotCallback(type, botName, "");
-                                    source.sendMessage(Component.text(
-                                            "Bot event queued: " + type + " " + botName,
-                                            NamedTextColor.GRAY));
-                                    return RCommandResult.SUCCESS;
-                                })));
     }
 
     @Override

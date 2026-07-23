@@ -25,6 +25,37 @@ dependencies {
     implementation(project(":inventory"))
     implementation(project(":inventory-shared"))
     implementation(project(":inventory-fabric"))
+
+    // Also add to shadow configuration so they're included in the standalone JAR.
+    // shadow() deps are resolved with proper variant attributes (set in afterEvaluate)
+    // and won't include Fabric API or its transitive dependency tree.
+    shadow(project(":events"))
+    shadow(project(":events-fabric"))
+    shadow(project(":commands"))
+    shadow(project(":commands-shared"))
+    shadow(project(":commands-fabric"))
+    shadow(project(":gui"))
+    shadow(project(":gui-shared"))
+    shadow(project(":gui-fabric"))
+    shadow(project(":visuals"))
+    shadow(project(":visuals-shared"))
+    shadow(project(":visuals-fabric"))
+    shadow(project(":nbt"))
+    shadow(project(":nbt-shared"))
+    shadow(project(":nbt-fabric"))
+    shadow(project(":inventory"))
+    shadow(project(":inventory-shared"))
+    shadow(project(":inventory-fabric"))
+}
+
+// Configure the shadow configuration to use the runtime classpath attributes,
+// so Gradle can resolve project dependencies without variant ambiguity.
+afterEvaluate {
+    configurations["shadow"].attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+    }
 }
 
 // Thin jar (lowercase default name)
@@ -32,16 +63,23 @@ tasks.jar {
     // Keep default project artifact naming: platform-fabric-<version>.jar
 }
 
-// Full standalone mod (CamelCase)
+// Full standalone mod (CamelCase) - only bundles shadow configuration
 tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    configurations = listOf(project.configurations["shadow"])
     archiveBaseName.set("RapunzelLibFabric")
     archiveClassifier.set("standalone")
     mergeServiceFiles()
-    exclude("/net/minecraft/**")
-    exclude("/com/mojang/**")
     dependencies {
-        exclude(dependency("org.jetbrains:annotations"))
-        exclude(dependency("net.fabricmc:fabric-loader"))
+        // Exclude platform-provided dependencies (Fabric API, Minecraft, and their transitive trees)
+        exclude("net.fabricmc:fabric-loader")
+        exclude("net.fabricmc.fabric-api:fabric-api")
+        exclude("net.fabricmc.fabric-api:fabric-api-base")
+        exclude("net.fabricmc.fabric-api:fabric-command-api-v2")
+        exclude("net.fabricmc.fabric-api:fabric-lifecycle-events-v1")
+        exclude("net.fabricmc.fabric-api:fabric-networking-api-v1")
+        exclude("net.fabricmc.fabric-api:fabric-events-interaction-v0")
+        exclude("com.mojang:minecraft")
+        exclude("org.jetbrains:annotations")
     }
 }
 

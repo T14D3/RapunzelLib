@@ -1,7 +1,5 @@
 package de.t14d3.rapunzellib.devrunner;
 
-import de.t14d3.rapunzellib.devrunner.bot.BotClient;
-import de.t14d3.rapunzellib.devrunner.bot.BotConstants;
 import de.t14d3.rapunzellib.devrunner.bot.BotManager;
 import de.t14d3.rapunzellib.devrunner.bot.BotTcpServer;
 import de.t14d3.rapunzellib.devrunner.platform.PlatformAdapter;
@@ -19,7 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class DevRunnerOrchestrator {
     private final DevRunnerConfig cfg;
@@ -32,8 +29,6 @@ public final class DevRunnerOrchestrator {
     private final Map<String, String> runningContainerNames = new LinkedHashMap<>();
     private final BotManager botManager = new BotManager();
     private BotTcpServer botTcpServer;
-    // Tracks which server requested each bot (botName -> serverName)
-    private final Map<String, String> botToServer = new ConcurrentHashMap<>();
 
     public DevRunnerOrchestrator(DevRunnerConfig cfg) {
         this.cfg = cfg;
@@ -65,7 +60,6 @@ public final class DevRunnerOrchestrator {
         }
 
         console.startInputRouting();
-        startBotManagement();
         runLiveTestsIfEnabled(console);
 
         int exitCode = awaitAnyProcessExit();
@@ -460,7 +454,6 @@ public final class DevRunnerOrchestrator {
 
     // ── Bot management ─────────────────────────────────────────────────────
 
-    
     private int startBotTcpServer() {
         try {
             botTcpServer = new BotTcpServer(botManager, 0, serverName -> {
@@ -473,316 +466,8 @@ public final class DevRunnerOrchestrator {
             return port;
         } catch (Exception e) {
             System.err.println("[devrunner] Failed to start bot TCP server: " + e.getMessage());
-            System.err.println("[devrunner] Falling back to stdout-based bot protocol");
             return 0;
         }
-    }
-
-    private void startBotManagement() {
-        // Register a line listener that processes [BOT_*] protocol messages from server output
-        console.addLineListener((sourceName, line, isError) -> {
-            if (isError) return; // Only process stdout
-
-            // Debug: log every line for diagnosis
-            if (line.contains("[BOT_")) {
-                System.out.println("[devrunner] Bot line from " + sourceName + ": " + line);
-            }
-
-            BotConstants.BotCommand cmd = BotConstants.parseBotMessage(line);
-            if (cmd == null) return;
-
-            try {
-                switch (cmd.type()) {
-                    case "CONNECT" -> handleBotConnect(sourceName, cmd);
-                    case "DISCONNECT" -> handleBotDisconnect(cmd);
-                    case "EXEC" -> handleBotExec(cmd);
-                    case "DIG" -> handleBotDig(cmd);
-                    case "USE" -> handleBotUse(cmd);
-                    case "QUERY_POSITION" -> handleBotQueryPosition(cmd);
-                    case "QUERY_HEALTH" -> handleBotQueryHealth(cmd);
-                    case "QUERY_HELD_ITEM" -> handleBotQueryHeldItem(cmd);
-                    case "QUERY_GAMEMODE" -> handleBotQueryGameMode(cmd);
-                    case "QUERY_OPEN_CONTAINER" -> handleBotQueryOpenContainer(cmd);
-                    case "QUERY_ENTITIES" -> handleBotQueryEntities(cmd);
-                    case "MOVE_TO" -> handleBotMoveTo(cmd);
-                    case "ATTACK" -> handleBotAttack(cmd);
-                    case "INTERACT" -> handleBotInteract(cmd);
-                    case "SWING" -> handleBotSwing(cmd);
-                    case "SET_SLOT" -> handleBotSetSlot(cmd);
-                }
-            } catch (Exception e) {
-                System.err.println("[devrunner] Bot error: " + e.getMessage());
-            }
-        });
-
-        System.out.println("[devrunner] Bot management started");
-    }
-
-    private void handleBotConnect(String sourceServer, BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        String serverArg = cmd.args().length > 0 ? cmd.args()[0] : "";
-        // Remove any stale entry first - a previous test may have disconnected
-        // but the [BOT_DISCONNECT] line hasn't been processed yet.
-        String previous = botToServer.remove(botName);
-        if (previous != null) {
-            System.out.println("[devrunner] Bot '" + botName + "' stale entry removed from " + previous);
-        }
-        if (botToServer.putIfAbsent(botName, sourceServer) != null) {
-            // Shouldn't happen after the remove above, but guard thread safety
-            System.out.println("[devrunner] Bot '" + botName + "' is already connected or requested (from " + botToServer.get(botName) + ")");
-            return;
-        }
-
-        DevRunnerConfig cfg = this.cfg;
-        String address = findServerAddress(serverArg, cfg);
-        if (address == null) {
-            System.err.println("[devrunner] Unknown server '" + serverArg + "' for bot connect");
-            console.sendToServer(sourceServer, "/botcallback ERROR " + botName + " Unknown server: " + serverArg);
-            return;
-        }
-
-        String[] hostPort = address.split(":");
-        String host = hostPort[0];
-        int port = Integer.parseInt(hostPort[1]);
-
-        final String finalSourceServer = sourceServer;
-
-        // Connect the bot in a separate thread to avoid blocking the line listener
-        new Thread(() -> {
-            try {
-                // Track which server requested this bot
-                botToServer.put(botName, finalSourceServer);
-
-                // Connect the bot (blocking call)
-                System.out.println("[devrunner] Connecting bot '" + botName + "' to " + host + ":" + port + "...");
-                botManager.connectBot(botName, host, port);
-
-                System.out.println("[devrunner] Bot '" + botName + "' connected to " + host + ":" + port);
-
-                // Register a chat callback so received messages are forwarded to the server
-                BotClient client = botManager.getBot(botName);
-                if (client != null) {
-                    client.addChatCallback(message -> {
-                        String server = botToServer.get(botName);
-                        if (server != null) {
-                            String safeMessage = message.replace("\n", "\\n").replace("\r", "\\r");
-                            console.sendToServer(server, "/botcallback CHAT " + botName + " " + safeMessage);
-                        }
-                    });
-                }
-
-                // Signal the server that the bot is ready
-                console.sendToServer(finalSourceServer, "/botcallback READY " + botName);
-            } catch (Exception e) {
-                System.err.println("[devrunner] Bot '" + botName + "' connection error: " + e.getMessage());
-                e.printStackTrace();
-                console.sendToServer(finalSourceServer, "/botcallback ERROR " + botName + " " + e.getMessage());
-            }
-        }).start();
-    }
-
-    private void handleBotDisconnect(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        String server = botToServer.remove(botName);
-        botManager.disconnectBot(botName);
-        if (server != null) {
-            console.sendToServer(server, "/botcallback DISCONNECT " + botName);
-        }
-    }
-
-    private void handleBotExec(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        String command = cmd.args().length > 0 ? cmd.args()[0] : "";
-        if (command.isEmpty()) {
-            System.err.println("[devrunner] Empty command for bot '" + botName + "'");
-            return;
-        }
-        botManager.execute(botName, command);
-    }
-
-    private void handleBotDig(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        if (cmd.args().length < 4) {
-            System.err.println("[devrunner] Invalid DIG command for bot '" + botName + "'");
-            return;
-        }
-        try {
-            int x = Integer.parseInt(cmd.args()[0]);
-            int y = Integer.parseInt(cmd.args()[1]);
-            int z = Integer.parseInt(cmd.args()[2]);
-            int direction = Integer.parseInt(cmd.args()[3]);
-            botManager.digBlock(botName, x, y, z, direction);
-        } catch (NumberFormatException e) {
-            System.err.println("[devrunner] Invalid DIG coordinates for bot '" + botName + "': " + e.getMessage());
-        }
-    }
-
-    private void handleBotUse(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        if (cmd.args().length < 5) {
-            System.err.println("[devrunner] Invalid USE command for bot '" + botName + "'");
-            return;
-        }
-        try {
-            int x = Integer.parseInt(cmd.args()[0]);
-            int y = Integer.parseInt(cmd.args()[1]);
-            int z = Integer.parseInt(cmd.args()[2]);
-            int hand = Integer.parseInt(cmd.args()[3]);
-            int direction = Integer.parseInt(cmd.args()[4]);
-            botManager.useItemOn(botName, x, y, z, hand, direction);
-        } catch (NumberFormatException e) {
-            System.err.println("[devrunner] Invalid USE arguments for bot '" + botName + "': " + e.getMessage());
-        }
-    }
-
-    private void handleBotQueryPosition(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        String server = botToServer.get(botName);
-        if (server == null) return;
-        double[] pos = botManager.queryPosition(botName);
-        if (pos != null) {
-            console.sendToServer(server, String.format("/botcallback POSITION %s %.2f %.2f %.2f %.2f %.2f",
-                botName, pos[0], pos[1], pos[2], pos[3], pos[4]));
-        }
-    }
-
-    private void handleBotQueryHealth(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        String server = botToServer.get(botName);
-        if (server == null) return;
-        float[] health = botManager.queryHealth(botName);
-        if (health != null) {
-            console.sendToServer(server, String.format("/botcallback HEALTH %s %.1f %d %.1f",
-                botName, health[0], (int) health[1], health[2]));
-        }
-    }
-
-    private void handleBotQueryHeldItem(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        String server = botToServer.get(botName);
-        if (server == null) return;
-        int[] item = botManager.queryHeldItem(botName);
-        if (item != null) {
-            console.sendToServer(server, String.format("/botcallback HELD_ITEM %s %d unknown",
-                botName, item[0]));
-        }
-    }
-
-    private void handleBotQueryGameMode(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        String server = botToServer.get(botName);
-        if (server == null) return;
-        String gm = botManager.queryGameMode(botName);
-        if (gm != null) {
-            console.sendToServer(server, "/botcallback GAMEMODE " + botName + " " + gm);
-        }
-    }
-
-    private void handleBotQueryOpenContainer(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        String server = botToServer.get(botName);
-        if (server == null) return;
-        int containerId = botManager.queryOpenContainerId(botName);
-        console.sendToServer(server, "/botcallback OPEN_CONTAINER " + botName + " " + containerId);
-    }
-
-    private void handleBotQueryEntities(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        String server = botToServer.get(botName);
-        if (server == null) return;
-        String typeName = cmd.args().length > 0 ? cmd.args()[0] : "";
-        int[] entityIds = botManager.findEntities(botName, typeName);
-        StringBuilder sb = new StringBuilder("/botcallback ENTITIES " + botName);
-        for (int id : entityIds) {
-            sb.append(" ").append(id);
-        }
-        console.sendToServer(server, sb.toString());
-    }
-
-    private void handleBotMoveTo(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        if (cmd.args().length < 3) {
-            System.err.println("[devrunner] Invalid MOVE_TO command for bot '" + botName + "'");
-            return;
-        }
-        try {
-            int x = Integer.parseInt(cmd.args()[0]);
-            int y = Integer.parseInt(cmd.args()[1]);
-            int z = Integer.parseInt(cmd.args()[2]);
-            botManager.moveTo(botName, x, y, z);
-        } catch (NumberFormatException e) {
-            System.err.println("[devrunner] Invalid MOVE_TO coordinates for bot '" + botName + "': " + e.getMessage());
-        }
-    }
-
-    private void handleBotAttack(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        if (cmd.args().length < 1) {
-            System.err.println("[devrunner] Invalid ATTACK command for bot '" + botName + "'");
-            return;
-        }
-        try {
-            int entityId = Integer.parseInt(cmd.args()[0]);
-            botManager.attackEntity(botName, entityId);
-        } catch (NumberFormatException e) {
-            System.err.println("[devrunner] Invalid ATTACK entityId for bot '" + botName + "': " + e.getMessage());
-        }
-    }
-
-    private void handleBotInteract(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        if (cmd.args().length < 2) {
-            System.err.println("[devrunner] Invalid INTERACT command for bot '" + botName + "'");
-            return;
-        }
-        try {
-            int entityId = Integer.parseInt(cmd.args()[0]);
-            int hand = Integer.parseInt(cmd.args()[1]);
-            botManager.interactEntity(botName, entityId, hand);
-        } catch (NumberFormatException e) {
-            System.err.println("[devrunner] Invalid INTERACT arguments for bot '" + botName + "': " + e.getMessage());
-        }
-    }
-
-    private void handleBotSwing(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        if (cmd.args().length < 1) {
-            System.err.println("[devrunner] Invalid SWING command for bot '" + botName + "'");
-            return;
-        }
-        try {
-            int hand = Integer.parseInt(cmd.args()[0]);
-            botManager.swingHand(botName, hand);
-        } catch (NumberFormatException e) {
-            System.err.println("[devrunner] Invalid SWING hand for bot '" + botName + "': " + e.getMessage());
-        }
-    }
-
-    private void handleBotSetSlot(BotConstants.BotCommand cmd) {
-        String botName = cmd.botName();
-        if (cmd.args().length < 1) {
-            System.err.println("[devrunner] Invalid SET_SLOT command for bot '" + botName + "'");
-            return;
-        }
-        try {
-            int slot = Integer.parseInt(cmd.args()[0]);
-            botManager.setHeldItemSlot(botName, slot);
-        } catch (NumberFormatException e) {
-            System.err.println("[devrunner] Invalid SET_SLOT slot for bot '" + botName + "': " + e.getMessage());
-        }
-    }
-
-    /**
-     * Looks up the address (host:port) for a given server name from the config.
-     *
-     * @param serverName the logical server name
-     * @param config     the DevRunner configuration
-     * @return "host:port" string, or null if the server is not found
-     */
-    static String findServerAddress(String serverName, DevRunnerConfig config) {
-        DevRunnerConfig.ServerSpec spec = config.servers().get(serverName);
-        if (spec == null) return null;
-        return "127.0.0.1:" + spec.port();
     }
 
     private ServiceAdapter.ServiceSpec toServiceSpec(DevRunnerConfig.ServiceSpec spec, String name) {
