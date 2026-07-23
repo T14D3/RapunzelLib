@@ -296,9 +296,6 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (bus.hasPostListeners(PlayerQuitPost.class)) {
             bus.dispatchPost(new PlayerQuitPost(event.getPlayer().getUniqueId(), event.getPlayer().getName()));
         }
-        if (bus.hasPostListeners(PlayerQuitPre.class)) {
-            bus.dispatchPost(new PlayerQuitPre(event.getPlayer().getUniqueId(), event.getPlayer().getName()));
-        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -546,6 +543,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         // getChangedType() returns the Material (block type) that changed, triggering this physics update
         RKey changedTypeKey = RKey.of(event.getChangedType().getKey().toString());
         BlockPhysicsPre pre = new BlockPhysicsPre(world, pos, blockTypeKey, changedTypeKey, event.isCancelled());
+        bus.dispatchPre(pre);
 
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -562,6 +560,40 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         RKey blockTypeKey = RKey.of(event.getBlock().getType().getKey().toString());
         RKey changedTypeKey = RKey.of(event.getChangedType().getKey().toString());
         bus.dispatchPost(new BlockPhysicsPost(world, pos, blockTypeKey, changedTypeKey, event.isCancelled()));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBlockFormPre(BlockFormEvent event) {
+        if (!bus.hasPreListeners(BlockFormPre.class)) return;
+
+        Location loc = event.getBlock().getLocation();
+        RWorldRef world = worldRef(loc.getWorld());
+        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+        RKey newBlockTypeKey = RKey.of(event.getNewState().getType().getKey().toString());
+        RKey sourceBlockTypeKey = RKey.of(event.getBlock().getType().getKey().toString());
+
+        BlockFormPre pre = new BlockFormPre(world, pos, newBlockTypeKey, sourceBlockTypeKey, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBlockSpreadPre(BlockSpreadEvent event) {
+        if (!bus.hasPreListeners(BlockSpreadPre.class)) return;
+
+        Location loc = event.getBlock().getLocation();
+        RWorldRef world = worldRef(loc.getWorld());
+        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+        RKey newBlockTypeKey = RKey.of(event.getNewState().getType().getKey().toString());
+        RKey sourceBlockTypeKey = RKey.of(event.getSource().getType().getKey().toString());
+
+        BlockSpreadPre pre = new BlockSpreadPre(world, pos, newBlockTypeKey, sourceBlockTypeKey, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)

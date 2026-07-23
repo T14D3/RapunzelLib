@@ -38,7 +38,6 @@ import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
 import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
-import de.t14d3.rapunzellib.events.player.PlayerQuitPre;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
@@ -92,7 +91,6 @@ final class GameEventCatalog {
         BucketEntityPre.class,
         InteractBlockPre.class,
         PlayerQuitPost.class,
-        PlayerQuitPre.class,
         PlayerMovePre.class,
         PlayerMovePost.class,
         ChunkUnloadPost.class,
