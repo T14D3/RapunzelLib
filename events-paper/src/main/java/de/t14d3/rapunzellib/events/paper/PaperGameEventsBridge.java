@@ -243,7 +243,6 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onEntitySpawnPre(CreatureSpawnEvent event) {
         if (!bus.hasPreListeners(EntitySpawnPre.class)) return;
-        if (event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.SPAWNER_EGG) return;
 
         Location loc = event.getLocation();
         RWorldRef world = worldRef(loc.getWorld());
@@ -273,8 +272,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         RWorldRef world = worldRef(loc.getWorld());
         RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         RKey typeKey = RKey.of(event.getEntityType().getKey().toString());
-        String reason = event instanceof CreatureSpawnEvent cs
-                ? cs.getSpawnReason().name() : "UNKNOWN";
+        String reason = "UNKNOWN";
 
         EntitySpawnPre pre = new EntitySpawnPre(world, pos, typeKey, reason, event.isCancelled());
         bus.dispatchPre(pre);

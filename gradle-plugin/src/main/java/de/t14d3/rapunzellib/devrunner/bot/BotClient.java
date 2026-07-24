@@ -238,16 +238,12 @@ public class BotClient {
 
         confirmPosition();
 
-        System.err.println("[BotClient] digBlock: confirmPosition sent, bot pos=(" +
-                this.x + "," + this.y + "," + this.z + ") gm=" + this.gameMode);
-
         session.send(new ServerboundSwingPacket(Hand.MAIN_HAND));
 
         Vector3i pos = Vector3i.from(x, y, z);
         Direction dir = Direction.values()[direction];
 
         int startSeq = interactionSequence.getAndIncrement();
-        System.err.println("[BotClient] START_DIGGING seq=" + startSeq);
         session.send(new ServerboundPlayerActionPacket(
                 PlayerAction.START_DIGGING,
                 pos,
@@ -256,7 +252,6 @@ public class BotClient {
         ));
 
         int finishSeq = interactionSequence.getAndIncrement();
-        System.err.println("[BotClient] FINISH_DIGGING seq=" + finishSeq);
         session.send(new ServerboundPlayerActionPacket(
                 PlayerAction.FINISH_DIGGING,
                 pos,

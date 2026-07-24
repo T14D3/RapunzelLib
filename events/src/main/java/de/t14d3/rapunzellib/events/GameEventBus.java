@@ -85,7 +85,6 @@ public final class GameEventBus implements AutoCloseable {
         ListenerList list = preListeners.get(event.getClass());
         if (list == null) return;
         for (Consumer<?> listener : list.snapshot()) {
-            if (event.isDenied()) return;
             dispatchUnchecked(listener, event);
         }
     }
