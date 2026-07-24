@@ -258,6 +258,31 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         }
     }
 
+    /**
+     * Handles {@link EntitySpawnEvent} for entity types that do not fire
+     * {@link CreatureSpawnEvent} (e.g., spawn eggs in Paper 1.21.4+).
+     * Skips events already handled by {@link #onEntitySpawnPre(CreatureSpawnEvent)}.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onEntitySpawnPreGeneric(EntitySpawnEvent event) {
+        // Skip if this is a CreatureSpawnEvent (already handled by onEntitySpawnPre)
+        if (event instanceof CreatureSpawnEvent) return;
+        if (!bus.hasPreListeners(EntitySpawnPre.class)) return;
+
+        Location loc = event.getLocation();
+        RWorldRef world = worldRef(loc.getWorld());
+        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+        RKey typeKey = RKey.of(event.getEntityType().getKey().toString());
+        String reason = event instanceof CreatureSpawnEvent cs
+                ? cs.getSpawnReason().name() : "UNKNOWN";
+
+        EntitySpawnPre pre = new EntitySpawnPre(world, pos, typeKey, reason, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onEntityHurtPre(EntityDamageEvent event) {
         if (event instanceof EntityDamageByEntityEvent byEntity && byEntity.getDamager() instanceof org.bukkit.entity.Player) {
