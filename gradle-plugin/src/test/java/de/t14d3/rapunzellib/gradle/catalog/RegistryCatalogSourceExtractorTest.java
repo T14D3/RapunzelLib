@@ -213,57 +213,6 @@ class RegistryCatalogSourceExtractorTest {
         );
     }
 
-    @Test
-    void parityVerifierHonorsNormalizationAndAllowedSupersets() {
-        Path canonicalClasspath = TestSupport.compileSources(
-            tempDir,
-            "canonical",
-            sharedItemFixtureSources(Map.of("CUT_STANDSTONE_SLAB", "cut_sandstone_slab"))
-        );
-        Path candidateClasspath = TestSupport.compileSources(
-            tempDir,
-            "candidate",
-            sharedItemFixtureSources(Map.of("CUT_STANDSTONE_SLAB", "cut_standstone_slab", "APPLE", "apple"))
-        );
-
-        RegistryCatalogParityResult result = RegistryCatalogParityVerifier.verify(
-            "vanilla item types",
-            List.of(
-                new RegistryCatalogSourceDefinition(
-                    "canonical",
-                    RegistryCatalogSourceType.NATIVE_STATIC_FIELDS,
-                    List.of(canonicalClasspath.toFile()),
-                    RegistryCatalogNormalizationProfile.NONE,
-                    false,
-                    "",
-                    "net.minecraft.world.item.Items",
-                    "net.minecraft.world.item.Item",
-                    List.of(),
-                    List.of(),
-                    mojangKeyAccessor,
-                    Set.of()
-                ),
-                new RegistryCatalogSourceDefinition(
-                    "candidate",
-                    RegistryCatalogSourceType.NATIVE_STATIC_FIELDS,
-                    List.of(candidateClasspath.toFile()),
-                    RegistryCatalogNormalizationProfile.VANILLA_MOJANG_ITEM_TYPES,
-                    true,
-                    "",
-                    "net.minecraft.world.item.Items",
-                    "net.minecraft.world.item.Item",
-                    List.of(),
-                    List.of(),
-                    mojangKeyAccessor,
-                    Set.of()
-                )
-            )
-        );
-
-        assertEquals(1, result.entryCount());
-        assertEquals("candidate", result.comparedSources().getFirst().name());
-    }
-
     private Map<String, String> sharedItemFixtureSources(Map<String, String> items) {
         StringBuilder itemFields = new StringBuilder();
         for (Map.Entry<String, String> entry : items.entrySet()) {

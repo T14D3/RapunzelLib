@@ -96,57 +96,6 @@ class GenerateRegistryCatalogTaskFunctionalTest {
         assertTrue(Files.exists(compiledClass("com/example/UsesMultipleCatalogs.class")));
     }
 
-    @Test
-    void parityVerificationRunsAgainstConfiguredSources() throws Exception {
-        Path canonicalClasspath = compileSharedItemFixture("canonical", Map.of("CUT_STANDSTONE_SLAB", "cut_sandstone_slab"));
-        Path candidateClasspath = compileSharedItemFixture("candidate", Map.of("CUT_STANDSTONE_SLAB", "cut_standstone_slab", "APPLE", "apple"));
-
-        writeConsumerProject(
-            """
-            plugins {
-                id 'java'
-                id 'de.t14d3.rapunzellib'
-            }
-
-            rapunzellib {
-                contextWrapper {
-                    enabled.set(false)
-                }
-                registryCatalogs {
-                    create('vanilla-item-types') {
-                        packageName.set('com.example.catalog')
-                        className.set('GeneratedSharedItems')
-                        domainName.set('shared item types')
-                        registryValueType.set('de.t14d3.rapunzellib.registry.RItemType')
-                        registryKeyOwnerType.set('de.t14d3.rapunzellib.registry.RRegistries')
-                        registryKeyFieldName.set('ITEM_TYPES')
-                        source {
-                            mojangItemTypes()
-                            classpath.from(files('%s'))
-                        }
-                        verifyAgainst('candidate') {
-                            mojangItemTypes()
-                            normalizationProfile.set('%s')
-                            allowSupersetOfCanonical.set(true)
-                            classpath.from(files('%s'))
-                        }
-                    }
-                }
-            }
-            """.formatted(
-                TestSupport.toGradlePath(canonicalClasspath),
-                RegistryCatalogNormalizationProfile.VANILLA_MOJANG_ITEM_TYPES,
-                TestSupport.toGradlePath(candidateClasspath)
-            )
-        );
-        writeRegistryFixtureTypes();
-
-        BuildResult result = TestSupport.runGradle(tempDir, "rapunzellibVerifyRegistryCatalogParity", "compileJava");
-
-        assertEquals(SUCCESS, result.task(":rapunzellibVerifyRegistryCatalogParity").getOutcome());
-        assertEquals(SUCCESS, result.task(":compileJava").getOutcome());
-    }
-
     private void writeConsumerProject(String buildFile) {
         TestSupport.writeFile(tempDir, "settings.gradle", "rootProject.name = 'consumer-registry-catalog'");
         TestSupport.writeFile(tempDir, "build.gradle", buildFile.strip());

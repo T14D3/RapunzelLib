@@ -1,5 +1,4 @@
 import de.t14d3.rapunzellib.gradle.tasks.GenerateDisplayMetadataTask
-import de.t14d3.rapunzellib.gradle.tasks.VerifyRegistryCatalogParityTask
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.kotlin.dsl.the
 import org.spongepowered.gradle.vanilla.repository.MinecraftPlatform
@@ -82,7 +81,7 @@ rapunzellib {
     }
 }
 
-tasks.withType(VerifyRegistryCatalogParityTask::class.java).configureEach {
+tasks.matching { it.name.startsWith("rapunzellibVerify") && it.name.endsWith("Parity") }.configureEach {
     dependsOn(":platform-paper:paperweightUserdevSetup")
 }
 

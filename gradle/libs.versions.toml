@@ -67,6 +67,7 @@ network-module-conventions = { id = "de.t14d3.rapunzellib.network-module-convent
 backend-platform-module-conventions = { id = "de.t14d3.rapunzellib.backend-platform-module-conventions" }
 platform-fabric-module-conventions = { id = "de.t14d3.rapunzellib.platform-fabric-module-conventions" }
 platform-neoforge-module-conventions = { id = "de.t14d3.rapunzellib.platform-neoforge-module-conventions" }
+internal-tasks = { id = "de.t14d3.rapunzellib.internal-tasks" }
 
 [libraries]
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }

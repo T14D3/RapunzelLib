@@ -1,13 +1,10 @@
 package de.t14d3.rapunzellib.gradle;
 
 import de.t14d3.rapunzellib.gradle.tasks.GenerateKeyCatalogTask;
-import de.t14d3.rapunzellib.gradle.tasks.GeneratePlatformAdapterScaffoldTask;
 import de.t14d3.rapunzellib.gradle.tasks.GenerateRNbtSchemaTask;
 import de.t14d3.rapunzellib.gradle.tasks.InitTemplateTask;
 import de.t14d3.rapunzellib.gradle.tasks.RunServersTask;
 import de.t14d3.rapunzellib.gradle.tasks.ValidateMessagesTask;
-import de.t14d3.rapunzellib.gradle.tasks.VerifyInstallerWiringTask;
-import de.t14d3.rapunzellib.gradle.tasks.VerifySharedParityTask;
 import de.t14d3.rapunzellib.gradle.tasks.GenerateContextWrapperTask;
 import org.gradle.api.Project;
 import org.gradle.api.tasks.TaskProvider;
@@ -91,34 +88,6 @@ public final class RapunzelLibTaskRegistrars {
             task.getOutputDir().set(extension.getTemplateOutputDir());
             task.getBasePackage().set(extension.getTemplateBasePackage());
             task.getProjectName().set(extension.getTemplateProjectName());
-        });
-    }
-
-    public static void registerPlatformAdapterScaffoldTask(Project project, RapunzelLibExtension extension) {
-        project.getTasks().register("rapunzellibGeneratePlatformAdapterScaffold", GeneratePlatformAdapterScaffoldTask.class, task -> {
-            task.setGroup("rapunzellib");
-            task.setDescription("Generates scaffold modules for a RapunzelLib platform adapter.");
-
-            task.getOutputDir().set(extension.getScaffoldOutputDir());
-            task.getBasePackage().set(extension.getScaffoldBasePackage());
-            task.getPlatformKey().set(extension.getScaffoldPlatformKey());
-            task.getSharedCoreFamily().set(extension.getScaffoldSharedCoreFamily());
-            task.getSharedCoreFeatures().set(extension.getScaffoldSharedCoreFeatures());
-            task.getFeatures().set(extension.getScaffoldFeatures());
-        });
-    }
-
-    public static void registerInstallerWiringTask(Project project) {
-        project.getTasks().register("rapunzellibVerifyInstallerWiring", VerifyInstallerWiringTask.class, task -> {
-            task.setGroup("verification");
-            task.setDescription("Verifies installer service descriptors are present for detected feature/platform modules.");
-        });
-    }
-
-    public static void registerSharedParityTask(Project project) {
-        project.getTasks().register("rapunzellibVerifySharedParity", VerifySharedParityTask.class, task -> {
-            task.setGroup("verification");
-            task.setDescription("Checks Fabric/NeoForge modules stay aligned on minecraft + mappings assumptions.");
         });
     }
 

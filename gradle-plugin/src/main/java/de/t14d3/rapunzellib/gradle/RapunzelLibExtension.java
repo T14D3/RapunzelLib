@@ -55,18 +55,6 @@ public abstract class RapunzelLibExtension {
 
     public abstract Property<String> getTemplateProjectName();
 
-    public abstract DirectoryProperty getScaffoldOutputDir();
-
-    public abstract Property<String> getScaffoldBasePackage();
-
-    public abstract Property<String> getScaffoldPlatformKey();
-
-    public abstract Property<String> getScaffoldSharedCoreFamily();
-
-    public abstract SetProperty<String> getScaffoldSharedCoreFeatures();
-
-    public abstract SetProperty<String> getScaffoldFeatures();
-
     public KeyCatalogGenerationExtension getKeyCatalog() {
         return keyCatalog;
     }
@@ -119,13 +107,6 @@ public void multiVersion(Action<? super MultiVersionExtension> action) {
     getTemplateOutputDir().convention(project.getLayout().getProjectDirectory().dir("template"));
     getTemplateBasePackage().convention("de.t14d3");
     getTemplateProjectName().convention(project.getName());
-
-    getScaffoldOutputDir().convention(project.getLayout().getProjectDirectory().dir("platform-adapter-scaffold"));
-    getScaffoldBasePackage().convention("de.t14d3.rapunzellib");
-    getScaffoldPlatformKey().convention("custom");
-    getScaffoldSharedCoreFamily().convention(ModuleMatrix.SHARED_CORE_FAMILY_AUTO);
-    getScaffoldSharedCoreFeatures().convention(Set.of());
-    getScaffoldFeatures().convention(Set.of("commands", "events", "gui", "inventory", "nbt"));
 
     multiVersion.getEnabled().convention(false);
     multiVersion.getTargetVersions().convention(List.of());

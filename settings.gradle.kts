@@ -38,6 +38,7 @@ pluginManagement {
     includeBuild("gradle-plugin") {
         name = "gradle-plugin-build"
     }
+    includeBuild("build-logic")
 
     resolutionStrategy {
         eachPlugin {

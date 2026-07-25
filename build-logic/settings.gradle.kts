@@ -27,4 +27,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "gradle-plugin"
+// Depend on the public gradle-plugin for shared classes (RegistryCatalogSpec, etc.)
+includeBuild("../gradle-plugin")
+
+rootProject.name = "build-logic"

@@ -2,18 +2,14 @@ package de.t14d3.rapunzellib.gradle;
 
 import de.t14d3.rapunzellib.gradle.tasks.GenerateKeyCatalogTask;
 import de.t14d3.rapunzellib.gradle.tasks.GenerateRNbtSchemaTask;
-import de.t14d3.rapunzellib.gradle.tasks.RunServersTask;
 import de.t14d3.rapunzellib.gradle.tasks.ValidateMessagesTask;
 import org.gradle.api.Project;
-import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskProvider;
-import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 
 import java.io.File;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 public final class RapunzelLibJavaWiring {
@@ -67,46 +63,5 @@ public final class RapunzelLibJavaWiring {
             task.dependsOn(registryCatalogTasks.generateAll());
             task.dependsOn(generateRNbtSchema);
         });
-
-        project.getTasks().named("check").configure(task -> {
-            if (registryCatalogTasks.includeVerifyParityInCheck().get()) {
-                task.dependsOn(registryCatalogTasks.verifyParity());
-            }
-        });
-    }
-
-    public static void wireArchiveTasksAfterEvaluate(
-        Project project,
-        TaskProvider<RunServersTask> runServersTask,
-        TaskProvider<RunServersTask> runPerfServersTask
-    ) {
-        project.afterEvaluate(ignored -> {
-            List<TaskProvider<RunServersTask>> runTasks = List.of(runServersTask, runPerfServersTask);
-
-            AbstractArchiveTask paperJar = archiveTask(project, "paperJar");
-            if (paperJar != null) {
-                for (TaskProvider<RunServersTask> runTask : runTasks) {
-                    runTask.configure(task -> {
-                        task.dependsOn(paperJar);
-                        task.getPaperPluginJar().set(paperJar.getArchiveFile());
-                    });
-                }
-            }
-
-            AbstractArchiveTask velocityJar = archiveTask(project, "velocityJar");
-            if (velocityJar != null) {
-                for (TaskProvider<RunServersTask> runTask : runTasks) {
-                    runTask.configure(task -> {
-                        task.dependsOn(velocityJar);
-                        task.getVelocityPluginJar().set(velocityJar.getArchiveFile());
-                    });
-                }
-            }
-        });
-    }
-
-    private static AbstractArchiveTask archiveTask(Project project, String name) {
-        Object task = project.getTasks().findByName(name);
-        return task instanceof AbstractArchiveTask archiveTask ? archiveTask : null;
     }
 }

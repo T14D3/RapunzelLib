@@ -3,7 +3,6 @@ package de.t14d3.rapunzellib.gradle;
 import de.t14d3.rapunzellib.gradle.tasks.GenerateContextWrapperTask;
 import de.t14d3.rapunzellib.gradle.tasks.GenerateKeyCatalogTask;
 import de.t14d3.rapunzellib.gradle.tasks.GenerateRNbtSchemaTask;
-import de.t14d3.rapunzellib.gradle.tasks.RunServersTask;
 import de.t14d3.rapunzellib.gradle.tasks.ValidateMessagesTask;
 import de.t14d3.rapunzellib.multiversion.MultiVersionExtension;
 import de.t14d3.rapunzellib.multiversion.tasks.PreprocessSourcesTask;
@@ -42,10 +41,8 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
             RapunzelLibTaskRegistrars.registerValidateMessagesTask(project, extension);
         TaskProvider<GenerateRNbtSchemaTask> generateRNbtSchema =
             RapunzelLibTaskRegistrars.registerRNbtSchemaTask(project, extension);
-        TaskProvider<RunServersTask> runServersTask =
-            RapunzelLibTaskRegistrars.registerRunServersTask(project, runnerProperties);
-        TaskProvider<RunServersTask> runPerfServersTask =
-            RapunzelLibTaskRegistrars.registerRunPerfServersTask(project, runnerProperties);
+        RapunzelLibTaskRegistrars.registerRunServersTask(project, runnerProperties);
+        RapunzelLibTaskRegistrars.registerRunPerfServersTask(project, runnerProperties);
 
         // DevRunner extension and tasks
         DevRunnerExtension devRunnerExtension = project.getExtensions().create("devRunner", DevRunnerExtension.class);
@@ -54,9 +51,7 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
         RapunzelLibTaskRegistrars.registerDevRunnerPerfTask(project, devRunnerExtension);
 
         RapunzelLibTaskRegistrars.registerInitTemplateTask(project, extension);
-        RapunzelLibTaskRegistrars.registerPlatformAdapterScaffoldTask(project, extension);
-        RapunzelLibTaskRegistrars.registerInstallerWiringTask(project);
-        RapunzelLibTaskRegistrars.registerSharedParityTask(project);
+
         // Context wrapper task - register early so it's available in afterEvaluate.
         project.afterEvaluate(p -> {
             if (!extension.getContextWrapper().getEnabled().get()) {
@@ -112,8 +107,6 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
                 generateRNbtSchema
             );
         });
-
-        RapunzelLibJavaWiring.wireArchiveTasksAfterEvaluate(project, runServersTask, runPerfServersTask);
     }
 
     private void configureMultiVersionTasks(Project project) {

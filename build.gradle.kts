@@ -17,6 +17,7 @@ plugins {
     alias(libs.plugins.idea.ext)
     alias(libs.plugins.root.subproject.conventions)
     alias(libs.plugins.root.publishing.conventions)
+    alias(libs.plugins.internal.tasks)
     alias(libs.plugins.dokka)
     alias(libs.plugins.visualizer.collector.java)
     alias(libs.plugins.visualizer.bundler)
@@ -418,7 +419,7 @@ val checkParity = tasks.register("checkParity") {
     description = "Runs opt-in parity verification tasks that are excluded from the default build lifecycle."
 
     dependsOn(
-        ":api:rapunzellibVerifyRegistryCatalogParity",
+        "rapunzellibVerifyRegistryCatalogParity",
     )
 }
 
