@@ -7,6 +7,7 @@ import de.t14d3.rapunzellib.objects.REntity;
 import de.t14d3.rapunzellib.objects.RLivingEntity;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.objects.snapshot.REntitySnapshot;
+import de.t14d3.rapunzellib.registry.REntityType;
 
 import java.util.Optional;
 
@@ -21,7 +22,7 @@ import java.util.Optional;
 public record EntityHurtPost(
     REntity entity,
     REntitySnapshot snapshot,
-    String damageTypeKey,
+    RKey damageTypeKey,
     boolean cancelled
 ) implements GamePostEvent {
     /**
@@ -31,8 +32,19 @@ public record EntityHurtPost(
      * @param damageTypeKey the damage type key
      * @param cancelled     whether the damage was cancelled
      */
-    public EntityHurtPost(REntity entity, String damageTypeKey, boolean cancelled) {
+    public EntityHurtPost(REntity entity, RKey damageTypeKey, boolean cancelled) {
         this(entity, entity.snapshot(), damageTypeKey, cancelled);
+    }
+
+    /**
+     * Creates an EntityHurtPost from an entity, damage type string, and cancelled state.
+     *
+     * @param entity        the entity that was hurt
+     * @param damageTypeKey the damage type key string
+     * @param cancelled     whether the damage was cancelled
+     */
+    public EntityHurtPost(REntity entity, String damageTypeKey, boolean cancelled) {
+        this(entity, entity.snapshot(), RKey.of(damageTypeKey), cancelled);
     }
 
     public RWorldRef world() {
@@ -45,6 +57,15 @@ public record EntityHurtPost(
 
     public RKey entityTypeKey() {
         return snapshot.entityTypeKey();
+    }
+
+    /**
+     * Returns the typed entity type wrapper, resolved from the live entity.
+     *
+     * @return the entity type
+     */
+    public REntityType entityType() {
+        return entity.requireType();
     }
 
     public Optional<RLivingEntity> livingEntity() {

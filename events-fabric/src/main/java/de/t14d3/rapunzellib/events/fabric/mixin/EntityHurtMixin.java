@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Entity.class)
 public abstract class EntityHurtMixin {
     @Inject(method = "hurtOrSimulate", at = @At("RETURN"))
-    private void onEntityHurtPost(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    private void onEntityHurtPost(DamageSource source, float damage, CallbackInfoReturnable<Boolean> cir) {
         GameEventBus bus = SharedMixinEventsBridge.bus();
         if (bus == null) return;
 

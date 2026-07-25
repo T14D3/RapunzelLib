@@ -9,6 +9,8 @@ import org.jetbrains.gradle.ext.taskTriggers
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.bundling.Zip
 import java.util.Properties
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 plugins {
     base
@@ -148,6 +150,15 @@ allprojects {
     group = "de.t14d3.rapunzellib"
     version = buildVersion
 
+    // When building for a specific Minecraft version in the parallel multi-version
+    // build (Option 1: isolated build directories), redirect each project's buildDir
+    // to a version-specific location so concurrent inner builds do not conflict.
+    val versionBuildRoot = providers.gradleProperty("rapunzellib.versionBuildRoot").orNull
+    if (versionBuildRoot != null) {
+        val relativePath = project.path.replace(':', '/').trimStart('/').ifEmpty { "root" }
+        buildDir = file("$versionBuildRoot/$relativePath")
+    }
+
     activeTargetVersionDefaults.forEach { (alias, version) ->
         setDefaultProjectProperty("rapunzellib.version.$alias", version)
     }
@@ -226,26 +237,55 @@ collectAllJars.configure {
 }
 
 // After each Gradle build, aggregate all subproject JAR outputs into root build/libs/<version>/
+// When the parallel multi-version build ran (build/minecraft-builds/ exists), collect from
+// each version's isolated directory tree into a version-specific libs/ subdirectory.
 gradle.buildFinished {
-    val targetDir = rootProject.layout.buildDirectory.dir("libs/$collectedJarVersion").get().asFile
-    targetDir.mkdirs()
-    rootProject.subprojects.forEach { subproject ->
-        val buildLibs = File(subproject.buildDir, "libs")
-        if (buildLibs.isDirectory()) {
-            buildLibs.listFiles { f -> f.name.endsWith(".jar") }?.forEach { jarFile ->
-                val destFile = File(targetDir, jarFile.name)
-                if (!destFile.exists()) {
-                    jarFile.copyTo(destFile)
+    val mcBuildsDir = rootProject.layout.buildDirectory.dir("minecraft-builds").get().asFile
+
+    if (mcBuildsDir.isDirectory()) {
+        // Parallel multi-version build: collect each version's JARs into build/libs/<version>/
+        mcBuildsDir.listFiles { f -> f.isDirectory }?.forEach { versionDir ->
+            val version = versionDir.name
+            val targetDir = rootProject.layout.buildDirectory.dir("libs/$version").get().asFile
+            targetDir.mkdirs()
+            rootProject.subprojects.forEach { subproject ->
+                val relativePath = subproject.path.replace(':', '/').trimStart('/').ifEmpty { "root" }
+                val buildLibs = File(versionDir, "$relativePath/libs")
+                if (buildLibs.isDirectory()) {
+                    buildLibs.listFiles { f -> f.name.endsWith(".jar") }?.forEach { jarFile ->
+                        val destFile = File(targetDir, jarFile.name)
+                        if (!destFile.exists()) {
+                            jarFile.copyTo(destFile)
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // Single-version build: original behaviour
+        val targetDir = rootProject.layout.buildDirectory.dir("libs/$collectedJarVersion").get().asFile
+        targetDir.mkdirs()
+        rootProject.subprojects.forEach { subproject ->
+            val buildLibs = File(subproject.buildDir, "libs")
+            if (buildLibs.isDirectory()) {
+                buildLibs.listFiles { f -> f.name.endsWith(".jar") }?.forEach { jarFile ->
+                    val destFile = File(targetDir, jarFile.name)
+                    if (!destFile.exists()) {
+                        jarFile.copyTo(destFile)
+                    }
                 }
             }
         }
     }
 }
 
-val minecraftVersionBuilds = minecraftTargetVersions.get().map { minecraftVersion ->
+// Register standalone single-version build tasks (e.g. ./gradlew buildMinecraft1_21_10).
+// These are NOT part of the buildAllMinecraftVersions dependency chain - use
+// buildAllMinecraftVersions (or just ./gradlew build) to build all versions in parallel.
+minecraftTargetVersions.get().forEach { minecraftVersion ->
     tasks.register<Exec>("buildMinecraft${minecraftVersion.toMinecraftTaskSuffix()}") {
         group = "verification"
-        description = "Builds RapunzelLib for Minecraft $minecraftVersion."
+        description = "Builds RapunzelLib for Minecraft $minecraftVersion (standalone single-version build)."
 
         val wrapper = if (System.getProperty("os.name").lowercase().contains("windows")) {
             rootProject.file("gradlew.bat")
@@ -256,22 +296,95 @@ val minecraftVersionBuilds = minecraftTargetVersions.get().map { minecraftVersio
         workingDir = rootProject.rootDir
         environment("JAVA_HOME", System.getenv("JAVA_HOME")?.takeIf { it.isNotBlank() }
             ?: System.getProperty("java.home"))
+
+        val versionBuildRoot = rootProject.layout.buildDirectory
+            .dir("minecraft-builds/$minecraftVersion").get().asFile
+
         commandLine(
             wrapper.absolutePath,
             "build",
+            "--no-daemon",
             *gradle.startParameter.projectProperties
                 .filterKeys { it != "rapunzellib.minecraftTarget" }
                 .flatMap { (key, value) -> listOf("-P$key=$value") }
                 .toTypedArray(),
-            "-Prapunzellib.minecraftTarget=$minecraftVersion"
+            "-Prapunzellib.minecraftTarget=$minecraftVersion",
+            "-Prapunzellib.versionBuildRoot=${versionBuildRoot.absolutePath}"
         )
     }
 }
 
 tasks.register("buildAllMinecraftVersions") {
     group = "verification"
-    description = "Builds RapunzelLib once for each configured Minecraft target version."
-    dependsOn(minecraftVersionBuilds)
+    description = "Builds RapunzelLib for each configured Minecraft target version concurrently."
+
+    val wrapperFile = if (System.getProperty("os.name").lowercase().contains("windows")) {
+        rootProject.file("gradlew.bat")
+    } else {
+        rootProject.file("gradlew")
+    }
+
+    // Forward all Gradle properties except minecraftTarget (each version sets its own)
+    val forwardedProps = gradle.startParameter.projectProperties
+        .filterKeys { it != "rapunzellib.minecraftTarget" }
+        .flatMap { (key, value) -> listOf("-P$key=$value") }
+
+    doLast {
+        val versions = minecraftTargetVersions.get()
+        if (versions.isEmpty()) {
+            logger.warn("No Minecraft target versions configured.")
+            return@doLast
+        }
+
+        val executor = Executors.newFixedThreadPool(versions.size)
+        val errors = java.util.Collections.synchronizedList(java.util.ArrayList<String>())
+
+        try {
+            val futures = versions.map { version ->
+                executor.submit<Unit> {
+                    val versionBuildRoot = rootProject.layout.buildDirectory
+                        .dir("minecraft-builds/$version").get().asFile.absolutePath
+
+                    val command = mutableListOf(
+                        wrapperFile.absolutePath,
+                        "build",
+                        "--no-daemon",
+                    )
+                    command.addAll(forwardedProps)
+                    command.add("-Prapunzellib.minecraftTarget=$version")
+                    command.add("-Prapunzellib.versionBuildRoot=$versionBuildRoot")
+
+                    logger.lifecycle("Building for Minecraft $version in $versionBuildRoot")
+
+                    val process = ProcessBuilder(command)
+                        .directory(rootProject.rootDir)
+                        .inheritIO()
+                        .start()
+
+                    val exitCode = process.waitFor()
+                    if (exitCode != 0) {
+                        val msg = "Build for Minecraft $version failed with exit code $exitCode"
+                        errors.add(msg)
+                        logger.error(msg)
+                    } else {
+                        logger.lifecycle("Build for Minecraft $version completed successfully")
+                    }
+                }
+            }
+
+            // Wait for all builds to complete
+            futures.forEach { it.get() }
+
+            if (errors.isNotEmpty()) {
+                throw GradleException(
+                    "Multi-version build completed with errors:\n" + errors.joinToString("\n")
+                )
+            }
+        } finally {
+            executor.shutdown()
+            executor.awaitTermination(1, TimeUnit.MINUTES)
+        }
+    }
 }
 
 tasks.named("build") {

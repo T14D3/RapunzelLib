@@ -4,51 +4,90 @@ import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.BaseCancellablePreEvent;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.block.RBlock;
+import de.t14d3.rapunzellib.registry.RBlockType;
 
 import java.util.Objects;
 
 /**
  * Dispatched before a block transforms (e.g., oxidation, waxing, etc.).
+ *
+ * <p>The original block is supplied as a live {@link RBlock} (the block being
+ * transformed) and the target is supplied as a resolved {@link RBlockType}
+ * (the type the block will become - there is no live block for it yet).
+ * Convenience accessors {@link #originalType()} / {@link #originalTypeKey()}
+ * expose the original block's current type, while {@link #transformedType()}
+ * / {@link #transformedTypeKey()} expose the target type. {@link #world()} and
+ * {@link #pos()} delegate to {@code block.world().ref()} and
+ * {@code block.pos()} respectively.</p>
  */
 public final class BlockTransformPre extends BaseCancellablePreEvent {
-    private final RWorldRef world;
-    private final RBlockPos pos;
-    private final RKey originalBlockTypeKey;
-    private final RKey transformedBlockTypeKey;
+    private final RBlock block;
+    private final RBlockType transformedType;
 
-    public BlockTransformPre(RWorldRef world, RBlockPos pos, RKey originalBlockTypeKey, RKey transformedBlockTypeKey) {
-        this(world, pos, originalBlockTypeKey, transformedBlockTypeKey, false);
+    public BlockTransformPre(RBlock block, RBlockType transformedType) {
+        this(block, transformedType, false);
     }
 
-    public BlockTransformPre(RWorldRef world, RBlockPos pos, String originalBlockTypeKey, String transformedBlockTypeKey) {
-        this(world, pos, RKey.of(originalBlockTypeKey), RKey.of(transformedBlockTypeKey));
-    }
-
-    public BlockTransformPre(RWorldRef world, RBlockPos pos, RKey originalBlockTypeKey, RKey transformedBlockTypeKey, boolean isCancelled) {
-        this.world = Objects.requireNonNull(world, "world");
-        this.pos = Objects.requireNonNull(pos, "pos");
-        this.originalBlockTypeKey = Objects.requireNonNull(originalBlockTypeKey, "originalBlockTypeKey");
-        this.transformedBlockTypeKey = Objects.requireNonNull(transformedBlockTypeKey, "transformedBlockTypeKey");
+    public BlockTransformPre(RBlock block, RBlockType transformedType, boolean isCancelled) {
+        this.block = Objects.requireNonNull(block, "block");
+        this.transformedType = Objects.requireNonNull(transformedType, "transformedType");
         setCancelled(isCancelled);
     }
 
-    public BlockTransformPre(RWorldRef world, RBlockPos pos, String originalBlockTypeKey, String transformedBlockTypeKey, boolean isCancelled) {
-        this(world, pos, RKey.of(originalBlockTypeKey), RKey.of(transformedBlockTypeKey), isCancelled);
+    public BlockTransformPre(RBlock block, RKey transformedTypeKey) {
+        this(block, RBlockType.require(transformedTypeKey));
     }
 
+    public BlockTransformPre(RBlock block, String transformedTypeKey) {
+        this(block, RBlockType.require(transformedTypeKey));
+    }
+
+    public BlockTransformPre(RBlock block, RKey transformedTypeKey, boolean isCancelled) {
+        this(block, RBlockType.require(transformedTypeKey), isCancelled);
+    }
+
+    public BlockTransformPre(RBlock block, String transformedTypeKey, boolean isCancelled) {
+        this(block, RBlockType.require(transformedTypeKey), isCancelled);
+    }
+
+    /** The world the transformed block belongs to. */
     public RWorldRef world() {
-        return world;
+        return block.world().ref();
     }
 
+    /** The position of the transformed block. */
     public RBlockPos pos() {
-        return pos;
+        return block.pos();
     }
 
-    public RKey originalBlockTypeKey() {
-        return originalBlockTypeKey;
+    /** The original (live) block being transformed. */
+    public RBlock block() {
+        return block;
     }
 
-    public RKey transformedBlockTypeKey() {
-        return transformedBlockTypeKey;
+    /**
+     * Convenience accessor resolving the original block's current type via
+     * {@code block().requireType()}.
+     *
+     * @return the original block type
+     */
+    public RBlockType originalType() {
+        return block.requireType();
+    }
+
+    /** The target type the block will be transformed into. */
+    public RBlockType transformedType() {
+        return transformedType;
+    }
+
+    /** The key of the original block's type. */
+    public RKey originalTypeKey() {
+        return originalType().key();
+    }
+
+    /** The key of the transformed (target) block type. */
+    public RKey transformedTypeKey() {
+        return transformedType.key();
     }
 }

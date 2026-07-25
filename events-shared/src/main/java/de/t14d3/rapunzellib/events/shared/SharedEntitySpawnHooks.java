@@ -8,8 +8,10 @@ import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.objects.snapshot.REntitySnapshot;
+import de.t14d3.rapunzellib.registry.REntityType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.entity.Entity;
@@ -36,7 +38,11 @@ public final class SharedEntitySpawnHooks {
             return cancelled;
         }
 
-        EntitySpawnPre pre = new EntitySpawnPre(worldRef(entity.level()), pos(entity), typeKey(entity), reason, cancelled);
+        RLocation location = new RLocation(worldRef(entity.level()), entity.getX(), entity.getY(), entity.getZ());
+        var key = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        REntityType type = REntityType.require(RKey.of(key.getNamespace(), key.getPath()));
+
+        EntitySpawnPre pre = new EntitySpawnPre(location, type, reason, cancelled);
         bus.dispatchPre(pre);
         return pre.isDenied();
     }

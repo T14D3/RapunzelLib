@@ -5,6 +5,8 @@ import de.t14d3.rapunzellib.events.BaseCancellablePreEvent;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.block.RBlock;
+import de.t14d3.rapunzellib.registry.RBlockType;
 
 import java.util.Objects;
 
@@ -12,64 +14,51 @@ import java.util.Objects;
  * Pre-event fired before a block is placed by a player.
  *
  * <p>This event is cancellable. If denied, the block will not be placed.
- * Contains information about the player, world, position, and block type.</p>
+ * Contains information about the player, world, position, and the live
+ * {@link RBlock} that is being placed.</p>
+ *
+ * <p>Convenience accessors {@link #blockType()} and {@link #blockTypeKey()}
+ * are provided so that callers interested only in the placed block's type do
+ * not have to resolve it themselves. The {@code world} and {@code pos} fields
+ * are retained alongside the live {@code RBlock} because the bridge knows them
+ * independently and callers may rely on them directly.</p>
  */
 public final class BlockPlacePre extends BaseCancellablePreEvent {
     private final RPlayer player;
-    private final RWorldRef world;
-    private final RBlockPos pos;
-    private final RKey blockTypeKey;
+    private final RBlock block;
 
-    public BlockPlacePre(RPlayer player, RWorldRef world, RBlockPos pos, RKey blockTypeKey) {
-        this(player, world, pos, blockTypeKey, false);
-    }
 
-    /**
-     * Creates a new BlockPlacePre event with a string block type key.
-     *
-     * @param player      the player placing the block
-     * @param world       the world reference
-     * @param pos         the block position
-     * @param blockTypeKey the block type key as a string
-     */
-    public BlockPlacePre(RPlayer player, RWorldRef world, RBlockPos pos, String blockTypeKey) {
-        this(player, world, pos, RKey.of(blockTypeKey));
-    }
-
-    public BlockPlacePre(RPlayer player, RWorldRef world, RBlockPos pos, RKey blockTypeKey, boolean isCancelled) {
+    public BlockPlacePre(RPlayer player, RBlock block, boolean isCancelled) {
         this.player = Objects.requireNonNull(player, "player");
-        this.world = Objects.requireNonNull(world, "world");
-        this.pos = Objects.requireNonNull(pos, "pos");
-        this.blockTypeKey = Objects.requireNonNull(blockTypeKey, "blockTypeKey");
+        this.block = Objects.requireNonNull(block, "block");
         setCancelled(isCancelled);
-    }
-
-    /**
-     * Creates a new BlockPlacePre event with cancelled state and string key.
-     *
-     * @param player      the player placing the block
-     * @param world       the world reference
-     * @param pos         the block position
-     * @param blockTypeKey the block type key as a string
-     * @param isCancelled whether the event is initially cancelled
-     */
-    public BlockPlacePre(RPlayer player, RWorldRef world, RBlockPos pos, String blockTypeKey, boolean isCancelled) {
-        this(player, world, pos, RKey.of(blockTypeKey), isCancelled);
     }
 
     public RPlayer player() {
         return player;
     }
 
-    public RWorldRef world() {
-        return world;
+    public RBlock block() {
+        return block;
     }
 
-    public RBlockPos pos() {
-        return pos;
+    /**
+     * Convenience accessor resolving the placed block's type via
+     * {@code block().requireType()}. Throws if the type is not registered.
+     *
+     * @return the block type being placed
+     */
+    public RBlockType blockType() {
+        return block.requireType();
     }
 
+    /**
+     * Convenience accessor returning the placed block's type key via
+     * {@code block().typeKey()}.
+     *
+     * @return the block type key
+     */
     public RKey blockTypeKey() {
-        return blockTypeKey;
+        return block.typeKey();
     }
 }

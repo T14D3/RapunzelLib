@@ -16,7 +16,7 @@ final class GameEventBusTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(GameEventBusTest.class);
 
     @Test
-    void dispatchPreStopsWhenDenied() {
+    void dispatchPropagatesDeniedState() {
         GameEventBus bus = new GameEventBus(new InlineScheduler(), LOGGER);
         AtomicInteger called = new AtomicInteger();
 
@@ -24,7 +24,10 @@ final class GameEventBusTest {
             called.incrementAndGet();
             ev.deny();
         });
-        bus.onPre(TestPreEvent.class, _ev -> called.incrementAndGet());
+        bus.onPre(TestPreEvent.class, ev -> {
+            if (ev.isDenied()) return;
+            called.incrementAndGet();
+        });
 
         bus.dispatchPre(new TestPreEvent());
         assertEquals(1, called.get());

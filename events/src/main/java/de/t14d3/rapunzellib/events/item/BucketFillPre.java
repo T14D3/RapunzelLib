@@ -1,10 +1,12 @@
 package de.t14d3.rapunzellib.events.item;
 
-import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.BaseCancellablePreEvent;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.block.RBlock;
+import de.t14d3.rapunzellib.registry.RBlockType;
 
 import java.util.Objects;
 
@@ -15,52 +17,66 @@ import java.util.Objects;
  */
 public final class BucketFillPre extends BaseCancellablePreEvent {
     private final RPlayer player;
-    private final RWorldRef world;
-    private final RBlockPos pos;
-    private final RKey blockTypeKey;
+    private final RBlock block;
 
-    public BucketFillPre(RPlayer player, RWorldRef world, RBlockPos pos, RKey blockTypeKey) {
-        this(player, world, pos, blockTypeKey, false);
+    public BucketFillPre(RPlayer player, RBlock block) {
+        this(player, block, false);
     }
 
-    public BucketFillPre(RPlayer player, RWorldRef world, RBlockPos pos, String blockTypeKey) {
-        this(player, world, pos, RKey.of(blockTypeKey));
-    }
-
-    public BucketFillPre(RPlayer player, RWorldRef world, RBlockPos pos, RKey blockTypeKey, boolean isCancelled) {
+    public BucketFillPre(RPlayer player, RBlock block, boolean isCancelled) {
         this.player = Objects.requireNonNull(player, "player");
-        this.world = Objects.requireNonNull(world, "world");
-        this.pos = Objects.requireNonNull(pos, "pos");
-        this.blockTypeKey = Objects.requireNonNull(blockTypeKey, "blockTypeKey");
+        this.block = Objects.requireNonNull(block, "block");
         setCancelled(isCancelled);
-    }
-
-    /**
-     * Creates a new BucketFillPre event with cancelled state and string key.
-     *
-     * @param player      the player filling the bucket
-     * @param world       the world reference
-     * @param pos         the position of the fluid
-     * @param blockTypeKey the block type of the fluid as a string
-     * @param isCancelled whether the event is initially cancelled
-     */
-    public BucketFillPre(RPlayer player, RWorldRef world, RBlockPos pos, String blockTypeKey, boolean isCancelled) {
-        this(player, world, pos, RKey.of(blockTypeKey), isCancelled);
     }
 
     public RPlayer player() {
         return player;
     }
 
-    public RWorldRef world() {
-        return world;
+    /**
+     * Returns the live wrapper for the block being scooped into the bucket.
+     * Use {@link #blockType()} or {@link #blockTypeKey()} for the fluid's
+     * type identity and {@link #world()} / {@link #pos()} for spatial access.
+     *
+     * @return the live block being filled from
+     */
+    public RBlock block() {
+        return block;
     }
 
-    public RBlockPos pos() {
-        return pos;
+    /**
+     * Returns the block type of the fluid being scooped into the bucket.
+     *
+     * @return the fluid block type
+     */
+    public RBlockType blockType() {
+        return block.requireType();
     }
 
+    /**
+     * Returns the key of the fluid block type.
+     *
+     * @return the block type key
+     */
     public RKey blockTypeKey() {
-        return blockTypeKey;
+        return block.typeKey();
+    }
+
+    /**
+     * Returns the world reference of the fluid block.
+     *
+     * @return the world reference
+     */
+    public RWorldRef world() {
+        return block.world().ref();
+    }
+
+    /**
+     * Returns the position of the fluid block.
+     *
+     * @return the block position
+     */
+    public RBlockPos pos() {
+        return block.pos();
     }
 }

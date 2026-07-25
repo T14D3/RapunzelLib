@@ -1,7 +1,7 @@
 package de.t14d3.rapunzellib.events.sponge;
 
 import de.t14d3.rapunzellib.Rapunzel;
-import de.t14d3.rapunzellib.objects.RKey;
+import de.t14d3.rapunzellib.objects.*;
 import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.block.BlockBreakPost;
@@ -28,13 +28,11 @@ import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
+import de.t14d3.rapunzellib.events.world.ExplosionSourceKind;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 import de.t14d3.rapunzellib.events.world.WorldLoadPost;
-import de.t14d3.rapunzellib.objects.RBlockPos;
-import de.t14d3.rapunzellib.objects.RPlayer;
-import de.t14d3.rapunzellib.objects.RWorld;
-import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.objects.block.RBlock;
+import de.t14d3.rapunzellib.registry.REntityType;
 import org.spongepowered.api.ResourceKey;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
@@ -126,9 +124,9 @@ final class SpongeGameEventsBridge implements GameEventBridge {
             for (BlockTransaction tx : event.transactions(Operations.PLACE.get()).toList()) {
                 BlockSnapshot placed = tx.finalReplacement();
                 RBlockPos pos = toPos(placed.position());
-                RKey typeKey = Rapunzel.blocks().requireData(placed.state()).typeKey();
+                RBlock placeBlock = Rapunzel.blocks().at(rWorld, pos);
 
-                BlockPlacePre pre = new BlockPlacePre(rPlayer, worldRef, pos, typeKey, event.isCancelled());
+                BlockPlacePre pre = new BlockPlacePre(rPlayer, placeBlock, event.isCancelled());
                 bus.dispatchPre(pre);
                 if (pre.isDenied()) {
                     event.setCancelled(true);
@@ -166,10 +164,10 @@ final class SpongeGameEventsBridge implements GameEventBridge {
             for (BlockTransaction tx : event.transactions(Operations.PLACE.get()).toList()) {
                 BlockSnapshot placed = tx.finalReplacement();
                 RBlockPos pos = toPos(placed.position());
-                RKey typeKey = Rapunzel.blocks().requireData(placed.state()).typeKey();
+                RBlock placeBlock = Rapunzel.blocks().at(rWorld, pos);
 
-                if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, worldRef, pos, typeKey, true));
-                if (needsPlaceAsync) bus.dispatchAsync(new BlockPlaceSnapshot(rPlayer.uuid(), worldRef, pos, typeKey, true));
+                if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, placeBlock, true));
+                if (needsPlaceAsync) bus.dispatchAsync(new BlockPlaceSnapshot(rPlayer.uuid(), worldRef, pos, Rapunzel.blocks().requireData(placed.state()).typeKey(), true));
             }
         }
     }
@@ -184,7 +182,6 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
         RPlayer rPlayer = Rapunzel.players().require(player);
         RWorld rWorld = Rapunzel.worlds().require(event.world());
-        RWorldRef worldRef = rWorld.ref();
 
         for (BlockTransactionReceipt receipt : event.receipts()) {
             if (receipt.operation().equals(Operations.BREAK.get())) {
@@ -199,9 +196,8 @@ final class SpongeGameEventsBridge implements GameEventBridge {
                 if (!needsPlacePost && !needsPlaceAsync) continue;
                 BlockSnapshot placed = receipt.finalBlock();
                 RBlockPos pos = toPos(placed.position());
-                RKey typeKey = Rapunzel.blocks().requireData(placed.state()).typeKey();
                 RBlock block = Rapunzel.blocks().at(rWorld, pos);
-                if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, worldRef, pos, typeKey, false));
+                if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, block, false));
                 if (needsPlaceAsync) bus.dispatchAsync(BlockPlaceSnapshot.capture(rPlayer.uuid(), block, false));
             }
         }
@@ -357,10 +353,10 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         for (Entity entity : event.entities()) {
             ServerLocation loc = entity.serverLocation();
             RWorldRef worldRef = Rapunzel.worlds().require(loc.world()).ref();
-            RBlockPos pos = toPos(entity.blockPosition());
-            RKey entityTypeKey = RKey.of(entity.type().key(RegistryTypes.ENTITY_TYPE).asString());
+            RLocation location = new RLocation(worldRef, loc.x(), loc.y(), loc.z());
+            REntityType entityTypeKey = REntityType.require(RKey.of(entity.type().key(RegistryTypes.ENTITY_TYPE).asString()));
 
-            EntitySpawnPre pre = new EntitySpawnPre(worldRef, pos, entityTypeKey, reason, event.isCancelled());
+            EntitySpawnPre pre = new EntitySpawnPre(location, entityTypeKey, reason, event.isCancelled());
             bus.dispatchPre(pre);
             if (pre.isDenied()) {
                 event.setCancelled(true);
@@ -430,12 +426,18 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
         ServerWorld world = event.world();
         RWorldRef worldRef = Rapunzel.worlds().require(world).ref();
-        Vector3i origin = event.explosion().location().blockPosition();
 
-        String sourceTypeKey = event.explosion()
-            .sourceExplosive()
-            .map(src -> src.type().key(RegistryTypes.ENTITY_TYPE).asString())
-            .orElse("unknown");
+        ServerLocation serverLocation = event.explosion().serverLocation();
+        RLocation location = new RLocation(worldRef, serverLocation.x(), serverLocation.y(), serverLocation.z());
+
+        var sourceOpt = event.explosion().sourceExplosive();
+        RKey sourceTypeKey = sourceOpt
+            .map(src -> {
+                var key = src.type().key(RegistryTypes.ENTITY_TYPE);
+                return RKey.of(key.namespace(), key.value());
+            })
+            .orElse(null);
+        ExplosionSourceKind sourceKind = sourceOpt.isPresent() ? ExplosionSourceKind.ENTITY : ExplosionSourceKind.OTHER;
 
         List<RBlockPos> affected = new ArrayList<>();
         for (ServerLocation loc : event.affectedLocations()) {
@@ -443,7 +445,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
             affected.add(new RBlockPos(p.x(), p.y(), p.z()));
         }
 
-        ExplosionPre pre = new ExplosionPre(worldRef, new RBlockPos(origin.x(), origin.y(), origin.z()), sourceTypeKey, affected, event.isCancelled());
+        ExplosionPre pre = new ExplosionPre(location, sourceTypeKey, sourceKind, affected, event.isCancelled());
         bus.dispatchPre(pre);
 
         if (pre.isDenied()) {
@@ -463,17 +465,18 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         FusedExplosive explosive = event.fusedExplosive();
         ServerLocation loc = explosive.serverLocation();
         ServerWorld world = loc.world();
-        RWorldRef worldRef = Rapunzel.worlds().require(world).ref();
         Vector3i pos = explosive.blockPosition();
 
-        RKey typeKey = RKey.of(explosive.type().key(RegistryTypes.ENTITY_TYPE).asString());
+        RWorld rWorld = Rapunzel.worlds().require(world);
+        RBlock block = Rapunzel.blocks().at(rWorld, toPos(pos));
+
         String cause = event.context()
             .get(EventContextKeys.SPAWN_TYPE)
             .map(st -> st.key(RegistryTypes.SPAWN_TYPE).asString())
             .orElse(event.cause().root().getClass().getSimpleName());
 
         RPlayer rPlayer = event.cause().first(ServerPlayer.class).map(p -> Rapunzel.players().require(p)).orElse(null);
-        TntPrimePre pre = new TntPrimePre(worldRef, toPos(pos), typeKey, cause, rPlayer, event.isCancelled());
+        TntPrimePre pre = new TntPrimePre(block, cause, rPlayer, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);

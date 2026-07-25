@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.events.entity;
 
 import de.t14d3.rapunzellib.objects.REntity;
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import org.jetbrains.annotations.NotNull;
 
@@ -73,7 +74,7 @@ public final class EntityEventPayloads {
      * @return the post-event
      */
     public static @NotNull EntityHurtPost hurtPost(@NotNull REntity entity, @NotNull String damageTypeKey, boolean cancelled) {
-        return new EntityHurtPost(Objects.requireNonNull(entity, "entity"), Objects.requireNonNull(damageTypeKey, "damageTypeKey"), cancelled);
+        return new EntityHurtPost(Objects.requireNonNull(entity, "entity"), RKey.of(Objects.requireNonNull(damageTypeKey, "damageTypeKey")), cancelled);
     }
 
     /**
@@ -85,6 +86,6 @@ public final class EntityEventPayloads {
      * @return the snapshot
      */
     public static @NotNull EntityHurtSnapshot hurtSnapshot(@NotNull REntity entity, @NotNull String damageTypeKey, boolean cancelled) {
-        return EntityHurtSnapshot.capture(Objects.requireNonNull(entity, "entity"), Objects.requireNonNull(damageTypeKey, "damageTypeKey"), cancelled);
+        return EntityHurtSnapshot.capture(Objects.requireNonNull(entity, "entity"), RKey.of(Objects.requireNonNull(damageTypeKey, "damageTypeKey")), cancelled);
     }
 }

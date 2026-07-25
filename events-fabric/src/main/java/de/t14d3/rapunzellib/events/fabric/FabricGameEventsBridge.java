@@ -202,20 +202,21 @@ final class FabricGameEventsBridge implements GameEventBridge {
                 RKey placeKey = RKey.of(BuiltInRegistries.BLOCK.getKey(blockItem.getBlock()).toString());
                 RWorldRef worldRef = clickedBlock.world().ref();
                 RBlockPos rPlacePos = new RBlockPos(placePos.getX(), placePos.getY(), placePos.getZ());
+                RBlock placeBlock = Rapunzel.blocks().at(rWorld, rPlacePos);
 
                 if (needsPlacePre) {
-                    BlockPlacePre pre = new BlockPlacePre(rPlayer, worldRef, rPlacePos, placeKey);
+                    BlockPlacePre pre = new BlockPlacePre(rPlayer, placeBlock, false);
                     bus.dispatchPre(pre);
                     cancelled = pre.isDenied();
                 }
 
                 if (cancelled) {
-                    if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, worldRef, rPlacePos, placeKey, true));
+                    if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, placeBlock, true));
                     if (needsPlaceAsync) bus.dispatchAsync(new BlockPlaceSnapshot(rPlayer.uuid(), worldRef, rPlacePos, placeKey, true));
                     return InteractionResult.FAIL;
                 }
 
-                if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, worldRef, rPlacePos, placeKey, false));
+                if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, placeBlock, false));
                 if (needsPlaceAsync) bus.dispatchAsync(new BlockPlaceSnapshot(rPlayer.uuid(), worldRef, rPlacePos, placeKey, false));
             }
         }

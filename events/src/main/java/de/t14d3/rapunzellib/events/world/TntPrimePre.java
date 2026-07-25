@@ -1,10 +1,12 @@
 package de.t14d3.rapunzellib.events.world;
 
-import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.BaseCancellablePreEvent;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.block.RBlock;
+import de.t14d3.rapunzellib.registry.RBlockType;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -15,53 +17,64 @@ import java.util.Optional;
  * <p>This event is cancellable. If denied, the TNT will not be primed.</p>
  */
 public final class TntPrimePre extends BaseCancellablePreEvent {
-    private final RWorldRef world;
-    private final RBlockPos pos;
-    private final RKey blockTypeKey;
+    private final RBlock block;
     private final String cause;
     private final RPlayer player;
 
-    public TntPrimePre(RWorldRef world, RBlockPos pos, RKey blockTypeKey, String cause, RPlayer player) {
-        this(world, pos, blockTypeKey, cause, player, false);
+    public TntPrimePre(RBlock block, String cause, RPlayer player) {
+        this(block, cause, player, false);
     }
 
-    public TntPrimePre(RWorldRef world, RBlockPos pos, String blockTypeKey, String cause, RPlayer player) {
-        this(world, pos, RKey.of(blockTypeKey), cause, player);
-    }
-
-    public TntPrimePre(RWorldRef world, RBlockPos pos, RKey blockTypeKey, String cause, RPlayer player, boolean isCancelled) {
-        this.world = Objects.requireNonNull(world, "world");
-        this.pos = Objects.requireNonNull(pos, "pos");
-        this.blockTypeKey = Objects.requireNonNull(blockTypeKey, "blockTypeKey");
+    public TntPrimePre(RBlock block, String cause, RPlayer player, boolean isCancelled) {
+        this.block = Objects.requireNonNull(block, "block");
         this.cause = Objects.requireNonNull(cause, "cause");
         this.player = player;
         setCancelled(isCancelled);
     }
 
     /**
-     * Creates a new TntPrimePre event with cancelled state and string key.
+     * Returns the live wrapper for the TNT block being primed.
      *
-     * @param world         the world reference
-     * @param pos           the position
-     * @param blockTypeKey  the block type key as a string
-     * @param cause         the cause of priming
-     * @param player        the player who primed the TNT, may be null
-     * @param isCancelled   whether the event is initially cancelled
+     * @return the live TNT block
      */
-    public TntPrimePre(RWorldRef world, RBlockPos pos, String blockTypeKey, String cause, RPlayer player, boolean isCancelled) {
-        this(world, pos, RKey.of(blockTypeKey), cause, player, isCancelled);
+    public RBlock block() {
+        return block;
     }
 
-    public RWorldRef world() {
-        return world;
+    /**
+     * Returns the block type of the TNT being primed.
+     *
+     * @return the block type
+     */
+    public RBlockType blockType() {
+        return block.requireType();
     }
 
-    public RBlockPos pos() {
-        return pos;
-    }
-
+    /**
+     * Returns the key of the TNT block type.
+     *
+     * @return the block type key
+     */
     public RKey blockTypeKey() {
-        return blockTypeKey;
+        return block.typeKey();
+    }
+
+    /**
+     * Returns the world reference of the TNT block.
+     *
+     * @return the world reference
+     */
+    public RWorldRef world() {
+        return block.world().ref();
+    }
+
+    /**
+     * Returns the position of the TNT block.
+     *
+     * @return the block position
+     */
+    public RBlockPos pos() {
+        return block.pos();
     }
 
     /**

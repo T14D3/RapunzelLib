@@ -60,7 +60,7 @@ final class LiveEntityPayloadsTest {
         assertSame(entity, spawn.livingEntity().orElseThrow());
         assertEquals(new RBlockPos(1, 70, 2), hurt.pos());
         assertEquals(new RBlockPos(1, 70, 2), spawn.pos());
-        assertEquals("test:fire", hurt.damageTypeKey());
+        assertEquals(RKey.of("test:fire"), hurt.damageTypeKey());
         assertEquals("NATURAL", spawn.reason());
     }
 
@@ -112,7 +112,7 @@ final class LiveEntityPayloadsTest {
         assertEquals(TestWorld.REF, hurt.world());
         assertEquals(new RBlockPos(5, 68, 3), hurt.pos());
         assertEquals(RKey.of("test:creeper"), hurt.entityTypeKey());
-        assertEquals("test:explosion", hurt.damageTypeKey());
+        assertEquals(RKey.of("test:explosion"), hurt.damageTypeKey());
     }
 
     private static final class TestServerPlayer extends RNativeHandle<Object> implements RServerPlayer {

@@ -3,7 +3,10 @@ package de.t14d3.rapunzellib.events.fabric.mixin;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.shared.mixin.SharedMixinEventsBridge;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
+import de.t14d3.rapunzellib.events.world.ExplosionSourceKind;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.RKey;
+import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 
 import net.minecraft.core.BlockPos;
@@ -52,14 +55,17 @@ public class ExplosionMixin {
         // #else
         String worldId = level.dimension().location().toString();
         // #endif
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
-        RBlockPos origin = new RBlockPos(center.getX(), center.getY(), center.getZ());
+        RWorldRef worldRef = new RWorldRef(RKey.of(worldId));
+        RLocation origin = new RLocation(worldRef, center.getX(), center.getY(), center.getZ());
 
         // Determine source type
-        String sourceTypeKey = "unknown";
+        RKey sourceTypeKey = null;
         Entity source = explosion.getDirectSourceEntity();
+        ExplosionSourceKind sourceKind = ExplosionSourceKind.OTHER;
         if (source != null) {
-            sourceTypeKey = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(source.getType()).toString();
+            var key = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(source.getType());
+            sourceTypeKey = RKey.of(key.getNamespace(), key.getPath());
+            sourceKind = ExplosionSourceKind.ENTITY;
         }
 
         List<RBlockPos> affectedBlocks = new ArrayList<>(affectedBlockPositions.size());
@@ -67,7 +73,7 @@ public class ExplosionMixin {
             affectedBlocks.add(new RBlockPos(pos.getX(), pos.getY(), pos.getZ()));
         }
 
-        ExplosionPre pre = new ExplosionPre(worldRef, origin, sourceTypeKey, affectedBlocks);
+        ExplosionPre pre = new ExplosionPre(origin, sourceTypeKey, sourceKind, affectedBlocks, cir.isCancelled());
         bus.dispatchPre(pre);
 
         if (pre.isDenied()) {

@@ -1,10 +1,8 @@
 package de.t14d3.rapunzellib.events.item;
 
-import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.BaseCancellablePreEvent;
-import de.t14d3.rapunzellib.objects.RBlockPos;
-import de.t14d3.rapunzellib.objects.RPlayer;
-import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.*;
+import de.t14d3.rapunzellib.registry.REntityType;
 
 import java.util.Objects;
 
@@ -15,19 +13,14 @@ import java.util.Objects;
  */
 public final class BucketEntityPre extends BaseCancellablePreEvent {
     private final RPlayer player;
-    private final RWorldRef world;
-    private final RBlockPos pos;
-    private final RKey entityTypeKey;
+    private final RLocation location;
+    private final REntity entity;
 
-    public BucketEntityPre(RPlayer player, RWorldRef world, RBlockPos pos, RKey entityTypeKey) {
-        this(player, world, pos, entityTypeKey, false);
-    }
 
-    public BucketEntityPre(RPlayer player, RWorldRef world, RBlockPos pos, RKey entityTypeKey, boolean isCancelled) {
+    public BucketEntityPre(RPlayer player, RLocation location, REntity entity, boolean isCancelled) {
         this.player = Objects.requireNonNull(player, "player");
-        this.world = Objects.requireNonNull(world, "world");
-        this.pos = Objects.requireNonNull(pos, "pos");
-        this.entityTypeKey = Objects.requireNonNull(entityTypeKey, "entityTypeKey");
+        this.location = Objects.requireNonNull(location, "location");
+        this.entity = Objects.requireNonNull(entity, "entity");
         setCancelled(isCancelled);
     }
 
@@ -35,15 +28,34 @@ public final class BucketEntityPre extends BaseCancellablePreEvent {
         return player;
     }
 
-    public RWorldRef world() {
-        return world;
+    public RLocation getLocation() {
+        return location;
     }
 
-    public RBlockPos pos() {
-        return pos;
+    /**
+     * Returns the live wrapper for the entity being captured into the bucket.
+     *
+     * @return the live entity
+     */
+    public REntity entity() {
+        return entity;
     }
 
+    /**
+     * Returns the entity type of the captured entity.
+     *
+     * @return the entity type
+     */
+    public REntityType entityType() {
+        return entity.requireType();
+    }
+
+    /**
+     * Returns the key of the captured entity's type.
+     *
+     * @return the entity type key
+     */
     public RKey entityTypeKey() {
-        return entityTypeKey;
+        return entity.typeKey();
     }
 }

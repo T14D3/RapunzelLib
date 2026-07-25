@@ -3,13 +3,21 @@ package de.t14d3.rapunzellib.events.block;
 import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.objects.RBlockPos;
-import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.RWorld;
+import de.t14d3.rapunzellib.objects.block.RBlock;
+import de.t14d3.rapunzellib.registry.RBlockType;
 
 /**
  * Utility class for dispatching block-related events via the {@link GameEventBus}.
  *
  * <p>Provides static helper methods for creating and dispatching block form, spread,
  * transform, and physics events from platform bridge code.</p>
+ *
+ * <p>Bridge callers typically only know the world key and the integer coordinates of
+ * the affected block together with the involved type keys. These helpers synthesize
+ * the live {@link RBlock} wrappers (via {@link RBlock#at(RWorld, RBlockPos)}) and
+ * resolve {@link RBlockType}s (via {@link RBlockType#require(RKey)}) before
+ * constructing the events.</p>
  */
 public final class BlockEventDispatchUtil {
     private BlockEventDispatchUtil() {
@@ -36,13 +44,21 @@ public final class BlockEventDispatchUtil {
             RKey newBlockKey,
             RKey sourceBlockKey
     ) {
-        BlockFormPre pre = new BlockFormPre(worldRef(worldKey), blockPos(x, y, z), newBlockKey, sourceBlockKey);
+        RBlockPos pos = blockPos(x, y, z);
+        RBlock block = blockAt(worldKey, pos);
+        BlockFormPre pre = new BlockFormPre(block, RBlockType.require(newBlockKey));
         bus.dispatchPre(pre);
         return pre.isDenied();
     }
 
     /**
      * Dispatches a {@link BlockSpreadPre} event and returns whether it was denied.
+     *
+     * <p>Note: the legacy signature only carries a single world+position plus the two
+     * type keys. The {@link BlockSpreadPre} event now requires two live {@link RBlock}
+     * wrappers, so this helper synthesizes both from the supplied world+position
+     * (the actual donor/source location must be supplied by future bridge revisions
+     * with richer coordinates).</p>
      *
      * @param bus           the event bus
      * @param worldKey      the world key
@@ -62,7 +78,13 @@ public final class BlockEventDispatchUtil {
             RKey newBlockKey,
             RKey sourceBlockKey
     ) {
-        BlockSpreadPre pre = new BlockSpreadPre(worldRef(worldKey), blockPos(x, y, z), newBlockKey, sourceBlockKey);
+        RBlockPos pos = blockPos(x, y, z);
+        RBlock block = blockAt(worldKey, pos);
+        // The legacy dispatch did not carry separate donor coordinates; synthesize a
+        // source block at the same position. Bridges with richer coordinates should
+        // construct BlockSpreadPre directly.
+        RBlock source = block;
+        BlockSpreadPre pre = new BlockSpreadPre(block, source);
         bus.dispatchPre(pre);
         return pre.isDenied();
     }
@@ -88,7 +110,9 @@ public final class BlockEventDispatchUtil {
             RKey originalBlockKey,
             RKey newBlockKey
     ) {
-        BlockTransformPre pre = new BlockTransformPre(worldRef(worldKey), blockPos(x, y, z), originalBlockKey, newBlockKey);
+        RBlockPos pos = blockPos(x, y, z);
+        RBlock block = blockAt(worldKey, pos);
+        BlockTransformPre pre = new BlockTransformPre(block, RBlockType.require(newBlockKey));
         bus.dispatchPre(pre);
         return pre.isDenied();
     }
@@ -122,13 +146,17 @@ public final class BlockEventDispatchUtil {
         boolean cancelled = false;
 
         if (needsPre) {
-            BlockPhysicsPre pre = new BlockPhysicsPre(worldRef(worldKey), blockPos(x, y, z), blockTypeKey, changedTypeKey);
+            RBlockPos pos = blockPos(x, y, z);
+            RBlock block = blockAt(worldKey, pos);
+            BlockPhysicsPre pre = new BlockPhysicsPre(block, RBlockType.require(changedTypeKey));
             bus.dispatchPre(pre);
             cancelled = pre.isDenied();
         }
 
         if (cancelled && needsPost) {
-            bus.dispatchPost(new BlockPhysicsPost(worldRef(worldKey), blockPos(x, y, z), blockTypeKey, changedTypeKey, true));
+            RBlockPos pos = blockPos(x, y, z);
+            RBlock block = blockAt(worldKey, pos);
+            bus.dispatchPost(new BlockPhysicsPost(block, RBlockType.require(changedTypeKey), true));
         }
 
         return cancelled;
@@ -156,14 +184,16 @@ public final class BlockEventDispatchUtil {
             RKey changedTypeKey,
             boolean cancelled
     ) {
-        bus.dispatchPost(new BlockPhysicsPost(worldRef(worldKey), blockPos(x, y, z), blockTypeKey, changedTypeKey, cancelled));
-    }
-
-    private static RWorldRef worldRef(RKey worldKey) {
-        return new RWorldRef(worldKey.asString(), worldKey);
+        RBlockPos pos = blockPos(x, y, z);
+        RBlock block = blockAt(worldKey, pos);
+        bus.dispatchPost(new BlockPhysicsPost(block, RBlockType.require(changedTypeKey), cancelled));
     }
 
     private static RBlockPos blockPos(int x, int y, int z) {
         return new RBlockPos(x, y, z);
+    }
+
+    private static RBlock blockAt(RKey worldKey, RBlockPos pos) {
+        return RBlock.at(RWorld.require(worldKey), pos);
     }
 }

@@ -149,17 +149,19 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         // #endif
         RWorldRef worldRef = new RWorldRef(null, worldKey);
         RKey placedKey = RKey.of(BuiltInRegistries.BLOCK.getKey(event.getPlacedBlock().getBlock()).toString());
+        RWorld rWorld = Rapunzel.worlds().require(level);
+        RBlock placeBlock = Rapunzel.blocks().at(rWorld, rPos);
         boolean cancelled = event.isCanceled();
 
         if (needsPre) {
-            BlockPlacePre pre = new BlockPlacePre(rPlayer, worldRef, rPos, placedKey, cancelled);
+            BlockPlacePre pre = new BlockPlacePre(rPlayer, placeBlock, cancelled);
             bus.dispatchPre(pre);
             cancelled = pre.isDenied();
             if (cancelled) event.setCanceled(true);
         }
 
         if (cancelled) {
-            if (needsPost) bus.dispatchPost(new BlockPlacePost(rPlayer, worldRef, rPos, placedKey, true));
+            if (needsPost) bus.dispatchPost(new BlockPlacePost(rPlayer, placeBlock, true));
             if (needsAsync) bus.dispatchAsync(new BlockPlaceSnapshot(rPlayer.uuid(), worldRef, rPos, placedKey, true));
             return;
         }
@@ -167,7 +169,7 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         if (!needsPost && !needsAsync) return;
         UUID uuid = rPlayer.uuid();
         level.getServer().execute(() -> {
-            if (needsPost) bus.dispatchPost(new BlockPlacePost(rPlayer, worldRef, rPos, placedKey, false));
+            if (needsPost) bus.dispatchPost(new BlockPlacePost(rPlayer, placeBlock, false));
             if (needsAsync) bus.dispatchAsync(new BlockPlaceSnapshot(uuid, worldRef, rPos, placedKey, false));
         });
     }

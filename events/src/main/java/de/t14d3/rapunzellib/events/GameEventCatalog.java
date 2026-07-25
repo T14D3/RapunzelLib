@@ -3,6 +3,7 @@ package de.t14d3.rapunzellib.events;
 import de.t14d3.rapunzellib.events.block.BlockBreakPost;
 import de.t14d3.rapunzellib.events.block.BlockBreakPre;
 import de.t14d3.rapunzellib.events.block.BlockBreakSnapshot;
+import de.t14d3.rapunzellib.events.block.BlockDestroyPre;
 import de.t14d3.rapunzellib.events.block.BlockFormPre;
 import de.t14d3.rapunzellib.events.block.BlockPhysicsPost;
 import de.t14d3.rapunzellib.events.block.BlockPhysicsPre;
@@ -58,6 +59,7 @@ final class GameEventCatalog {
         BlockBreakPre.class,
         BlockBreakPost.class,
         BlockBreakSnapshot.class,
+        BlockDestroyPre.class,
         BlockPlacePre.class,
         BlockPlacePost.class,
         BlockPlaceSnapshot.class,

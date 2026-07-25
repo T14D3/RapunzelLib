@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.events.paper;
 
 import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.common.objects.KeyedLruCache;
 import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.block.*;
@@ -15,6 +16,7 @@ import de.t14d3.rapunzellib.events.player.*;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.WorldLoadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
+import de.t14d3.rapunzellib.events.world.ExplosionSourceKind;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RKey;
@@ -22,6 +24,10 @@ import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.objects.block.RBlock;
+import de.t14d3.rapunzellib.registry.RBlockType;
+import com.destroystokyo.paper.event.block.BlockDestroyEvent;
+import de.t14d3.rapunzellib.registry.REntityType;
+import de.t14d3.rapunzellib.registry.RItemType;
 import io.papermc.paper.event.entity.EntityMoveEvent;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -47,12 +53,16 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 
+@SuppressWarnings("DefaultAnnotationParam")
 final class PaperGameEventsBridge implements Listener, GameEventBridge {
     private final JavaPlugin plugin;
     private final GameEventBus bus;
 
     /** Cache of Bukkit {@link World} to {@link RWorldRef}, avoiding repeated key resolution. */
     private final ConcurrentHashMap<World, RWorldRef> worldRefCache = new ConcurrentHashMap<>();
+
+    // Bukkit<->RLib location cache
+    private final KeyedLruCache<Location, RLocation> locationCache = new KeyedLruCache<>(1000);
 
     PaperGameEventsBridge(JavaPlugin plugin, GameEventBus bus) {
         this.plugin = plugin;
@@ -72,6 +82,13 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     private RWorldRef worldRef(World world) {
         return worldRefCache.computeIfAbsent(world, w ->
             new RWorldRef(w.getName(), RKey.of(w.getKey().toString())));
+    }
+
+    private RLocation fromBukkit(Location location) {
+        return locationCache.getOrCreate(location, loc -> {
+            RWorldRef worldRef = worldRef(loc.getWorld());
+            return new RLocation(worldRef, loc.getX(), loc.getY(), loc.getZ(), loc.getYaw(), loc.getPitch());
+        });
     }
 
     /** Convenience overload extracting the world from a {@link Location}. */
@@ -118,7 +135,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         RPlayer player = Rapunzel.players().require(event.getPlayer());
         RBlock block = Rapunzel.blocks().require(event.getBlockPlaced());
 
-        BlockPlacePre pre = new BlockPlacePre(player, block.world().ref(), block.pos(), block.typeKey(), event.isCancelled());
+        BlockPlacePre pre = new BlockPlacePre(player, block, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -135,12 +152,8 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         RBlock block = Rapunzel.blocks().require(event.getBlockPlaced());
         boolean cancelled = event.isCancelled();
 
-        RWorldRef world = block.world().ref();
-        RBlockPos pos = block.pos();
-        RKey typeKey = block.typeKey();
-
         if (needsPost) {
-            bus.dispatchPost(new BlockPlacePost(player, world, pos, typeKey, cancelled));
+            bus.dispatchPost(new BlockPlacePost(player, block, cancelled));
         }
         if (needsAsync) {
             bus.dispatchAsync(BlockPlaceSnapshot.capture(player.uuid(), block, cancelled));
@@ -244,13 +257,10 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     public void onEntitySpawnPre(CreatureSpawnEvent event) {
         if (!bus.hasPreListeners(EntitySpawnPre.class)) return;
 
-        Location loc = event.getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey typeKey = RKey.of(event.getEntityType().getKey().toString());
+        REntityType type = REntityType.require(RKey.of(event.getEntityType().getKey().namespace(), event.getEntityType().getKey().value()));
         String reason = event.getSpawnReason().name();
 
-        EntitySpawnPre pre = new EntitySpawnPre(world, pos, typeKey, reason, event.isCancelled());
+        EntitySpawnPre pre = new EntitySpawnPre(fromBukkit(event.getLocation()), type, reason, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -268,13 +278,15 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (event instanceof CreatureSpawnEvent) return;
         if (!bus.hasPreListeners(EntitySpawnPre.class)) return;
 
-        Location loc = event.getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey typeKey = RKey.of(event.getEntityType().getKey().toString());
-        String reason = "UNKNOWN";
-
-        EntitySpawnPre pre = new EntitySpawnPre(world, pos, typeKey, reason, event.isCancelled());
+        EntitySpawnPre pre = new EntitySpawnPre(
+                fromBukkit(event.getLocation()),
+                REntityType.require(RKey.of(
+                        event.getEntityType().getKey().namespace(),
+                        event.getEntityType().getKey().value()
+                )),
+                "UNKNOWN",
+                event.isCancelled()
+        );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -326,13 +338,12 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPostListeners(EntityMovePost.class)) return;
 
         var entity = Rapunzel.entities().require(event.getEntity());
-        Location from = event.getFrom();
-        Location to = event.getTo();
-        RWorldRef world = new RWorldRef(from.getWorld().getName(), from.getWorld().getKey().toString());
-        RLocation fromLoc = new RLocation(world, from.getX(), from.getY(), from.getZ(), from.getYaw(), from.getPitch());
-        RLocation toLoc = new RLocation(world, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
 
-        bus.dispatchPost(new EntityMovePost(entity.uuid(), entity.typeKey(), fromLoc, toLoc));
+        bus.dispatchPost(new EntityMovePost(
+                entity,
+                fromBukkit(event.getFrom()),
+                fromBukkit(event.getTo())
+        ));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -340,13 +351,12 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPostListeners(EntityTeleportPost.class)) return;
 
         var entity = Rapunzel.entities().require(event.getEntity());
-        Location from = event.getFrom();
-        Location to = event.getTo();
-        RWorldRef world = new RWorldRef(from.getWorld().getName(), from.getWorld().getKey().toString());
-        RLocation fromLoc = new RLocation(world, from.getX(), from.getY(), from.getZ(), from.getYaw(), from.getPitch());
-        RLocation toLoc = new RLocation(world, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
 
-        bus.dispatchPost(new EntityTeleportPost(entity.uuid(), entity.typeKey(), fromLoc, toLoc));
+        bus.dispatchPost(new EntityTeleportPost(
+                entity,
+                fromBukkit(event.getFrom()),
+                fromBukkit(event.getTo())
+        ));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -355,13 +365,12 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
         for (org.bukkit.entity.Entity passenger : event.getVehicle().getPassengers()) {
             var entity = Rapunzel.entities().require(passenger);
-            Location from = event.getFrom();
-            Location to = event.getTo();
-            RWorldRef world = new RWorldRef(from.getWorld().getName(), from.getWorld().getKey().toString());
-            RLocation fromLoc = new RLocation(world, from.getX(), from.getY(), from.getZ(), from.getYaw(), from.getPitch());
-            RLocation toLoc = new RLocation(world, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
 
-            bus.dispatchPost(new EntityMovePost(entity.uuid(), entity.typeKey(), fromLoc, toLoc));
+            bus.dispatchPost(new EntityMovePost(
+                    entity,
+                    fromBukkit(event.getFrom()),
+                    fromBukkit(event.getTo())
+            ));
         }
     }
 
@@ -369,14 +378,11 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     public void onTntPrimePre(TNTPrimeEvent event) {
         if (!bus.hasPreListeners(TntPrimePre.class)) return;
 
-        Location loc = event.getBlock().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey blockTypeKey = RKey.of(event.getBlock().getType().getKey().toString());
+        RBlock block = Rapunzel.blocks().require(event.getBlock());
         String cause = event.getCause().name();
         RPlayer player = event.getPrimingEntity() instanceof org.bukkit.entity.Player p ? Rapunzel.players().require(p) : null;
 
-        TntPrimePre pre = new TntPrimePre(world, pos, blockTypeKey, cause, player, event.isCancelled());
+        TntPrimePre pre = new TntPrimePre(block, cause, player, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -387,17 +393,15 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     public void onEntityExplodePre(EntityExplodeEvent event) {
         if (!bus.hasPreListeners(ExplosionPre.class)) return;
 
-        Location loc = event.getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos origin = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
         String sourceTypeKey = event.getEntityType().getKey().toString();
+        RLocation origin = fromBukkit(event.getLocation());
 
         List<RBlockPos> affected = new ArrayList<>();
         for (var b : event.blockList()) {
             affected.add(new RBlockPos(b.getX(), b.getY(), b.getZ()));
         }
 
-        ExplosionPre pre = new ExplosionPre(world, origin, sourceTypeKey, affected, event.isCancelled());
+        ExplosionPre pre = new ExplosionPre(origin, sourceTypeKey, ExplosionSourceKind.ENTITY, affected, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -415,9 +419,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     public void onBlockExplodePre(BlockExplodeEvent event) {
         if (!bus.hasPreListeners(ExplosionPre.class)) return;
 
-        Location loc = event.getBlock().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos origin = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+        RLocation origin = fromBukkit(event.getBlock().getLocation());
         String sourceTypeKey = event.getExplodedBlockState().getType().getKey().toString();
 
         List<RBlockPos> affected = new ArrayList<>();
@@ -425,7 +427,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
             affected.add(new RBlockPos(b.getX(), b.getY(), b.getZ()));
         }
 
-        ExplosionPre pre = new ExplosionPre(world, origin, sourceTypeKey, affected, event.isCancelled());
+        ExplosionPre pre = new ExplosionPre(origin, sourceTypeKey, ExplosionSourceKind.BLOCK, affected, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -444,12 +446,9 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPreListeners(BucketFillPre.class)) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
-        Location loc = event.getBlockClicked().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey blockTypeKey = RKey.of(event.getBlockClicked().getType().getKey().toString());
+        RBlock block = Rapunzel.blocks().require(event.getBlockClicked());
 
-        BucketFillPre pre = new BucketFillPre(player, world, pos, blockTypeKey, event.isCancelled());
+        BucketFillPre pre = new BucketFillPre(player, block, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -461,12 +460,9 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPreListeners(BucketEmptyPre.class)) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
-        Location loc = event.getBlockClicked().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        String bucketTypeKey = event.getBucket().getKey().toString();
+        RItemType type = RItemType.require(RKey.of(event.getBucket().key().namespace(), event.getBucket().key().value()));
 
-        BucketEmptyPre pre = new BucketEmptyPre(player, world, pos, bucketTypeKey, event.isCancelled());
+        BucketEmptyPre pre = new BucketEmptyPre(player, fromBukkit(event.getBlock().getLocation()), type, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -478,12 +474,9 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPreListeners(BucketEntityPre.class)) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
-        Location loc = event.getEntity().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey entityTypeKey = RKey.of(event.getEntity().getType().getKey().toString());
+        var entity = Rapunzel.entities().require(event.getEntity());
 
-        BucketEntityPre pre = new BucketEntityPre(player, world, pos, entityTypeKey, event.isCancelled());
+        BucketEntityPre pre = new BucketEntityPre(player, fromBukkit(event.getEntity().getLocation()), entity, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -496,12 +489,9 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (event.getPlayer() == null) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
-        Location loc = event.getEntity().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey typeKey = RKey.of(event.getEntity().getType().getKey().toString());
+        RBlock block = Rapunzel.blocks().require(event.getEntity().getLocation().getBlock());
 
-        BlockPlacePre pre = new BlockPlacePre(player, world, pos, typeKey, event.isCancelled());
+        BlockPlacePre pre = new BlockPlacePre(player, block, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -529,12 +519,9 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (event.getPlayer() == null) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
-        Location loc = event.getEntity().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey typeKey = RKey.of(event.getEntityType().getKey().toString());
+        RBlock block = Rapunzel.blocks().require(event.getEntity().getLocation().getBlock());
 
-        BlockPlacePre pre = new BlockPlacePre(player, world, pos, typeKey, event.isCancelled());
+        BlockPlacePre pre = new BlockPlacePre(player, block, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -559,13 +546,10 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     public void onBlockPhysicsPre(BlockPhysicsEvent event) {
         if (!bus.hasPreListeners(BlockPhysicsPre.class)) return;
 
-        Location loc = event.getBlock().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey blockTypeKey = RKey.of(event.getBlock().getType().getKey().toString());
+        RBlock block = Rapunzel.blocks().require(event.getBlock());
         // getChangedType() returns the Material (block type) that changed, triggering this physics update
         RKey changedTypeKey = RKey.of(event.getChangedType().getKey().toString());
-        BlockPhysicsPre pre = new BlockPhysicsPre(world, pos, blockTypeKey, changedTypeKey, event.isCancelled());
+        BlockPhysicsPre pre = new BlockPhysicsPre(block, changedTypeKey, event.isCancelled());
         bus.dispatchPre(pre);
 
         if (pre.isDenied()) {
@@ -577,25 +561,50 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     public void onBlockPhysicsPost(BlockPhysicsEvent event) {
         if (!bus.hasPostListeners(BlockPhysicsPost.class)) return;
 
-        Location loc = event.getBlock().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey blockTypeKey = RKey.of(event.getBlock().getType().getKey().toString());
-        RKey changedTypeKey = RKey.of(event.getChangedType().getKey().toString());
-        bus.dispatchPost(new BlockPhysicsPost(world, pos, blockTypeKey, changedTypeKey, event.isCancelled()));
+        RBlock block = Rapunzel.blocks().require(event.getBlock());
+        RBlockType changedType = RBlockType.require(RKey.of(event.getChangedType().getKey().toString()));
+        bus.dispatchPost(new BlockPhysicsPost(block, changedType, event.isCancelled()));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onBlockFormPre(BlockFormEvent event) {
         if (!bus.hasPreListeners(BlockFormPre.class)) return;
 
-        Location loc = event.getBlock().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+        RBlock block = Rapunzel.blocks().require(event.getBlock());
         RKey newBlockTypeKey = RKey.of(event.getNewState().getType().getKey().toString());
-        RKey sourceBlockTypeKey = RKey.of(event.getBlock().getType().getKey().toString());
 
-        BlockFormPre pre = new BlockFormPre(world, pos, newBlockTypeKey, sourceBlockTypeKey, event.isCancelled());
+        BlockFormPre pre = new BlockFormPre(block, newBlockTypeKey, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBlockDestroyPre(BlockDestroyEvent event) {
+        if (!bus.hasPreListeners(BlockDestroyPre.class)) return;
+
+        RBlock block = Rapunzel.blocks().require(event.getBlock());
+        RKey replacementTypeKey = RKey.of(event.getNewState().getMaterial().getKey().toString());
+
+        BlockDestroyPre pre = new BlockDestroyPre(block, replacementTypeKey, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBlockBurnPre(BlockBurnEvent event) {
+        if (!bus.hasPreListeners(BlockDestroyPre.class)) return;
+
+        RBlock block = Rapunzel.blocks().require(event.getBlock());
+        // Fire always replaces the burned block with air (or the fluid
+        // state if waterlogged, but the DESTROY flag only cares about the
+        // block being destroyed, not the replacement).
+        RKey replacementTypeKey = RKey.of("minecraft:air");
+
+        BlockDestroyPre pre = new BlockDestroyPre(block, replacementTypeKey, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -606,13 +615,10 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     public void onBlockSpreadPre(BlockSpreadEvent event) {
         if (!bus.hasPreListeners(BlockSpreadPre.class)) return;
 
-        Location loc = event.getBlock().getLocation();
-        RWorldRef world = worldRef(loc.getWorld());
-        RBlockPos pos = new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
-        RKey newBlockTypeKey = RKey.of(event.getNewState().getType().getKey().toString());
-        RKey sourceBlockTypeKey = RKey.of(event.getSource().getType().getKey().toString());
+        RBlock block = Rapunzel.blocks().require(event.getBlock());
+        RBlock source = Rapunzel.blocks().require(event.getSource());
 
-        BlockSpreadPre pre = new BlockSpreadPre(world, pos, newBlockTypeKey, sourceBlockTypeKey, event.isCancelled());
+        BlockSpreadPre pre = new BlockSpreadPre(block, source, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -702,14 +708,8 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         }
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
-        Location from = event.getFrom();
-        Location to = event.getTo();
 
-        RWorldRef world = new RWorldRef(from.getWorld().getName(), from.getWorld().getKey().toString());
-        RLocation fromLoc = new RLocation(world, from.getX(), from.getY(), from.getZ(), from.getYaw(), from.getPitch());
-        RLocation toLoc = new RLocation(world, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
-
-        PlayerMovePre pre = new PlayerMovePre(player, fromLoc, toLoc, event.isCancelled());
+        PlayerMovePre pre = new PlayerMovePre(player, fromBukkit(event.getFrom()), fromBukkit(event.getTo()), event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -728,15 +728,8 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
             return;
         }
 
-        UUID uuid = event.getPlayer().getUniqueId();
-        String name = event.getPlayer().getName();
-        Location from = event.getFrom();
-        Location to = event.getTo();
+        RPlayer player = Rapunzel.players().require(event.getPlayer());
 
-        RWorldRef world = new RWorldRef(from.getWorld().getName(), from.getWorld().getKey().toString());
-        RLocation fromLoc = new RLocation(world, from.getX(), from.getY(), from.getZ(), from.getYaw(), from.getPitch());
-        RLocation toLoc = new RLocation(world, to.getX(), to.getY(), to.getZ(), to.getYaw(), to.getPitch());
-
-        bus.dispatchPost(new PlayerMovePost(uuid, name, fromLoc, toLoc));
+        bus.dispatchPost(new PlayerMovePost(player, fromBukkit(event.getFrom()), fromBukkit(event.getTo()), event.isCancelled()));
     }
 }

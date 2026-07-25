@@ -1,13 +1,15 @@
 package de.t14d3.rapunzellib.events.fabric.mixin;
 
+import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.shared.mixin.SharedMixinEventsBridge;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.RWorld;
 import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.block.RBlock;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.TntBlock;
 
@@ -42,11 +44,11 @@ public class TntPrimeMixin {
         // #else
         String worldId = level.dimension().location().toString();
         // #endif
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
+        RWorld rWorld = Rapunzel.worlds().require(level);
         RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
-        String blockTypeKey = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()).toString();
+        RBlock block = Rapunzel.blocks().at(rWorld, rPos);
 
-        TntPrimePre pre = new TntPrimePre(worldRef, rPos, blockTypeKey, "EXPLOSION", null);
+        TntPrimePre pre = new TntPrimePre(block, "EXPLOSION", null);
         bus.dispatchPre(pre);
 
         if (pre.isDenied()) {

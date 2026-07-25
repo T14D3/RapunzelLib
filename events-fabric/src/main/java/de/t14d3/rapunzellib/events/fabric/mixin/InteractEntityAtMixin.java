@@ -16,8 +16,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Entity.class)
 public abstract class InteractEntityAtMixin {
-    @Inject(method = "interactAt", at = @At("RETURN"))
-    private void onInteractEntityAtPost(Player player, Vec3 hitPos, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
+    @Inject(method = "interact", at = @At("RETURN"))
+    private void onInteractEntityAtPost(Player player, InteractionHand hand, Vec3 location, CallbackInfoReturnable<InteractionResult> cir) {
         GameEventBus bus = SharedMixinEventsBridge.bus();
         if (bus == null) return;
         if (!(player instanceof ServerPlayer serverPlayer)) return;

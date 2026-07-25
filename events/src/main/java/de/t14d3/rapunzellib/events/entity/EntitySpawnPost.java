@@ -7,6 +7,7 @@ import de.t14d3.rapunzellib.objects.REntity;
 import de.t14d3.rapunzellib.objects.RLivingEntity;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import de.t14d3.rapunzellib.objects.snapshot.REntitySnapshot;
+import de.t14d3.rapunzellib.registry.REntityType;
 
 import java.util.Optional;
 
@@ -39,6 +40,15 @@ public record EntitySpawnPost(
 
     public RKey entityTypeKey() {
         return snapshot.entityTypeKey();
+    }
+
+    /**
+     * Returns the typed entity type wrapper, resolved from the live entity.
+     *
+     * @return the entity type
+     */
+    public REntityType entityType() {
+        return entity.requireType();
     }
 
     public Optional<RLivingEntity> livingEntity() {

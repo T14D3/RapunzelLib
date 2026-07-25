@@ -3,7 +3,9 @@ package de.t14d3.rapunzellib.events.entity;
 import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.BaseCancellablePreEvent;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.registry.REntityType;
 
 import java.util.Objects;
 
@@ -12,35 +14,43 @@ import java.util.Objects;
  *
  * <p>This event is cancellable. If denied, the entity will not spawn.
  * Contains the world, position, entity type, and spawn reason.</p>
+ *
+ * <p>The entity has not been spawned yet at the time this event fires, so a
+ * live {@code REntity} wrapper is not available. The entity type is carried as
+ * a typed {@link REntityType} wrapper instead.</p>
  */
 public final class EntitySpawnPre extends BaseCancellablePreEvent {
-    private final RWorldRef world;
-    private final RBlockPos pos;
-    private final RKey entityTypeKey;
+    private final RLocation location;
+    private final REntityType entityType;
     private final String reason;
 
-    public EntitySpawnPre(RWorldRef world, RBlockPos pos, RKey entityTypeKey, String reason) {
-        this(world, pos, entityTypeKey, reason, false);
-    }
-
-    public EntitySpawnPre(RWorldRef world, RBlockPos pos, RKey entityTypeKey, String reason, boolean isCancelled) {
-        this.world = Objects.requireNonNull(world, "world");
-        this.pos = Objects.requireNonNull(pos, "pos");
-        this.entityTypeKey = Objects.requireNonNull(entityTypeKey, "entityTypeKey");
+    public EntitySpawnPre(RLocation location, REntityType entityType, String reason, boolean isCancelled) {
+        this.location = Objects.requireNonNull(location, "location");
+        this.entityType = Objects.requireNonNull(entityType, "entityType");
         this.reason = Objects.requireNonNull(reason, "reason");
         setCancelled(isCancelled);
     }
 
-    public RWorldRef world() {
-        return world;
+    public RLocation location() {
+        return this.location;
     }
 
-    public RBlockPos pos() {
-        return pos;
+    /**
+     * Returns the typed entity type wrapper.
+     *
+     * @return the entity type
+     */
+    public REntityType entityType() {
+        return entityType;
     }
 
+    /**
+     * Returns the entity type key.
+     *
+     * @return the entity type key
+     */
     public RKey entityTypeKey() {
-        return entityTypeKey;
+        return entityType.key();
     }
 
     /**
