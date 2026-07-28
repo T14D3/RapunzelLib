@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.events.shared;
 
 import de.t14d3.rapunzellib.events.GameEventSupportManifest;
+import de.t14d3.rapunzellib.events.block.BlockDestroyPre;
 import de.t14d3.rapunzellib.events.block.BlockFormPre;
 import de.t14d3.rapunzellib.events.block.BlockPhysicsPost;
 import de.t14d3.rapunzellib.events.block.BlockPhysicsPre;
@@ -39,7 +40,7 @@ public final class SharedGameEventSupportManifests {
     }
 
     /**
-     * Adds block mixin emulated support events (physics, spread, form, transform).
+     * Adds block mixin emulated support events (physics, spread, form, transform, destroy).
      *
      * @param builder the manifest builder
      * @param details a description of the support
@@ -57,7 +58,8 @@ public final class SharedGameEventSupportManifests {
             BlockPhysicsPost.class,
             BlockSpreadPre.class,
             BlockFormPre.class,
-            BlockTransformPre.class
+            BlockTransformPre.class,
+            BlockDestroyPre.class
         );
     }
 }

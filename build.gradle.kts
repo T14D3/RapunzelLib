@@ -6,7 +6,6 @@ import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.Exec
 import org.jetbrains.gradle.ext.settings
 import org.jetbrains.gradle.ext.taskTriggers
-import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.bundling.Zip
 import java.util.Properties
 import java.util.concurrent.Executors

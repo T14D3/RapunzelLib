@@ -1,7 +1,6 @@
 package de.t14d3.rapunzellib.events.paper;
 
 import de.t14d3.rapunzellib.Rapunzel;
-import de.t14d3.rapunzellib.common.objects.KeyedLruCache;
 import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.block.*;
@@ -23,11 +22,20 @@ import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorldRef;
+import de.t14d3.rapunzellib.objects.WrapperStore;
 import de.t14d3.rapunzellib.objects.block.RBlock;
 import de.t14d3.rapunzellib.registry.RBlockType;
 import com.destroystokyo.paper.event.block.BlockDestroyEvent;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.RItemType;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickType;
+import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
+import de.t14d3.rapunzellib.inventory.InventoryFeatures;
+import de.t14d3.rapunzellib.inventory.RInventory;
 import io.papermc.paper.event.entity.EntityMoveEvent;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -37,6 +45,9 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.*;
 import org.bukkit.event.entity.*;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingPlaceEvent;
 import org.bukkit.event.player.*;
@@ -50,7 +61,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 
 @SuppressWarnings("DefaultAnnotationParam")
@@ -58,11 +68,11 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     private final JavaPlugin plugin;
     private final GameEventBus bus;
 
-    /** Cache of Bukkit {@link World} to {@link RWorldRef}, avoiding repeated key resolution. */
-    private final ConcurrentHashMap<World, RWorldRef> worldRefCache = new ConcurrentHashMap<>();
-
-    // Bukkit<->RLib location cache
-    private final KeyedLruCache<Location, RLocation> locationCache = new KeyedLruCache<>(1000);
+    /**
+     * Lazily resolved {@link WrapperStore}, providing cached
+     * {@link RWorldRef} and {@link RLocation} resolution for Bukkit handles.
+     */
+    private WrapperStore wrapperStore;
 
     PaperGameEventsBridge(JavaPlugin plugin, GameEventBus bus) {
         this.plugin = plugin;
@@ -78,17 +88,26 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         HandlerList.unregisterAll(this);
     }
 
+    /** Returns the registered {@link WrapperStore}, resolved lazily on first use. */
+    private WrapperStore wrapperStore() {
+        if (wrapperStore == null) {
+            wrapperStore = WrapperStore.current();
+            if (wrapperStore == null) {
+                throw new IllegalStateException("No WrapperStore registered in the active context");
+            }
+        }
+        return wrapperStore;
+    }
+
     /** Returns a cached {@link RWorldRef} for the given Bukkit {@link World}. */
     private RWorldRef worldRef(World world) {
-        return worldRefCache.computeIfAbsent(world, w ->
-            new RWorldRef(w.getName(), RKey.of(w.getKey().toString())));
+        return wrapperStore().worldRef(world).orElseThrow(() ->
+            new IllegalArgumentException("Unsupported native world type: " + world));
     }
 
     private RLocation fromBukkit(Location location) {
-        return locationCache.getOrCreate(location, loc -> {
-            RWorldRef worldRef = worldRef(loc.getWorld());
-            return new RLocation(worldRef, loc.getX(), loc.getY(), loc.getZ(), loc.getYaw(), loc.getPitch());
-        });
+        return wrapperStore().location(location).orElseThrow(() ->
+            new IllegalArgumentException("Unsupported native location type: " + location));
     }
 
     /** Convenience overload extracting the world from a {@link Location}. */
@@ -731,5 +750,89 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         RPlayer player = Rapunzel.players().require(event.getPlayer());
 
         bus.dispatchPost(new PlayerMovePost(player, fromBukkit(event.getFrom()), fromBukkit(event.getTo()), event.isCancelled()));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onInventoryOpenPre(InventoryOpenEvent event) {
+        if (!(event.getPlayer() instanceof org.bukkit.entity.Player player)) return;
+        if (!bus.hasPreListeners(InventoryOpenPre.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+
+        InventoryOpenPre pre = new InventoryOpenPre(rPlayer, rInventory);
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onInventoryOpenPost(InventoryOpenEvent event) {
+        if (!(event.getPlayer() instanceof org.bukkit.entity.Player player)) return;
+        if (!bus.hasPostListeners(InventoryOpenPost.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+
+        bus.dispatchPost(new InventoryOpenPost(rPlayer, rInventory));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onInventoryClosePost(InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof org.bukkit.entity.Player player)) return;
+        if (!bus.hasPostListeners(InventoryClosePost.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+
+        bus.dispatchPost(new InventoryClosePost(rPlayer, rInventory));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onInventoryClickPre(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+        if (!bus.hasPreListeners(InventoryClickPre.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        int slot = event.getRawSlot();
+        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+        InventoryClickType clickType = mapBukkitClick(event.getClick());
+
+        InventoryClickPre pre = new InventoryClickPre(rPlayer, rInventory, slot, clickType, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onInventoryClickPost(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+        if (!bus.hasPostListeners(InventoryClickPost.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        int slot = event.getRawSlot();
+        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+        InventoryClickType clickType = mapBukkitClick(event.getClick());
+
+        bus.dispatchPost(new InventoryClickPost(rPlayer, rInventory, slot, clickType, event.isCancelled()));
+    }
+
+    private static InventoryClickType mapBukkitClick(org.bukkit.event.inventory.ClickType bukkitClick) {
+        if (bukkitClick == null) return InventoryClickType.UNKNOWN;
+        return switch (bukkitClick) {
+            case LEFT -> InventoryClickType.LEFT;
+            case RIGHT -> InventoryClickType.RIGHT;
+            case SHIFT_LEFT -> InventoryClickType.SHIFT_LEFT;
+            case SHIFT_RIGHT -> InventoryClickType.SHIFT_RIGHT;
+            case MIDDLE -> InventoryClickType.MIDDLE;
+            case DOUBLE_CLICK -> InventoryClickType.DOUBLE_CLICK;
+            case DROP -> InventoryClickType.DROP;
+            case CONTROL_DROP -> InventoryClickType.CONTROL_DROP;
+            case NUMBER_KEY -> InventoryClickType.NUMBER_KEY_1;
+            case SWAP_OFFHAND -> InventoryClickType.SWAP_OFFHAND;
+            default -> InventoryClickType.UNKNOWN;
+        };
     }
 }

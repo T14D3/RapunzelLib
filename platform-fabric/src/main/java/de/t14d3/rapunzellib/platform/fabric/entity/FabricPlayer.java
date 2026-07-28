@@ -1,6 +1,7 @@
 package de.t14d3.rapunzellib.platform.fabric.entity;
 
 import de.t14d3.rapunzellib.PlatformId;
+import de.t14d3.rapunzellib.platform.shared.attachments.SharedAttachmentService;
 import de.t14d3.rapunzellib.platform.shared.entity.SharedServerPlayerBase;
 import net.kyori.adventure.audience.Audience;
 import net.minecraft.server.level.ServerPlayer;
@@ -9,11 +10,11 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 
 final class FabricPlayer extends SharedServerPlayerBase {
-    FabricPlayer(ServerPlayer handle, FabricWorlds worlds) {
+    FabricPlayer(ServerPlayer handle, @NotNull SharedAttachmentService attachmentService, FabricWorlds worlds) {
         super(
             PlatformId.FABRIC,
             Objects.requireNonNull(handle, "handle"),
-            de.t14d3.rapunzellib.attachments.RAttachmentContainer.lazyMutable(),
+            attachmentService.forPlayer(handle),
             Objects.requireNonNull(worlds, "worlds")
         );
     }

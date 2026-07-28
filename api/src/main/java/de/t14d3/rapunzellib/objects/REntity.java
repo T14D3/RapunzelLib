@@ -122,6 +122,11 @@ public interface REntity extends RNative {
         return Rapunzel.entities().wrap(nativeEntity);
     }
 
+    /** Wraps a native platform entity object into an REntity, throwing if not possible. */
+    static @NotNull REntity of(@NotNull Object nativeEntity) {
+        return Rapunzel.entities().require(nativeEntity);
+    }
+
     /** Returns the custom name of this entity, if set. */
     @NotNull Optional<String> getName();
 

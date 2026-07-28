@@ -50,6 +50,12 @@ public final class ModuleMatrix {
             "de.t14d3.rapunzellib.nbt.NbtFeatureInstaller",
             Map.of(SHARED_CORE_FAMILY_MOJANG, ":nbt-shared"),
             false
+        ),
+        new FeatureModuleSpec(
+            "visuals",
+            "de.t14d3.rapunzellib.visuals.VisualFeatureInstaller",
+            Map.of(SHARED_CORE_FAMILY_MOJANG, ":visuals-shared"),
+            false
         )
     );
 

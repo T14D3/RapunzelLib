@@ -12,7 +12,7 @@ public final class NeoForgeAttachmentFeatureInstaller implements AttachmentFeatu
     public @NotNull PlatformId platformId() { return PlatformId.NEOFORGE; }
 
     @Override
-    public @NotNull AttachmentSupport support() { return AttachmentFeatureInstallerSupport.serverTransientSupport(platformId()); }
+    public @NotNull AttachmentSupport support() { return AttachmentFeatureInstallerSupport.serverPersistentSupport(platformId()); }
 
     @Override
     public void install(@NotNull RapunzelContext context) { }

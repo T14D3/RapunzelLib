@@ -19,20 +19,36 @@ import de.t14d3.rapunzellib.events.entity.EntityHurtSnapshot;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
+import de.t14d3.rapunzellib.events.entity.EntityMovePost;
+import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockPost;
 import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
+import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
+import de.t14d3.rapunzellib.events.item.BucketEntityPre;
+import de.t14d3.rapunzellib.events.item.BucketFillPre;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
+import de.t14d3.rapunzellib.events.player.PlayerMovePost;
+import de.t14d3.rapunzellib.events.player.PlayerMovePre;
 import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.ExplosionSourceKind;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 import de.t14d3.rapunzellib.events.world.WorldLoadPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickType;
+import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
+import de.t14d3.rapunzellib.inventory.InventoryFeatures;
+import de.t14d3.rapunzellib.inventory.RInventory;
 import de.t14d3.rapunzellib.objects.block.RBlock;
 import de.t14d3.rapunzellib.registry.REntityType;
+import de.t14d3.rapunzellib.registry.RItemType;
 import org.spongepowered.api.ResourceKey;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
@@ -50,6 +66,8 @@ import org.spongepowered.api.event.block.InteractBlockEvent;
 import org.spongepowered.api.event.entity.AttackEntityEvent;
 import org.spongepowered.api.event.entity.DamageEntityEvent;
 import org.spongepowered.api.event.entity.InteractEntityEvent;
+import org.spongepowered.api.event.entity.ChangeEntityWorldEvent;
+import org.spongepowered.api.event.entity.MoveEntityEvent;
 import org.spongepowered.api.event.entity.SpawnEntityEvent;
 import org.spongepowered.api.event.entity.explosive.PrimeExplosiveEvent;
 import org.spongepowered.api.event.filter.IsCancelled;
@@ -58,10 +76,18 @@ import org.spongepowered.api.event.network.ServerSideConnectionEvent;
 import org.spongepowered.api.event.world.ExplosionEvent;
 import org.spongepowered.api.event.world.LoadWorldEvent;
 import org.spongepowered.api.event.world.chunk.ChunkEvent;
+import org.spongepowered.api.event.item.inventory.container.ClickContainerEvent;
+import org.spongepowered.api.event.item.inventory.container.InteractContainerEvent;
+import org.spongepowered.api.item.ItemType;
+import org.spongepowered.api.item.ItemTypes;
+import org.spongepowered.api.item.inventory.ItemStack;
+import org.spongepowered.api.item.inventory.ItemStackSnapshot;
+import org.spongepowered.api.item.inventory.Slot;
 import org.spongepowered.api.registry.RegistryTypes;
 import org.spongepowered.api.util.Tristate;
 import org.spongepowered.api.world.server.ServerLocation;
 import org.spongepowered.api.world.server.ServerWorld;
+import org.spongepowered.math.vector.Vector3d;
 import org.spongepowered.math.vector.Vector3i;
 import org.spongepowered.plugin.PluginContainer;
 
@@ -483,6 +509,264 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         }
     }
 
+    @Listener(order = Order.LAST)
+    public void onEntityTeleport(ChangeEntityWorldEvent.Reposition event) {
+        if (!bus.hasPostListeners(EntityTeleportPost.class)) return;
+
+        Entity entity = event.entity();
+        var rEntity = Rapunzel.entities().require(entity);
+
+        // Reposition inherits MoveEntityEvent, so positions are Vector3d
+        Vector3d fromPos = event.originalPosition();
+        Vector3d toPos = event.destinationPosition();
+
+        RWorldRef worldRef = Rapunzel.worlds().require(event.destinationWorld()).ref();
+        RLocation from = new RLocation(worldRef, fromPos.x(), fromPos.y(), fromPos.z());
+        RLocation to = new RLocation(worldRef, toPos.x(), toPos.y(), toPos.z());
+
+        bus.dispatchPost(new EntityTeleportPost(rEntity, from, to));
+    }
+
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onPlayerMovePre(MoveEntityEvent event) {
+        if (!bus.hasPreListeners(PlayerMovePre.class)) return;
+        if (!(event.entity() instanceof ServerPlayer player)) return;
+
+        Vector3d fromPos = event.originalPosition();
+        Vector3d toPos = event.destinationPosition();
+
+        // Ignore rotation-only and tiny movements to reduce event spam
+        if (Math.abs(fromPos.x() - toPos.x()) < 1.0
+                && Math.abs(fromPos.y() - toPos.y()) < 1.0
+                && Math.abs(fromPos.z() - toPos.z()) < 1.0) {
+            return;
+        }
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RWorldRef worldRef = Rapunzel.worlds().require(player.world()).ref();
+        RLocation from = new RLocation(worldRef, fromPos.x(), fromPos.y(), fromPos.z());
+        RLocation to = new RLocation(worldRef, toPos.x(), toPos.y(), toPos.z());
+
+        PlayerMovePre pre = new PlayerMovePre(rPlayer, from, to, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @Listener(order = Order.LAST)
+    @IsCancelled(value = Tristate.TRUE)
+    public void onPlayerMovePost(MoveEntityEvent event) {
+        if (!bus.hasPostListeners(PlayerMovePost.class)) return;
+        if (!(event.entity() instanceof ServerPlayer player)) return;
+
+        Vector3d fromPos = event.originalPosition();
+        Vector3d toPos = event.destinationPosition();
+
+        // Ignore tiny movements to reduce event spam
+        if (Math.abs(fromPos.x() - toPos.x()) < 1.0
+                && Math.abs(fromPos.y() - toPos.y()) < 1.0
+                && Math.abs(fromPos.z() - toPos.z()) < 1.0) {
+            return;
+        }
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RWorldRef worldRef = Rapunzel.worlds().require(player.world()).ref();
+        RLocation from = new RLocation(worldRef, fromPos.x(), fromPos.y(), fromPos.z());
+        RLocation to = new RLocation(worldRef, toPos.x(), toPos.y(), toPos.z());
+
+        bus.dispatchPost(new PlayerMovePost(rPlayer, from, to, event.isCancelled()));
+    }
+
+    @Listener(order = Order.LAST)
+    @IsCancelled(value = Tristate.TRUE)
+    public void onEntityMove(MoveEntityEvent event) {
+        if (!bus.hasPostListeners(EntityMovePost.class)) return;
+        // Player movement is published via onPlayerMovePost; skip here to avoid duplicates
+        if (event.entity() instanceof ServerPlayer) return;
+
+        Entity entity = event.entity();
+        var rEntity = Rapunzel.entities().require(entity);
+
+        Vector3d fromPos = event.originalPosition();
+        Vector3d toPos = event.destinationPosition();
+
+        // Only dispatch for significant movements (more than 0.5 block) to reduce spam
+        if (Math.abs(fromPos.x() - toPos.x()) < 0.5
+                && Math.abs(fromPos.y() - toPos.y()) < 0.5
+                && Math.abs(fromPos.z() - toPos.z()) < 0.5) {
+            return;
+        }
+
+        RWorldRef worldRef = Rapunzel.worlds().require(entity.world()).ref();
+        RLocation from = new RLocation(worldRef, fromPos.x(), fromPos.y(), fromPos.z());
+        RLocation to = new RLocation(worldRef, toPos.x(), toPos.y(), toPos.z());
+
+        bus.dispatchPost(new EntityMovePost(rEntity, from, to));
+    }
+
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onInventoryOpenPre(InteractContainerEvent.Open event) {
+        if (!(event.cause().first(ServerPlayer.class).orElse(null) instanceof ServerPlayer player)) return;
+        if (!bus.hasPreListeners(InventoryOpenPre.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().wrap(event.container()).orElse(null);
+        if (rInventory == null) return;
+
+        InventoryOpenPre pre = new InventoryOpenPre(rPlayer, rInventory);
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @Listener(order = Order.LAST)
+    public void onInventoryOpenPost(InteractContainerEvent.Open event) {
+        if (!(event.cause().first(ServerPlayer.class).orElse(null) instanceof ServerPlayer player)) return;
+        if (!bus.hasPostListeners(InventoryOpenPost.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().wrap(event.container()).orElse(null);
+        if (rInventory == null) return;
+
+        bus.dispatchPost(new InventoryOpenPost(rPlayer, rInventory));
+    }
+
+    @Listener(order = Order.LAST)
+    public void onInventoryClosePost(InteractContainerEvent.Close event) {
+        if (!(event.cause().first(ServerPlayer.class).orElse(null) instanceof ServerPlayer player)) return;
+        if (!bus.hasPostListeners(InventoryClosePost.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().wrap(event.container()).orElse(null);
+        if (rInventory == null) return;
+
+        bus.dispatchPost(new InventoryClosePost(rPlayer, rInventory));
+    }
+
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onInventoryClickPre(ClickContainerEvent event) {
+        if (!(event.cause().first(ServerPlayer.class).orElse(null) instanceof ServerPlayer player)) return;
+        if (!bus.hasPreListeners(InventoryClickPre.class)) return;
+
+        Optional<Slot> slotOpt = event.slot();
+        if (slotOpt.isEmpty()) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().wrap(event.container()).orElse(null);
+        if (rInventory == null) return;
+
+        int slot = slotIndex(event.container(), slotOpt.get());
+
+        InventoryClickPre pre = new InventoryClickPre(rPlayer, rInventory, slot, InventoryClickType.LEFT, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @Listener(order = Order.LAST)
+    public void onInventoryClickPost(ClickContainerEvent event) {
+        if (!(event.cause().first(ServerPlayer.class).orElse(null) instanceof ServerPlayer player)) return;
+        if (!bus.hasPostListeners(InventoryClickPost.class)) return;
+
+        Optional<Slot> slotOpt = event.slot();
+        if (slotOpt.isEmpty()) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().wrap(event.container()).orElse(null);
+        if (rInventory == null) return;
+
+        int slot = slotIndex(event.container(), slotOpt.get());
+
+        bus.dispatchPost(new InventoryClickPost(rPlayer, rInventory, slot, InventoryClickType.LEFT, event.isCancelled()));
+    }
+
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onBucketFillPre(InteractBlockEvent.Secondary event, @First ServerPlayer player) {
+        if (!bus.hasPreListeners(BucketFillPre.class)) return;
+
+        ItemType usedItemType = usedItemType(event);
+        if (usedItemType == null || !isBucketItem(usedItemType)) return;
+
+        // An empty bucket is "filling" only when the targeted block is a fluid source.
+        if (!isEmptyBucket(usedItemType)) return;
+
+        BlockSnapshot blockSnapshot = event.block();
+        if (blockSnapshot.state().fluidState().isEmpty()) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RBlock block = blockFromSnapshot(player.world(), blockSnapshot);
+
+        BucketFillPre pre = new BucketFillPre(rPlayer, block, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onBucketEmptyPre(InteractBlockEvent.Secondary event, @First ServerPlayer player) {
+        if (!bus.hasPreListeners(BucketEmptyPre.class)) return;
+
+        ItemType usedItemType = usedItemType(event);
+        if (usedItemType == null || !isBucketItem(usedItemType)) return;
+
+        // A filled bucket is "emptying" when placing its fluid into the world.
+        if (isEmptyBucket(usedItemType)) return;
+
+        BlockSnapshot blockSnapshot = event.block();
+        Vector3i placePos = blockSnapshot.position();
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RWorld rWorld = Rapunzel.worlds().require(player.world());
+        RWorldRef worldRef = rWorld.ref();
+        RLocation location = new RLocation(worldRef, placePos.x(), placePos.y(), placePos.z());
+        RKey itemTypeKey = RKey.of(usedItemType.key(RegistryTypes.ITEM_TYPE).toString());
+        RItemType rapunzelItemType = RItemType.require(itemTypeKey);
+
+        BucketEmptyPre pre = new BucketEmptyPre(rPlayer, location, rapunzelItemType, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onBucketEntityPre(InteractEntityEvent.Secondary event, @First ServerPlayer player) {
+        if (!bus.hasPreListeners(BucketEntityPre.class)) return;
+
+        ItemType usedItemType = usedItemType(event);
+        if (usedItemType == null || !isBucketItem(usedItemType)) return;
+        // Only water buckets can scoop entities (axolotl, fish, etc.)
+        if (!isEmptyBucket(usedItemType)) return;
+
+        Entity entity = event.entity();
+        // Only attempt for water-type entities that may be bucket-capturable.
+        // This is a heuristic; Sponge doesn't grant direct access to vanilla bucketable flags.
+        String entityKey = entity.type().key(RegistryTypes.ENTITY_TYPE).asString();
+        if (!isBucketableEntity(entityKey)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        ServerLocation loc = entity.serverLocation();
+        RWorldRef worldRef = Rapunzel.worlds().require(loc.world()).ref();
+        RLocation location = new RLocation(worldRef, loc.x(), loc.y(), loc.z());
+        var rEntity = Rapunzel.entities().require(entity);
+
+        BucketEntityPre pre = new BucketEntityPre(rPlayer, location, rEntity, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
     private static RBlock blockFromSnapshot(ServerWorld fallbackWorld, BlockSnapshot snapshot) {
         return Rapunzel.blocks().wrap(snapshot)
             .orElseGet(() -> {
@@ -494,6 +778,46 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
     private static RBlockPos toPos(Vector3i pos) {
         return new RBlockPos(pos.x(), pos.y(), pos.z());
+    }
+
+    private static int slotIndex(org.spongepowered.api.item.inventory.Container container, Slot slot) {
+        // Best-effort: scan the container's slots for the matching slot identity.
+        // This is O(n) per click but container sizes are bounded (<= 54 typically).
+        java.util.List<Slot> slots = container.slots();
+        for (int i = 0; i < slots.size(); i++) {
+            if (slots.get(i).equals(slot)) return i;
+        }
+        return -1;
+    }
+
+    private static ItemType usedItemType(org.spongepowered.api.event.Event event) {
+        Optional<ItemStackSnapshot> snapshot = event.context().get(EventContextKeys.USED_ITEM);
+        if (snapshot.isPresent()) {
+            ItemStack stack = snapshot.get().createStack();
+            return stack.type();
+        }
+        return null;
+    }
+
+    private static boolean isBucketItem(ItemType itemType) {
+        String key = itemType.key(RegistryTypes.ITEM_TYPE).asString();
+        return key.endsWith("_bucket");
+    }
+
+    private static boolean isEmptyBucket(ItemType itemType) {
+        String key = itemType.key(RegistryTypes.ITEM_TYPE).asString();
+        return "minecraft:bucket".equals(key);
+    }
+
+    private static boolean isBucketableEntity(String entityKey) {
+        // Heuristic: only water-bucket-capturable entities are listed here.
+        // Sponge lacks a public "bucketable" flag, so we keep this conservative.
+        return "minecraft:axolotl".equals(entityKey)
+            || "minecraft:tropical_fish".equals(entityKey)
+            || "minecraft:cod".equals(entityKey)
+            || "minecraft:salmon".equals(entityKey)
+            || "minecraft:pufferfish".equals(entityKey)
+            || "minecraft:tadpole".equals(entityKey);
     }
 
     private static String damageTypeKey(DamageEntityEvent event) {

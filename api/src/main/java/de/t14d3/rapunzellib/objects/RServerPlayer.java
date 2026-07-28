@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.objects;
 
+import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.RRegistryRef;
 import org.jetbrains.annotations.NotNull;
@@ -14,6 +15,17 @@ import java.util.concurrent.CompletableFuture;
  * that are actively connected to a game server (as opposed to proxy-only players).</p>
  */
 public interface RServerPlayer extends RPlayer, RLivingEntity {
+    /**
+     * Wraps a native platform server-player object into an RServerPlayer, throwing if not possible.
+     *
+     * @param nativePlayer the native server-player object
+     * @return the wrapped server player
+     * @throws IllegalArgumentException if the native player cannot be wrapped as a server player
+     */
+    static @NotNull RServerPlayer of(@NotNull Object nativePlayer) {
+        return Rapunzel.players().requireServer(nativePlayer);
+    }
+
     @Override
     default @NotNull RRegistryRef<REntityType> typeRef() {
         return REntityType.ref("minecraft:player");

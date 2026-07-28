@@ -2,6 +2,8 @@ package de.t14d3.rapunzellib.events.shared.mixin;
 
 import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.events.GameEventBus;
+import de.t14d3.rapunzellib.events.block.BlockDestroyPre;
+import de.t14d3.rapunzellib.events.block.BlockDestroyUtil;
 import de.t14d3.rapunzellib.events.block.BlockEventDispatchUtil;
 import de.t14d3.rapunzellib.events.block.BlockFormPre;
 import de.t14d3.rapunzellib.events.block.BlockFormUtil;
@@ -28,6 +30,44 @@ import java.util.Objects;
  */
 public final class SharedBlockMixinHooks {
     private SharedBlockMixinHooks() {
+    }
+
+    /**
+     * Thread-local flag set by platform bridges (e.g. Fabric
+     * {@code PlayerBlockBreakEvents} callbacks) while a player-initiated
+     * block break is in progress. Block destroy mixins consult
+     * {@link #isPlayerBreakInProgress()} to skip dispatching
+     * {@link BlockDestroyPre} for the {@code Level.setBlock} call that
+     * happens as part of the player break flow (the break itself is
+     * surfaced via {@code BlockBreakPre} instead).
+     */
+    private static final ThreadLocal<Boolean> PLAYER_BREAK_IN_PROGRESS =
+        ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+    /**
+     * Marks the start of a player-initiated block break on the current
+     * thread. Bridges MUST pair this with {@link #endPlayerBreak()} once
+     * the break flow completes (whether cancelled or successful).
+     */
+    public static void beginPlayerBreak() {
+        PLAYER_BREAK_IN_PROGRESS.set(Boolean.TRUE);
+    }
+
+    /**
+     * Marks the end of a player-initiated block break on the current
+     * thread. Safe to call unconditionally - clears the flag set by
+     * {@link #beginPlayerBreak()}.
+     */
+    public static void endPlayerBreak() {
+        PLAYER_BREAK_IN_PROGRESS.remove();
+    }
+
+    /**
+     * @return whether a player-initiated block break is currently in
+     * progress on the current thread (so destroy mixins should skip).
+     */
+    public static boolean isPlayerBreakInProgress() {
+        return PLAYER_BREAK_IN_PROGRESS.get();
     }
 
     /**
@@ -161,6 +201,59 @@ public final class SharedBlockMixinHooks {
             pos.getY(),
             pos.getZ(),
             originalBlockKey,
+            newBlockKey
+        );
+    }
+
+    /**
+     * Dispatches a block destroy pre-event.
+     *
+     * <p>Returns {@code false} (no-op) when no pre-listeners are registered,
+     * when the change is not a destroy event (per {@link BlockDestroyUtil}),
+     * or when a player-initiated block break is currently in progress on
+     * the calling thread (so the {@code Level.setBlock} call inside the
+     * player break flow does not double-fire as a destroy event).</p>
+     *
+     * @param bus   the game event bus
+     * @param level the server level
+     * @param pos   the block position
+     * @param state the new (replacement) block state
+     * @return {@code true} if the event was cancelled
+     */
+    public static boolean dispatchBlockDestroyPre(
+        @NotNull GameEventBus bus,
+        @NotNull ServerLevel level,
+        @NotNull BlockPos pos,
+        @NotNull BlockState state
+    ) {
+        Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(level, "level");
+        Objects.requireNonNull(pos, "pos");
+        Objects.requireNonNull(state, "state");
+        if (!bus.hasPreListeners(BlockDestroyPre.class)) {
+            return false;
+        }
+        if (isPlayerBreakInProgress()) {
+            return false;
+        }
+
+        BlockState currentState = level.getBlockState(pos);
+        if (currentState == state) {
+            return false;
+        }
+
+        RKey newBlockKey = blockKey(state);
+        RKey sourceBlockKey = blockKey(currentState);
+        if (!BlockDestroyUtil.isDestroyEvent(newBlockKey.asString(), sourceBlockKey.asString())) {
+            return false;
+        }
+
+        return BlockEventDispatchUtil.dispatchBlockDestroyPre(
+            bus,
+            worldKey(level),
+            pos.getX(),
+            pos.getY(),
+            pos.getZ(),
             newBlockKey
         );
     }

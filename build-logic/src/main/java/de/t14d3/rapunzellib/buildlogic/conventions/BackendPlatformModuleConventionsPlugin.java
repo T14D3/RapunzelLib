@@ -11,5 +11,6 @@ public final class BackendPlatformModuleConventionsPlugin implements Plugin<Proj
         BuildLogicPluginSupport.addProjectDependency(target, "implementation", ":common");
         BuildLogicPluginSupport.addProjectDependency(target, "implementation", ":network");
         BuildLogicPluginSupport.addProjectDependency(target, "implementation", ":database-spool");
+        BuildLogicPluginSupport.addProjectDependency(target, "api", ":platform-shared");
     }
 }

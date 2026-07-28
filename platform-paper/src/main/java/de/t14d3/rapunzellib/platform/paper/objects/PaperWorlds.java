@@ -22,6 +22,15 @@ public final class PaperWorlds extends SharedWorldsCore<PaperWorld> {
         super(server);
     }
 
+    /**
+     * Returns the internal cache of {@link ServerLevel} to {@link RWorldRef},
+     * exposed so that {@link PaperWrapperStore} can reuse the same backing
+     * cache rather than maintaining a duplicate.
+     */
+    ConcurrentHashMap<ServerLevel, RWorldRef> worldRefCache() {
+        return worldRefCache;
+    }
+
     @Override
     protected @NotNull PaperWorld createWorldWrapper(@NotNull ServerLevel level) {
         return new PaperWorld(level, this, cachedWorldUuid(level));

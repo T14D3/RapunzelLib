@@ -4,10 +4,27 @@
  "package": "de.t14d3.rapunzellib.events.neoforge.mixin",
  "compatibilityLevel": "JAVA_25",
  "mixins": [
+ "AttackEntityMixin",
+ "BlockDestroyMixin",
  "BlockFormMixin",
  "BlockPhysicsMixin",
  "BlockSpreadMixin",
- "BlockTransformMixin"
+ "BlockTransformMixin",
+ "BucketEntityMixin",
+ "BucketItemMixin",
+ "ContainerClickMixin",
+ "ContainerCloseMixin",
+ "ContainerOpenMixin",
+ "EntityHurtMixin",
+ "EntityMoveMixin",
+ "EntitySpawnMixin",
+ "EntityTeleportMixin",
+ "ExplosionMixin",
+ "InteractEntityAtMixin",
+ "InteractEntityMixin",
+"PlayerDestroyBlockMixin",
+    "PlayerMoveMixin",
+    "TntPrimeMixin"
  ],
  "client": [],
  "injectors": {

@@ -7,13 +7,31 @@ import de.t14d3.rapunzellib.events.block.*;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPost;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPre;
 import de.t14d3.rapunzellib.events.entity.EntityHurtPost;
+import de.t14d3.rapunzellib.events.entity.EntityHurtPre;
 import de.t14d3.rapunzellib.events.entity.EntityHurtSnapshot;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
+import de.t14d3.rapunzellib.events.entity.EntityMovePost;
+import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
+import de.t14d3.rapunzellib.events.interact.UseBlockPost;
+import de.t14d3.rapunzellib.events.interact.UseBlockPre;
+import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
+import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
+import de.t14d3.rapunzellib.events.item.BucketEntityPre;
+import de.t14d3.rapunzellib.events.item.BucketFillPre;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
+import de.t14d3.rapunzellib.events.player.PlayerMovePost;
+import de.t14d3.rapunzellib.events.player.PlayerMovePre;
+import de.t14d3.rapunzellib.events.world.ExplosionPre;
+import de.t14d3.rapunzellib.events.world.TntPrimePre;
 
 final class NeoForgeGameEventSupport {
     static final GameEventSupportManifest MANIFEST = SharedGameEventSupportManifests.withBlockMixinBridge(
@@ -32,14 +50,41 @@ final class NeoForgeGameEventSupport {
                     InteractEntityPost.class,
                     AttackEntityPre.class,
                     AttackEntityPost.class,
+                    EntityHurtPre.class,
                     EntityHurtPost.class,
-                    EntityHurtSnapshot.class
+                    EntityHurtSnapshot.class,
+                    UseBlockPre.class,
+                    UseBlockPost.class,
+                    UseBlockSnapshot.class,
+                    ExplosionPre.class,
+                    TntPrimePre.class,
+                    BucketEmptyPre.class,
+                    BucketFillPre.class,
+                    BucketEntityPre.class,
+                    EntityTeleportPost.class,
+                    InventoryOpenPre.class,
+                    InventoryOpenPost.class,
+                    InventoryClosePost.class
                 )
                 .partialSupport(
                     "NeoForge entity join bridge does not expose spawn reasons",
                     EntitySpawnPre.class,
                     EntitySpawnPost.class,
                     EntitySpawnSnapshot.class
+                )
+                .emulatedSupport(
+                    "NeoForge AbstractContainerMenu.doClick mixin",
+                    InventoryClickPre.class,
+                    InventoryClickPost.class
+                )
+                .emulatedSupport(
+                    "NeoForge Entity.move() mixin",
+                    EntityMovePost.class
+                )
+                .emulatedSupport(
+                    "NeoForge Entity.move() mixin",
+                    PlayerMovePre.class,
+                    PlayerMovePost.class
                 ),
             "NeoForge event bus bridge"
         ),

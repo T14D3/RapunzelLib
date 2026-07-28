@@ -5,7 +5,6 @@ plugins {
 }
 
 dependencies {
-    api(project(":platform-shared"))
     // Include all feature modules so the shadowJar provides a complete RLib plugin
     implementation(project(":events-paper"))
     implementation(project(":commands-paper"))

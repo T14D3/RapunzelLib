@@ -28,10 +28,10 @@ final class PaperGameEventSupportTest {
         assertEquals(GameEventSupportParity.NATIVE, manifest.support(EntitySpawnSnapshot.class).parity());
         assertEquals(GameEventSupportParity.NATIVE, manifest.support(EntityHurtPost.class).parity());
         assertEquals(GameEventSupportParity.NATIVE, manifest.support(EntityHurtSnapshot.class).parity());
-        assertEquals(GameEventSupportParity.UNSUPPORTED, manifest.support(InventoryClickPre.class).parity());
-        assertEquals(GameEventSupportParity.UNSUPPORTED, manifest.support(InventoryClickPost.class).parity());
-        assertEquals(GameEventSupportParity.UNSUPPORTED, manifest.support(InventoryOpenPre.class).parity());
-        assertEquals(GameEventSupportParity.UNSUPPORTED, manifest.support(InventoryOpenPost.class).parity());
-        assertEquals(GameEventSupportParity.UNSUPPORTED, manifest.support(InventoryClosePost.class).parity());
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryClickPre.class).parity());
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryClickPost.class).parity());
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryOpenPre.class).parity());
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryOpenPost.class).parity());
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryClosePost.class).parity());
     }
 }

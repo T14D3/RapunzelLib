@@ -118,6 +118,32 @@ public final class BlockEventDispatchUtil {
     }
 
     /**
+     * Dispatches a {@link BlockDestroyPre} event and returns whether it was denied.
+     *
+     * @param bus               the event bus
+     * @param worldKey          the world key
+     * @param x                 the x coordinate
+     * @param y                 the y coordinate
+     * @param z                 the z coordinate
+     * @param replacementTypeKey the key of the replacement block type (typically air or fluid)
+     * @return true if the event was denied
+     */
+    public static boolean dispatchBlockDestroyPre(
+            GameEventBus bus,
+            RKey worldKey,
+            int x,
+            int y,
+            int z,
+            RKey replacementTypeKey
+    ) {
+        RBlockPos pos = blockPos(x, y, z);
+        RBlock block = blockAt(worldKey, pos);
+        BlockDestroyPre pre = new BlockDestroyPre(block, RBlockType.require(replacementTypeKey), false);
+        bus.dispatchPre(pre);
+        return pre.isDenied();
+    }
+
+    /**
      * Dispatches a {@link BlockPhysicsPre} event (and optionally a {@link BlockPhysicsPost}
      * if cancelled) and returns whether the event was denied.
      *

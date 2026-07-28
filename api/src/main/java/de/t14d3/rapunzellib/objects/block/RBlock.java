@@ -167,6 +167,17 @@ public interface RBlock extends RNative {
     }
 
     /**
+     * Wraps a native platform block object into an RBlock, throwing if not possible.
+     *
+     * @param nativeBlock the native block object
+     * @return the wrapped block
+     * @throws IllegalArgumentException if the native block cannot be wrapped
+     */
+    static @NotNull RBlock of(@NotNull Object nativeBlock) {
+        return Rapunzel.blocks().require(nativeBlock);
+    }
+
+    /**
      * Returns the block at the given position in the given world.
      *
      * @param world the world

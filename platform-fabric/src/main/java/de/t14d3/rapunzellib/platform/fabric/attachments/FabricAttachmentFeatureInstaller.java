@@ -15,7 +15,7 @@ public final class FabricAttachmentFeatureInstaller implements AttachmentFeature
 
     @Override
     public @NotNull AttachmentSupport support() {
-        return AttachmentFeatureInstallerSupport.serverTransientSupport(platformId());
+        return AttachmentFeatureInstallerSupport.serverPersistentSupport(platformId());
     }
 
     @Override

@@ -14,6 +14,11 @@ import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
 import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
@@ -32,6 +37,8 @@ final class PaperGameEventSupport {
             BlockPlaceSnapshot.class,
             BlockPhysicsPre.class,
             BlockPhysicsPost.class,
+            BlockFormPre.class,
+            BlockSpreadPre.class,
             AttackEntityPre.class,
             AttackEntityPost.class,
             InteractEntityPre.class,
@@ -42,6 +49,8 @@ final class PaperGameEventSupport {
             EntityHurtPre.class,
             EntityHurtPost.class,
             EntityHurtSnapshot.class,
+            EntityMovePost.class,
+            EntityTeleportPost.class,
             UseBlockPre.class,
             UseBlockPost.class,
             UseBlockSnapshot.class,
@@ -52,6 +61,11 @@ final class PaperGameEventSupport {
             PlayerQuitPost.class,
             PlayerMovePre.class,
             PlayerMovePost.class,
+            InventoryOpenPre.class,
+            InventoryOpenPost.class,
+            InventoryClosePost.class,
+            InventoryClickPre.class,
+            InventoryClickPost.class,
             ChunkUnloadPost.class,
             WorldLoadPost.class,
             ExplosionPre.class,

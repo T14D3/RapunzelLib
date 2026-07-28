@@ -85,6 +85,17 @@ public interface RBlockData extends RNative {
     }
 
     /**
+     * Wraps a native platform block data object into an RBlockData, throwing if not possible.
+     *
+     * @param nativeBlockData the native block data object
+     * @return the wrapped block data
+     * @throws IllegalArgumentException if the native block data cannot be wrapped
+     */
+    static @NotNull RBlockData of(@NotNull Object nativeBlockData) {
+        return Rapunzel.blocks().requireData(nativeBlockData);
+    }
+
+    /**
      * Parses a string representation of block data into an RBlockData, if supported.
      *
      * @param value the string value to parse

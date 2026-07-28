@@ -66,4 +66,9 @@ public interface RLivingEntity extends REntity {
     static @NotNull Optional<RLivingEntity> wrap(@NotNull Object nativeEntity) {
         return Rapunzel.entities().wrapLivingEntity(nativeEntity);
     }
+
+    /** Wraps a native platform living entity object into an RLivingEntity, throwing if not possible. */
+    static @NotNull RLivingEntity of(@NotNull Object nativeEntity) {
+        return Rapunzel.entities().requireLivingEntity(nativeEntity);
+    }
 }

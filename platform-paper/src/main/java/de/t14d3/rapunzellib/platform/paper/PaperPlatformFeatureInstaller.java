@@ -9,7 +9,9 @@ import de.t14d3.rapunzellib.platform.paper.objects.PaperBlocks;
 import de.t14d3.rapunzellib.platform.paper.objects.PaperEntities;
 import de.t14d3.rapunzellib.platform.paper.objects.PaperNativeInteropSupport;
 import de.t14d3.rapunzellib.platform.paper.objects.PaperPlayers;
+import de.t14d3.rapunzellib.platform.paper.objects.PaperWrapperStore;
 import de.t14d3.rapunzellib.platform.paper.objects.PaperWorlds;
+import de.t14d3.rapunzellib.objects.WrapperStore;
 import net.minecraft.server.MinecraftServer;
 import org.jetbrains.annotations.NotNull;
 
@@ -26,6 +28,7 @@ public final class PaperPlatformFeatureInstaller implements PlatformFeatureInsta
         PaperPlayers players = new PaperPlayers(server, worlds);
         PaperEntities entities = new PaperEntities(server, players, worlds);
         PaperBlocks blocks = new PaperBlocks(worlds);
+        PaperWrapperStore wrapperStore = new PaperWrapperStore(worlds);
         BootstrapServices.registerServerPlatformServices(
             context,
             players,
@@ -39,5 +42,6 @@ public final class PaperPlatformFeatureInstaller implements PlatformFeatureInsta
             PaperNativeInteropSupport::register,
             () -> SharedRegistryBridge.createRegistryAccess(platformId())
         );
+        context.services().register(WrapperStore.class, wrapperStore);
     }
 }

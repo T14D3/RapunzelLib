@@ -14,6 +14,8 @@ import de.t14d3.rapunzellib.network.queue.NetworkQueueTransportDecorator;
 import de.t14d3.rapunzellib.platform.PlatformFeatures;
 import de.t14d3.rapunzellib.platform.neoforge.network.NeoForgePluginMessenger;
 import de.t14d3.rapunzellib.platform.neoforge.scheduler.NeoForgeScheduler;
+import de.t14d3.rapunzellib.platform.shared.attachments.SharedAttachmentService;
+import de.t14d3.rapunzellib.platform.shared.attachments.SharedPersistentAttachmentsStore;
 import de.t14d3.rapunzellib.runtime.EngineFamily;
 import de.t14d3.rapunzellib.runtime.LifecycleOwner;
 import de.t14d3.rapunzellib.runtime.PlatformRuntime;
@@ -103,6 +105,22 @@ public final class NeoForgeRapunzelBootstrap {
                 ctx -> {
                     ctx.register(MinecraftServer.class, server);
                     ctx.register(ConsoleCommandDispatcher.class, new NeoForgeConsoleCommandDispatcher(server));
+
+                    SharedPersistentAttachmentsStore attachmentStore = ctx.sharedRuntime().getOrCreate(
+                        SharedPersistentAttachmentsStore.class,
+                        () -> new SharedPersistentAttachmentsStore(
+                            logger,
+                            ctx.configs(),
+                            dataDirectory.resolve("attachments.yml")
+                        )
+                    );
+                    SharedAttachmentService attachmentService = ctx.sharedRuntime().getOrCreate(
+                        SharedAttachmentService.class,
+                        () -> new SharedAttachmentService(attachmentStore)
+                    );
+                    ctx.services().register(SharedPersistentAttachmentsStore.class, attachmentStore);
+                    ctx.services().register(SharedAttachmentService.class, attachmentService);
+
                     PlatformFeatures.install(ctx);
                 },
                 new BackendTransportBootstrap.Hooks(

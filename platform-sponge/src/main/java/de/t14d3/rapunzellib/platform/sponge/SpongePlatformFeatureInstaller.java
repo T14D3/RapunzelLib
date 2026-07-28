@@ -9,8 +9,10 @@ import de.t14d3.rapunzellib.platform.sponge.objects.SpongeBlocks;
 import de.t14d3.rapunzellib.platform.sponge.objects.SpongeEntities;
 import de.t14d3.rapunzellib.platform.sponge.objects.SpongeNativeInteropSupport;
 import de.t14d3.rapunzellib.platform.sponge.objects.SpongePlayers;
+import de.t14d3.rapunzellib.platform.sponge.objects.SpongeWrapperStore;
 import de.t14d3.rapunzellib.platform.sponge.objects.SpongeWorlds;
 import de.t14d3.rapunzellib.platform.sponge.registry.SpongeRegistryBridge;
+import de.t14d3.rapunzellib.objects.WrapperStore;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.Server;
 
@@ -41,5 +43,6 @@ public final class SpongePlatformFeatureInstaller implements PlatformFeatureInst
             SpongeNativeInteropSupport::register,
             () -> SpongeRegistryBridge.createRegistryAccess(server)
         );
+        context.services().register(WrapperStore.class, new SpongeWrapperStore());
     }
 }

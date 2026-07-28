@@ -9,14 +9,21 @@
     "InteractEntityAtMixin",
     "AttackEntityMixin",
     "EntityHurtMixin",
+    "EntityMoveMixin",
     "BlockFormMixin",
     "BlockPhysicsMixin",
     "BlockSpreadMixin",
     "BlockTransformMixin",
+    "BlockDestroyMixin",
     "ExplosionMixin",
     "TntPrimeMixin",
     "BucketItemMixin",
-    "BucketEntityMixin"
+    "BucketEntityMixin",
+    "EntityTeleportMixin",
+    "ContainerClickMixin",
+    "ContainerOpenMixin",
+    "ContainerCloseMixin",
+    "PlayerMoveMixin"
   ],
   "injectors": {
     "defaultRequire": 1

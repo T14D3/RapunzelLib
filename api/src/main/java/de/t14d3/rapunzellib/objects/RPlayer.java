@@ -113,6 +113,11 @@ public interface RPlayer extends RAudience, RCommandDispatcher {
         return Rapunzel.players().wrap(nativePlayer);
     }
 
+    /** Wraps a native platform player object into an RPlayer, throwing if not possible. */
+    static @NotNull RPlayer of(@NotNull Object nativePlayer) {
+        return Rapunzel.players().require(nativePlayer);
+    }
+
     @Override
     default void dispatch(@NotNull String command) {
         // Platform implementations should override with proper command-packet dispatch.

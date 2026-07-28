@@ -120,4 +120,9 @@ public interface RWorld extends RNative {
     static @NotNull Optional<RWorld> wrap(@NotNull Object nativeWorld) {
         return Rapunzel.worlds().wrap(nativeWorld);
     }
+
+    /** Wraps a native platform world object into an RWorld, throwing if not possible. */
+    static @NotNull RWorld of(@NotNull Object nativeWorld) {
+        return Rapunzel.worlds().require(nativeWorld);
+    }
 }

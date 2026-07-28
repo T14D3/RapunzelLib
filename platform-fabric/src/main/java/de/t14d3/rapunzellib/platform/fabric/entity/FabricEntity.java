@@ -1,17 +1,19 @@
 package de.t14d3.rapunzellib.platform.fabric.entity;
 
 import de.t14d3.rapunzellib.PlatformId;
+import de.t14d3.rapunzellib.platform.shared.attachments.SharedAttachmentService;
 import de.t14d3.rapunzellib.platform.shared.entity.SharedEntityBase;
 import net.minecraft.world.entity.Entity;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
 class FabricEntity extends SharedEntityBase {
-    FabricEntity(Entity handle, FabricWorlds worlds) {
+    FabricEntity(Entity handle, @NotNull SharedAttachmentService attachmentService, FabricWorlds worlds) {
         super(
             PlatformId.FABRIC,
             Objects.requireNonNull(handle, "handle"),
-            de.t14d3.rapunzellib.attachments.RAttachmentContainer.lazyMutable(),
+            attachmentService.forEntity(handle),
             Objects.requireNonNull(worlds, "worlds")
         );
     }

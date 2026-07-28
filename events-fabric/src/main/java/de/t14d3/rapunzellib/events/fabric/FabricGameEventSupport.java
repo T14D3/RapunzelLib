@@ -8,10 +8,17 @@ import de.t14d3.rapunzellib.events.entity.*;
 import de.t14d3.rapunzellib.events.interact.UseBlockPost;
 import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
 import de.t14d3.rapunzellib.events.item.BucketFillPre;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
+import de.t14d3.rapunzellib.events.player.PlayerMovePost;
+import de.t14d3.rapunzellib.events.player.PlayerMovePre;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 
@@ -44,16 +51,26 @@ final class FabricGameEventSupport {
                     MIXIN_BRIDGE_DETAILS,
                     InteractEntityPost.class,
                     AttackEntityPost.class,
+                    PlayerMovePre.class,
+                    PlayerMovePost.class,
+                    EntityHurtPre.class,
                     EntityHurtPost.class,
                     EntityHurtSnapshot.class,
                     EntitySpawnPre.class,
                     EntitySpawnPost.class,
                     EntitySpawnSnapshot.class,
+                    EntityTeleportPost.class,
+                    EntityMovePost.class,
                     BucketEmptyPre.class,
                     BucketFillPre.class,
                     BucketEntityPre.class,
                     ExplosionPre.class,
-                    TntPrimePre.class
+                    TntPrimePre.class,
+                    InventoryClickPre.class,
+                    InventoryClickPost.class,
+                    InventoryOpenPre.class,
+                    InventoryOpenPost.class,
+                    InventoryClosePost.class
                 ),
             CALLBACK_BRIDGE_DETAILS
         ),
