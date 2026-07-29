@@ -4,5 +4,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":gui-shared"))
+    implementation(project(":nbt-shared"))
     implementation(project(":nbt-paper"))
 }

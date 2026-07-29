@@ -224,6 +224,12 @@ public final class BuildLogicPluginSupport {
     public static void addFamilyAndSharedDependencies(Project project) {
         String family = project.getName().substring(0, project.getName().indexOf('-'));
         addProjectDependency(project, "api", ":" + family);
+        // Modules can opt out by setting rapunzellib.disableFamilySharedDependency=true
+        // in their own gradle.properties (loaded before any plugin applies).
+        Object skip = project.findProperty("rapunzellib.disableFamilySharedDependency");
+        if (skip != null && "true".equals(skip.toString())) {
+            return;
+        }
         addProjectDependency(project, "implementation", ":" + family + "-shared");
     }
 

@@ -34,6 +34,7 @@ public abstract class SharedNmsVisualManager extends AbstractVisualManager {
      *
      * @param uuid the player UUID
      */
+    @Override
     public final void cleanupForPlayer(@NotNull UUID uuid) {
         for (Visual<?> visual : all()) {
             if (visual instanceof SharedNmsVisual<?> nmsVisual) {

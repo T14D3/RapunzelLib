@@ -18,7 +18,7 @@ public final class NeoForgeVisualFeatureInstaller implements VisualFeatureInstal
     public void install(@NotNull RapunzelContext context) {
         NeoForgeVisuals visuals = new NeoForgeVisuals(context);
         context.services().find(GameEventBus.class).ifPresent(bus ->
-            bus.onPost(PlayerQuitPost.class, e -> ((NeoForgeVisualManager) visuals.manager()).cleanupForPlayer(e.uuid()))
+            bus.onPost(PlayerQuitPost.class, e -> visuals.manager().cleanupForPlayer(e.uuid()))
         );
         context.register(Visuals.class, visuals);
     }

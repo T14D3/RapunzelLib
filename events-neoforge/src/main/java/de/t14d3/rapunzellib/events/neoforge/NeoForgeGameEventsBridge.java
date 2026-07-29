@@ -46,6 +46,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -64,7 +65,11 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
+// #if VERSION >= 26
 import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
+// #else
+import net.neoforged.neoforge.event.level.BlockEvent;
+// #endif
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -104,7 +109,11 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
     public void onChunkUnload(ChunkEvent.Unload event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
         var chunk = event.getChunk();
+        // #if VERSION >= 26
         SharedLifecycleEventHooks.dispatchChunkUnloadPost(bus, level, chunk.getPos().x(), chunk.getPos().z());
+        // #else
+        SharedLifecycleEventHooks.dispatchChunkUnloadPost(bus, level, chunk.getPos().x, chunk.getPos().z);
+        // #endif
     }
 
     @SubscribeEvent
@@ -114,7 +123,13 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
     }
 
     @SubscribeEvent
-    public void onBlockBreak(BreakBlockEvent event) {
+    public void onBlockBreak(
+        // #if VERSION >= 26
+        BreakBlockEvent event
+        // #else
+        BlockEvent.BreakEvent event
+        // #endif
+    ) {
         boolean needsPre = bus.hasPreListeners(BlockBreakPre.class);
         boolean needsPost = bus.hasPostListeners(BlockBreakPost.class);
         boolean needsAsync = bus.hasAsyncListeners(BlockBreakSnapshot.class);
@@ -426,7 +441,11 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
 
         var prev = event.getPrev();
         var target = event.getTarget();
+        // #if VERSION >= 26
         var targetLevel = event.getTargetLevel();
+        // #else
+        Level targetLevel = null;
+        // #endif
 
         // Resolve FROM world key
         RKey fromDimKey;

@@ -18,7 +18,7 @@ public final class SpongeVisualFeatureInstaller implements VisualFeatureInstalle
     public void install(@NotNull RapunzelContext context) {
         SpongeVisuals visuals = new SpongeVisuals(context);
         context.services().find(GameEventBus.class).ifPresent(bus ->
-            bus.onPost(PlayerQuitPost.class, e -> ((SpongeVisualManager) visuals.manager()).cleanupForPlayer(e.uuid()))
+            bus.onPost(PlayerQuitPost.class, e -> visuals.manager().cleanupForPlayer(e.uuid()))
         );
         context.register(Visuals.class, visuals);
     }

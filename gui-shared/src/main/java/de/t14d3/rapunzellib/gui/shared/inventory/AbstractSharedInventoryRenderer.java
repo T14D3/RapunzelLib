@@ -219,6 +219,8 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
                 dropdown -> openDropdownSession(playerId, dropdown, openGui)
             );
 
+            onElementClicked(player, element, clickContext, result);
+
             if (result.stateMutated()) {
                 container.setItem(slot, elementRenderer().render(element, openGui.context));
                 ServerPlayer serverPlayer = unwrap(player);
@@ -229,6 +231,26 @@ public abstract class AbstractSharedInventoryRenderer implements GuiRenderer {
         } finally {
             clickDispatch.post();
         }
+    }
+
+    /**
+     * Hook invoked after a click on a GUI element has been dispatched but before
+     * state-mutation re-rendering. Platform-specific subclasses may override this
+     * to play feedback sounds or perform other side effects.
+     * <p>
+     * The default implementation is a no-op.
+     *
+     * @param player       the clicking player
+     * @param element      the clicked element
+     * @param clickContext the click context
+     * @param result       the element-handler result
+     */
+    protected void onElementClicked(
+        @NotNull RPlayer player,
+        @NotNull GuiElement element,
+        @NotNull ClickContext clickContext,
+        @NotNull GuiInventoryElementHandler.Result result
+    ) {
     }
 
     /**

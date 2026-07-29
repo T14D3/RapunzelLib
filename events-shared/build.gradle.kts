@@ -5,4 +5,5 @@ plugins {
 dependencies {
     api(project(":events"))
     compileOnly(libs.annotations)
+    compileOnly(libs.mixin)
 }

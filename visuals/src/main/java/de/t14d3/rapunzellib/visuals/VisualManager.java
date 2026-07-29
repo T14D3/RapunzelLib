@@ -5,6 +5,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Manages the lifecycle and registry of all visual objects.
@@ -95,4 +96,15 @@ public interface VisualManager {
         @NotNull BlockStructureConfig config,
         @NotNull VisualAudience audience
     );
+
+    /**
+     * Cleans up viewer state across all visuals for a disconnected player.
+     * <p>
+     * Default implementation is a no-op; platform implementations with viewer tracking
+     * (e.g. {@code SharedNmsVisualManager}) override this to clean up viewer state.
+     *
+     * @param uuid the player UUID to clean up
+     */
+    default void cleanupForPlayer(@NotNull UUID uuid) {
+    }
 }

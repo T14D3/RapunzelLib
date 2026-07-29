@@ -18,7 +18,7 @@ public final class PaperVisualFeatureInstaller implements VisualFeatureInstaller
     public void install(@NotNull RapunzelContext context) {
         PaperVisuals visuals = new PaperVisuals(context);
         context.services().find(GameEventBus.class).ifPresent(bus ->
-            bus.onPost(PlayerQuitPost.class, e -> ((PaperVisualManager) visuals.manager()).cleanupForPlayer(e.uuid()))
+            bus.onPost(PlayerQuitPost.class, e -> visuals.manager().cleanupForPlayer(e.uuid()))
         );
         context.register(Visuals.class, visuals);
     }

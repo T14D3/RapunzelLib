@@ -8,8 +8,6 @@ import org.jetbrains.gradle.ext.settings
 import org.jetbrains.gradle.ext.taskTriggers
 import org.gradle.api.tasks.bundling.Zip
 import java.util.Properties
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 plugins {
     base
@@ -281,7 +279,7 @@ gradle.buildFinished {
 
 // Register standalone single-version build tasks (e.g. ./gradlew buildMinecraft1_21_10).
 // These are NOT part of the buildAllMinecraftVersions dependency chain - use
-// buildAllMinecraftVersions (or just ./gradlew build) to build all versions in parallel.
+// buildAllMinecraftVersions (or just ./gradlew build) to build all versions.
 minecraftTargetVersions.get().forEach { minecraftVersion ->
     tasks.register<Exec>("buildMinecraft${minecraftVersion.toMinecraftTaskSuffix()}") {
         group = "verification"
@@ -316,18 +314,7 @@ minecraftTargetVersions.get().forEach { minecraftVersion ->
 
 tasks.register("buildAllMinecraftVersions") {
     group = "verification"
-    description = "Builds RapunzelLib for each configured Minecraft target version concurrently."
-
-    val wrapperFile = if (System.getProperty("os.name").lowercase().contains("windows")) {
-        rootProject.file("gradlew.bat")
-    } else {
-        rootProject.file("gradlew")
-    }
-
-    // Forward all Gradle properties except minecraftTarget (each version sets its own)
-    val forwardedProps = gradle.startParameter.projectProperties
-        .filterKeys { it != "rapunzellib.minecraftTarget" }
-        .flatMap { (key, value) -> listOf("-P$key=$value") }
+    description = "Builds RapunzelLib for each configured Minecraft target version sequentially."
 
     doLast {
         val versions = minecraftTargetVersions.get()
@@ -336,54 +323,63 @@ tasks.register("buildAllMinecraftVersions") {
             return@doLast
         }
 
-        val executor = Executors.newFixedThreadPool(versions.size)
-        val errors = java.util.Collections.synchronizedList(java.util.ArrayList<String>())
+        val wrapperFile = file(
+            if (System.getProperty("os.name").lowercase().contains("windows")) "gradlew.bat" else "gradlew"
+        )
 
-        try {
-            val futures = versions.map { version ->
-                executor.submit<Unit> {
-                    val versionBuildRoot = rootProject.layout.buildDirectory
-                        .dir("minecraft-builds/$version").get().asFile.absolutePath
+        val forwardedProps = gradle.startParameter.projectProperties
+            .filterKeys { it != "rapunzellib.minecraftTarget" }
+            .flatMap { (key, value) -> listOf("-P$key=$value") }
 
-                    val command = mutableListOf(
-                        wrapperFile.absolutePath,
-                        "build",
-                        "--no-daemon",
-                    )
-                    command.addAll(forwardedProps)
-                    command.add("-Prapunzellib.minecraftTarget=$version")
-                    command.add("-Prapunzellib.versionBuildRoot=$versionBuildRoot")
+        val results = mutableListOf<Pair<String, Int>>()
 
-                    logger.lifecycle("Building for Minecraft $version in $versionBuildRoot")
+        logger.lifecycle("═══ Sequential multi-version build ═══")
+        for (version in versions) {
+            val vRoot = rootProject.layout.buildDirectory
+                .dir("minecraft-builds/$version").get().asFile
+            val logFile = vRoot.resolve("build.log")
 
-                    val process = ProcessBuilder(command)
-                        .directory(rootProject.rootDir)
-                        .inheritIO()
-                        .start()
+            val command = listOf(
+                wrapperFile.absolutePath, "build", "--no-daemon"
+            ) + forwardedProps + listOf(
+                "-Prapunzellib.minecraftTarget=$version",
+                "-Prapunzellib.versionBuildRoot=${vRoot.absolutePath}"
+            )
 
-                    val exitCode = process.waitFor()
-                    if (exitCode != 0) {
-                        val msg = "Build for Minecraft $version failed with exit code $exitCode"
-                        errors.add(msg)
-                        logger.error(msg)
-                    } else {
-                        logger.lifecycle("Build for Minecraft $version completed successfully")
-                    }
+            logger.lifecycle("Building for Minecraft $version -> build/minecraft-builds/$version/build.log")
+
+            val exitCode = ProcessBuilder(command)
+                .directory(rootProject.rootDir)
+                .redirectOutput(logFile)
+                .redirectErrorStream(true)
+                .start()
+                .waitFor()
+
+            results.add(version to exitCode)
+
+            if (exitCode != 0) {
+                logger.error("Build for Minecraft $version FAILED (exit $exitCode)")
+                logFile.useLines { lines ->
+                    lines.toList().takeLast(20).forEach { logger.error("  $it") }
                 }
-            }
-
-            // Wait for all builds to complete
-            futures.forEach { it.get() }
-
-            if (errors.isNotEmpty()) {
                 throw GradleException(
-                    "Multi-version build completed with errors:\n" + errors.joinToString("\n")
+                    "Build for Minecraft $version failed with exit code $exitCode"
                 )
             }
-        } finally {
-            executor.shutdown()
-            executor.awaitTermination(1, TimeUnit.MINUTES)
+            logger.lifecycle("Build for Minecraft $version completed successfully")
         }
+
+        // ── Summary ─────────────────────────────────────────────────────
+        logger.lifecycle("")
+        logger.lifecycle("═══════════════════════════════════════")
+        logger.lifecycle("  Multi-version build summary:")
+        val passCount = results.count { it.second == 0 }
+        for ((version, exitCode) in results) {
+            logger.lifecycle("  ${if (exitCode == 0) "✓" else "✗"}  Minecraft $version  " +
+                if (exitCode == 0) "PASS" else "FAIL (exit $exitCode)")
+        }
+        logger.lifecycle("  $passCount / ${results.size} versions passed")
+        logger.lifecycle("═══════════════════════════════════════")
     }
 }
 

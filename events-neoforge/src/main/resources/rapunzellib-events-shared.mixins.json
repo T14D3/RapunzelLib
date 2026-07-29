@@ -1,0 +1,31 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "de.t14d3.rapunzellib.events.shared.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "AttackEntityMixin",
+    "BlockDestroyMixin",
+    "BlockFormMixin",
+    "BlockPhysicsMixin",
+    "BlockSpreadMixin",
+    "BlockTransformMixin",
+    "BucketEntityMixin",
+    "BucketItemMixin",
+    "ContainerClickMixin",
+    "ContainerCloseMixin",
+    "ContainerOpenMixin",
+    "EntityHurtMixin",
+    "EntityMoveMixin",
+    "EntitySpawnMixin",
+    "EntityTeleportMixin",
+    "ExplosionMixin",
+    "InteractEntityAtMixin",
+    "InteractEntityMixin",
+    "PlayerMoveMixin",
+    "TntPrimeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

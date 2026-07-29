@@ -18,7 +18,7 @@ public final class FabricVisualFeatureInstaller implements VisualFeatureInstalle
     public void install(@NotNull RapunzelContext context) {
         FabricVisuals visuals = new FabricVisuals(context);
         context.services().find(GameEventBus.class).ifPresent(bus ->
-            bus.onPost(PlayerQuitPost.class, e -> ((FabricVisualManager) visuals.manager()).cleanupForPlayer(e.uuid()))
+            bus.onPost(PlayerQuitPost.class, e -> visuals.manager().cleanupForPlayer(e.uuid()))
         );
         context.register(Visuals.class, visuals);
     }
