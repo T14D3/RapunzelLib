@@ -319,7 +319,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         }
         if (!bus.hasPreListeners(EntityHurtPre.class)) return;
 
-        String damageType = event.getDamageSource().getDamageType().toString();
+        String damageType = event.getDamageSource().getDamageType().getKey().toString();
         var entity = Rapunzel.entities().require(event.getEntity());
 
         EntityHurtPre pre = new EntityHurtPre(entity, damageType, event.isCancelled());
@@ -405,6 +405,50 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPistonExtendPre(BlockPistonExtendEvent event) {
+        if (!bus.hasPreListeners(PistonMovePre.class)) return;
+        dispatchPistonMove(event.getBlock(), event.getBlocks(), PistonMovePre.Action.EXTEND,
+                event.isCancelled(), cancelled -> event.setCancelled(cancelled));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPistonRetractPre(BlockPistonRetractEvent event) {
+        if (!bus.hasPreListeners(PistonMovePre.class)) return;
+        dispatchPistonMove(event.getBlock(), event.getBlocks(), PistonMovePre.Action.RETRACT,
+                event.isCancelled(), cancelled -> event.setCancelled(cancelled));
+    }
+
+    private void dispatchPistonMove(org.bukkit.block.Block piston,
+                                    List<org.bukkit.block.Block> moved,
+                                    PistonMovePre.Action action,
+                                    boolean wasCancelled,
+                                    java.util.function.Consumer<Boolean> cancel) {
+        if (!(piston.getBlockData() instanceof org.bukkit.block.data.Directional directional)) return;
+        org.bukkit.block.BlockFace facing = directional.getFacing();
+        // Extend pushes blocks in the piston's facing; a sticky retract pulls them
+        // back toward the piston (opposite of the facing).
+        org.bukkit.block.BlockFace move = action == PistonMovePre.Action.EXTEND
+                ? facing : facing.getOppositeFace();
+
+        de.t14d3.rapunzellib.objects.RWorldRef world = new de.t14d3.rapunzellib.objects.RWorldRef(
+                piston.getWorld().getName(), piston.getWorld().getKey().toString());
+        List<RBlockPos> sources = new ArrayList<>(moved.size());
+        List<RBlockPos> destinations = new ArrayList<>(moved.size());
+        for (org.bukkit.block.Block b : moved) {
+            sources.add(new RBlockPos(b.getX(), b.getY(), b.getZ()));
+            destinations.add(new RBlockPos(
+                    b.getX() + move.getModX(),
+                    b.getY() + move.getModY(),
+                    b.getZ() + move.getModZ()));
+        }
+        PistonMovePre pre = new PistonMovePre(world, sources, destinations, action, wasCancelled);
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            cancel.accept(true);
         }
     }
 
@@ -693,7 +737,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         boolean needsAsync = bus.hasAsyncListeners(EntityHurtSnapshot.class);
         if (!needsPost && !needsAsync) return;
 
-        String damageType = event.getDamageSource().getDamageType().toString();
+        String damageType = event.getDamageSource().getDamageType().getKey().toString();
         boolean cancelled = event.isCancelled();
         var entity = Rapunzel.entities().require(event.getEntity());
 

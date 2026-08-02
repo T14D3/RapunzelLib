@@ -12,6 +12,7 @@ import de.t14d3.rapunzellib.events.block.BlockPlacePre;
 import de.t14d3.rapunzellib.events.block.BlockPlaceSnapshot;
 import de.t14d3.rapunzellib.events.block.BlockSpreadPre;
 import de.t14d3.rapunzellib.events.block.BlockTransformPre;
+import de.t14d3.rapunzellib.events.block.PistonMovePre;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPost;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPre;
 import de.t14d3.rapunzellib.events.entity.EntityHurtPost;
@@ -98,7 +99,8 @@ final class GameEventCatalog {
         ChunkUnloadPost.class,
         WorldLoadPost.class,
         ExplosionPre.class,
-        TntPrimePre.class
+        TntPrimePre.class,
+        PistonMovePre.class
     );
 
     private GameEventCatalog() {
