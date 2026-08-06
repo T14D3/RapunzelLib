@@ -56,11 +56,6 @@ final class NeoForgeGameEventSupport {
                     UseBlockPre.class,
                     UseBlockPost.class,
                     UseBlockSnapshot.class,
-                    ExplosionPre.class,
-                    TntPrimePre.class,
-                    BucketEmptyPre.class,
-                    BucketFillPre.class,
-                    BucketEntityPre.class,
                     EntityTeleportPost.class,
                     InventoryOpenPre.class,
                     InventoryOpenPost.class,
@@ -71,6 +66,20 @@ final class NeoForgeGameEventSupport {
                     EntitySpawnPre.class,
                     EntitySpawnPost.class,
                     EntitySpawnSnapshot.class
+                )
+                .emulatedSupport(
+                    "NeoForge ServerExplosion.explode mixin",
+                    ExplosionPre.class
+                )
+                .emulatedSupport(
+                    "NeoForge TntBlock.wasExploded mixin",
+                    TntPrimePre.class
+                )
+                .emulatedSupport(
+                    "NeoForge BucketItem.use / Player.interactOn mixins",
+                    BucketEmptyPre.class,
+                    BucketFillPre.class,
+                    BucketEntityPre.class
                 )
                 .emulatedSupport(
                     "NeoForge AbstractContainerMenu.doClick mixin",

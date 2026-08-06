@@ -12,9 +12,10 @@ import java.util.Objects;
 /**
  * A scheduler wrapper that automatically binds each submitted task to a {@link RapunzelContext}.
  * <p>
- * Delegates scheduling to a platform-specific scheduler while wrapping every
- * {@link Runnable} to run within the given context via {@link Rapunzel#withContext}.
- * Also implements {@link AutoCloseable} to clean up the delegate if it is closeable.
+ * Delegates scheduling to a platform-specific scheduler. In the single-context model,
+ * {@link Rapunzel#context()} always returns the global context, so no explicit scoping
+ * wrapping is needed. This class exists to implement {@link AutoCloseable} for cleanup
+ * and to document the context association.</p>
  */
 public final class ContextualScheduler implements Scheduler, AutoCloseable {
     private final RapunzelContext context;
@@ -33,12 +34,12 @@ public final class ContextualScheduler implements Scheduler, AutoCloseable {
      */
     @Override
     public @NotNull ScheduledTask run(@NotNull Runnable task) {
-        return delegate.run(wrap(task));
+        return delegate.run(task);
     }
 
     @Override
     public @NotNull ScheduledTask runAsync(@NotNull Runnable task) {
-        return delegate.runAsync(wrap(task));
+        return delegate.runAsync(task);
     }
 
     /**
@@ -50,17 +51,17 @@ public final class ContextualScheduler implements Scheduler, AutoCloseable {
      */
     @Override
     public @NotNull ScheduledTask runLater(@NotNull Duration delay, @NotNull Runnable task) {
-        return delegate.runLater(delay, wrap(task));
+        return delegate.runLater(delay, task);
     }
 
     @Override
     public @NotNull ScheduledTask runRepeating(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
-        return delegate.runRepeating(initialDelay, period, wrap(task));
+        return delegate.runRepeating(initialDelay, period, task);
     }
 
     @Override
     public @NotNull ScheduledTask runRepeatingAsync(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
-        return delegate.runRepeatingAsync(initialDelay, period, wrap(task));
+        return delegate.runRepeatingAsync(initialDelay, period, task);
     }
 
     @Override
@@ -68,10 +69,5 @@ public final class ContextualScheduler implements Scheduler, AutoCloseable {
         if (delegate instanceof AutoCloseable closeable) {
             closeable.close();
         }
-    }
-
-    private @NotNull Runnable wrap(@NotNull Runnable task) {
-        Objects.requireNonNull(task, "task");
-        return () -> Rapunzel.withContext(context, task);
     }
 }

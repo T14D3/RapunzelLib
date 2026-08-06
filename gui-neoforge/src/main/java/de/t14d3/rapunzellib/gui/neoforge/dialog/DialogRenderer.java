@@ -11,6 +11,12 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
+/**
+ * NeoForge dialog renderer backed by the vanilla custom-payload channel.
+ * <p>
+ * Dialogs are transported as {@link DialogOpenPayload} packets, so no client-side
+ * mod is required; vanilla clients natively support these custom payloads.
+ */
 public final class DialogRenderer extends AbstractSharedDialogRenderer {
     private static final DialogRenderer INSTANCE = new DialogRenderer();
 
@@ -22,8 +28,14 @@ public final class DialogRenderer extends AbstractSharedDialogRenderer {
         super("neoforge-dialog");
     }
 
+    /**
+     * Checks whether the packet transport is available. The transport is always
+     * available server-side, so this is {@code true} unconditionally.
+     *
+     * @return {@code true}
+     */
     public boolean available() {
-        return false;
+        return true;
     }
 
     @Override
@@ -32,8 +44,19 @@ public final class DialogRenderer extends AbstractSharedDialogRenderer {
     }
 
     @Override
+    protected boolean isAvailable(@NotNull ServerPlayer player) {
+        return DialogPacketHandler.canSendDialog(player);
+    }
+
+    @Override
     protected boolean openDialog(@NotNull ServerPlayer serverPlayer, @NotNull SharedDialogRenderData dialog) {
-        return false;
+        return DialogPacketHandler.sendDialog(serverPlayer, dialog.payload());
+    }
+
+    @Override
+    protected void closeDialog(@NotNull ServerPlayer serverPlayer) {
+        DialogPacketHandler.clearPending(serverPlayer.getUUID());
+        serverPlayer.closeContainer();
     }
 
     @Override

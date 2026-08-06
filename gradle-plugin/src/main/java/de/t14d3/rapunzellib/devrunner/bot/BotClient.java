@@ -1027,17 +1027,8 @@ public class BotClient {
                 return;
             }
             if (packet instanceof ClientboundPlayerAbilitiesPacket abilitiesPacket) {
-                // Guard against stale abilities packets.  The server sends
-                // the initial abilities (survival defaults) shortly after
-                // login, but on a loaded server the packet may be delayed
-                // long enough that a game-mode change (sent via
-                // ClientboundGameEventPacket) has already been processed
-                // and our synthesised abilities (creative=true) have been
-                // set.  If we blindly overwrite here we would revert to
-                // the survival defaults.  Only apply the packet if our
-                // local gameMode is still consistent with it (i.e. the
-                // server hasn't changed the game mode after sending this
-                // abilities snapshot).
+                // Guard against stale abilities packets: if our abilities were already synthesised from
+                // a game-mode change, don't overwrite them with the delayed survival defaults.
                 boolean packetCreative = abilitiesPacket.isCreative();
                 boolean packetCanFly = abilitiesPacket.isCanFly();
                 boolean modeIsCreative = "creative".equals(gameMode);
@@ -1087,14 +1078,8 @@ public class BotClient {
                 if (gameEvent.getNotification() == GameEvent.CHANGE_GAME_MODE) {
                     if (gameEvent.getValue() instanceof GameMode mode) {
                         gameMode = mode.name().toLowerCase();
-                        // Synthesize an abilities update from the game mode
-                        // change.  The server does NOT resend
-                        // ClientboundPlayerAbilitiesPacket when the game mode
-                        // changes via commands or API - it only sends
-                        // ClientboundGameEventPacket.  Our abilities field
-                        // would stay stale (survival defaults), causing
-                        // queryAbilities to return creative=false even after
-                        // the player has been set to creative mode.
+                        // The server doesn't resend ClientboundPlayerAbilitiesPacket on game-mode changes,
+                        // so synthesise an abilities update from ClientboundGameEventPacket.
                         boolean isCreative = mode == GameMode.CREATIVE;
                         boolean isSpectator = mode == GameMode.SPECTATOR;
                         boolean canFly = isCreative || isSpectator;

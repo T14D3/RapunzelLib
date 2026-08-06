@@ -1,0 +1,37 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="LGPL-2.1"
+
+[[mods]]
+modId="rapunzellib_platform_neoforge"
+version="${version}"
+displayName="RapunzelLib"
+description="RapunzelLib - cross-platform Minecraft library."
+authors="t14d3"
+
+[[mods]]
+modId="rapunzellib_events_neoforge"
+version="${version}"
+displayName="RapunzelLib (NeoForge Events)"
+description="NeoForge event bridge for RapunzelLib events module."
+authors="t14d3"
+
+[[mods]]
+modId="rapunzellib_gui_neoforge"
+version="${version}"
+displayName="RapunzelLib (NeoForge GUI)"
+description="NeoForge GUI adapters for RapunzelLib supporting inventory and dialog-based GUIs."
+authors="t14d3"
+
+[[mods]]
+modId="rapunzellib_commands_neoforge"
+version="${version}"
+displayName="RapunzelLib (NeoForge Commands)"
+description="NeoForge command adapters for RapunzelLib."
+authors="t14d3"
+
+[[mixins]]
+config="rapunzellib-events-neoforge-shared.mixins.json"
+
+[[mixins]]
+config="rapunzellib-events-neoforge.mixins.json"

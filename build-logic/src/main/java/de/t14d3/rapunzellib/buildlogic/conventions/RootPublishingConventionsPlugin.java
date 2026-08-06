@@ -30,17 +30,8 @@ public final class RootPublishingConventionsPlugin implements Plugin<Project> {
             ));
         });
 
-        // ── Central Portal (via Nmcp - New Maven Central Publishing) ──────
-        //
-        // Nmcp is configured in settings.gradle.kts via the
-        // com.gradleup.nmcp.settings plugin. It auto-applies nmcp to all
-        // subprojects and nmcp.aggregation to root.
-        //
-        // Tasks created by Nmcp:
-        //   publishAggregationToCentralPortal  - for releases
-        //   publishAggregationToCentralSnapshots - for SNAPSHOTs
-        // This wrapper provides a consistent entry point:
-        //   ./gradlew publishToCentralPortal -Pversion=1.0.0
+        // Publish via Nmcp auto-applied across all subprojects by settings.gradle.kts.
+        // Entry point: ./gradlew publishToCentralPortal -Pversion=1.0.0
 
         TaskProvider<Task> publishToCentralPortal =
             target.getTasks().register("publishToCentralPortal", task -> {

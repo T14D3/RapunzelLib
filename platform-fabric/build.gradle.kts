@@ -64,11 +64,31 @@ tasks.jar {
 }
 
 // Full standalone mod (CamelCase) - only bundles shadow configuration
+val expandStandaloneFabricModJson = tasks.register("expandStandaloneFabricModJson") {
+    val props = mapOf("version" to project.version.toString())
+    val input = file("src/standalone/resources/fabric.mod.json")
+    val output = layout.buildDirectory.file("generated/standalone/resources/fabric.mod.json")
+    inputs.file(input)
+    inputs.properties(props)
+    outputs.file(output)
+    doLast {
+        val text = input.readText()
+        var expanded = text
+        for ((k, v) in props) {
+            expanded = expanded.replace("\${$k}", v)
+        }
+        val out = output.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(expanded)
+    }
+}
+
 tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
     configurations = listOf(project.configurations["shadow"])
     archiveBaseName.set("RapunzelLibFabric")
     archiveClassifier.set("standalone")
     mergeServiceFiles()
+    dependsOn(expandStandaloneFabricModJson)
     dependencies {
         // Exclude platform-provided dependencies (Fabric API, Minecraft, and their transitive trees)
         exclude("net.fabricmc:fabric-loader")
@@ -80,6 +100,14 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
         exclude("net.fabricmc.fabric-api:fabric-events-interaction-v0")
         exclude("com.mojang:minecraft")
         exclude("org.jetbrains:annotations")
+    }
+    // The bundled events-fabric module ships its own fabric.mod.json declaring the
+    // mixin configs; the standalone must present a single merged manifest that also
+    // wires those mixins so emulated events actually fire.
+    exclude("fabric.mod.json")
+    transform(com.github.jengelman.gradle.plugins.shadow.transformers.IncludeResourceTransformer::class.java) {
+        file.set(layout.buildDirectory.file("generated/standalone/resources/fabric.mod.json"))
+        resource.set("fabric.mod.json")
     }
 }
 

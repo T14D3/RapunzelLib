@@ -51,24 +51,8 @@ public final class BlockEventDispatchUtil {
         return pre.isDenied();
     }
 
-    /**
-     * Dispatches a {@link BlockSpreadPre} event and returns whether it was denied.
-     *
-     * <p>Note: the legacy signature only carries a single world+position plus the two
-     * type keys. The {@link BlockSpreadPre} event now requires two live {@link RBlock}
-     * wrappers, so this helper synthesizes both from the supplied world+position
-     * (the actual donor/source location must be supplied by future bridge revisions
-     * with richer coordinates).</p>
-     *
-     * @param bus           the event bus
-     * @param worldKey      the world key
-     * @param x             the x coordinate
-     * @param y             the y coordinate
-     * @param z             the z coordinate
-     * @param newBlockKey   the key of the spreading block
-     * @param sourceBlockKey the key of the source block
-     * @return true if the event was denied
-     */
+    // Synthesizes RBlock wrappers from legacy coordinates. Bridges with richer
+    // coordinates should construct BlockSpreadPre directly.
     public static boolean dispatchBlockSpreadPre(
             GameEventBus bus,
             RKey worldKey,
@@ -80,9 +64,8 @@ public final class BlockEventDispatchUtil {
     ) {
         RBlockPos pos = blockPos(x, y, z);
         RBlock block = blockAt(worldKey, pos);
-        // The legacy dispatch did not carry separate donor coordinates; synthesize a
-        // source block at the same position. Bridges with richer coordinates should
-        // construct BlockSpreadPre directly.
+        // Legacy dispatch had no separate donor position - same as source.
+        // Bridges with richer coordinates should construct BlockSpreadPre directly.
         RBlock source = block;
         BlockSpreadPre pre = new BlockSpreadPre(block, source);
         bus.dispatchPre(pre);

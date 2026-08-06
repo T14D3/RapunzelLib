@@ -61,11 +61,39 @@ tasks.jar {
 }
 
 // Full standalone mod (CamelCase) - only bundles shadow configuration
+val expandStandaloneModsToml = tasks.register("expandStandaloneModsToml") {
+    val props = mapOf("version" to project.version.toString())
+    val input = file("src/standalone/resources/META-INF/neoforge.mods.toml")
+    val outputDir = layout.buildDirectory.dir("generated/standalone/resources")
+    val output = outputDir.map { it.file("META-INF/neoforge.mods.toml") }
+    inputs.file(input)
+    inputs.properties(props)
+    outputs.file(output)
+    doLast {
+        val text = input.readText()
+        var expanded = text
+        for ((k, v) in props) {
+            expanded = expanded.replace("\${$k}", v)
+        }
+        val out = output.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(expanded)
+    }
+}
+
 tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
     configurations = listOf(project.configurations["shadow"])
     archiveBaseName.set("RapunzelLibNeoForge")
     archiveClassifier.set("standalone")
     mergeServiceFiles()
+    dependsOn(expandStandaloneModsToml)
+    // Each bundled module ships its own neoforge.mods.toml; the standalone must
+    // present a single merged manifest declaring all bundled mods and mixins.
+    exclude("META-INF/neoforge.mods.toml")
+    transform(com.github.jengelman.gradle.plugins.shadow.transformers.IncludeResourceTransformer::class.java) {
+        file.set(layout.buildDirectory.file("generated/standalone/resources/META-INF/neoforge.mods.toml"))
+        resource.set("META-INF/neoforge.mods.toml")
+    }
 }
 
 tasks.build {

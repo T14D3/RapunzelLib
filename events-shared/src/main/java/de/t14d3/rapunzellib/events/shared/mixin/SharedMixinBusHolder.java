@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
  * Accessed by both the shared bridge and platform-specific mixin code.
  */
 public final class SharedMixinBusHolder {
-    private static @Nullable GameEventBus bus;
+    private static volatile @Nullable GameEventBus bus;
 
     private SharedMixinBusHolder() {
     }
@@ -30,5 +30,12 @@ public final class SharedMixinBusHolder {
      */
     public static boolean isInitialized() {
         return bus != null;
+    }
+
+    /**
+     * Clears the bus reference (used when a bridge is closed).
+     */
+    public static void clear() {
+        bus = null;
     }
 }

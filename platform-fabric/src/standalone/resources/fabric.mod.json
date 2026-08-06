@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "rapunzellib",
+  "version": "${version}",
+  "name": "RapunzelLib",
+  "description": "RapunzelLib - cross-platform Minecraft library.",
+  "authors": [
+    "t14d3"
+  ],
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "de.t14d3.rapunzellib.platform.fabric.FabricPlatformMod"
+    ]
+  },
+  "depends": {
+    "fabric-events-interaction-v0": "*",
+    "fabric-lifecycle-events-v1": "*",
+    "fabric-networking-api-v1": "*",
+    "fabricloader": ">=0.16.0"
+  },
+  "mixins": [
+    "rapunzellib-events-shared.mixins.json",
+    "rapunzellib-events-fabric.mixins.json"
+  ]
+}

@@ -33,8 +33,6 @@ import de.t14d3.rapunzellib.events.shared.SharedEntityInteractionHooks;
 import de.t14d3.rapunzellib.events.shared.SharedEntitySpawnHooks;
 import de.t14d3.rapunzellib.events.shared.SharedLifecycleEventHooks;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
-import de.t14d3.rapunzellib.events.world.ExplosionPre;
-import de.t14d3.rapunzellib.events.world.ExplosionSourceKind;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RPlayer;
@@ -63,7 +61,6 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.ChunkEvent;
-import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 // #if VERSION >= 26
 import net.neoforged.neoforge.event.level.block.BreakBlockEvent;
@@ -72,8 +69,6 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 // #endif
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 final class NeoForgeGameEventsBridge implements GameEventBridge {
@@ -389,48 +384,10 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
     }
 
     // ---- Explosion ----
-
-    @SubscribeEvent
-    public void onExplosionStart(ExplosionEvent.Start event) {
-        if (!bus.hasPreListeners(ExplosionPre.class)) return;
-        if (!(event.getLevel() instanceof ServerLevel level)) return;
-
-        var explosion = event.getExplosion();
-        var center = explosion.center();
-        var damageSource = explosion.getDamageSource();
-
-        // Determine source kind and type key
-        ExplosionSourceKind sourceKind;
-        String sourceTypeKey;
-        Entity directEntity = damageSource.getDirectEntity();
-        if (directEntity != null) {
-            sourceKind = ExplosionSourceKind.ENTITY;
-            sourceTypeKey = BuiltInRegistries.ENTITY_TYPE.getKey(directEntity.getType()).toString();
-        } else {
-            sourceKind = ExplosionSourceKind.OTHER;
-            sourceTypeKey = damageSource.type().msgId();
-        }
-
-        RWorldRef worldRef = new RWorldRef(
-            null,
-            // #if VERSION >= 1.21.11
-            RKey.of(level.dimension().identifier().toString())
-            // #else
-            RKey.of(level.dimension().location().toString())
-            // #endif
-        );
-        RLocation origin = new RLocation(worldRef, center.x, center.y, center.z);
-
-        // getToBlow() is not publicly exposed on ServerExplosion in 26.x;
-        // use an empty list and rely on mixin-based block tracking.
-        List<RBlockPos> affected = new ArrayList<>();
-
-        ExplosionPre pre = new ExplosionPre(origin, sourceTypeKey, sourceKind, affected, event.isCanceled());
-        bus.dispatchPre(pre);
-        if (pre.isDenied()) {
-            event.setCanceled(true);
-        }
-    }
+    // ExplosionPre is dispatched by the shared ExplosionMixin (see
+    // rapunzellib-events-neoforge-shared.mixins.json), which captures the
+    // affected block list from ServerExplosion.explode() and supports
+    // cancellation. No native handler here to avoid double dispatch.
 
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public void onEntityTeleport(EntityTeleportEvent event) {

@@ -7,9 +7,18 @@ import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.block.BlockBreakPost;
 import de.t14d3.rapunzellib.events.block.BlockBreakPre;
 import de.t14d3.rapunzellib.events.block.BlockBreakSnapshot;
+import de.t14d3.rapunzellib.events.block.BlockDestroyPre;
+import de.t14d3.rapunzellib.events.block.BlockDestroyUtil;
+import de.t14d3.rapunzellib.events.block.BlockFormPre;
+import de.t14d3.rapunzellib.events.block.BlockFormUtil;
+import de.t14d3.rapunzellib.events.block.BlockPhysicsPre;
 import de.t14d3.rapunzellib.events.block.BlockPlacePost;
 import de.t14d3.rapunzellib.events.block.BlockPlacePre;
 import de.t14d3.rapunzellib.events.block.BlockPlaceSnapshot;
+import de.t14d3.rapunzellib.events.block.BlockSpreadPre;
+import de.t14d3.rapunzellib.events.block.BlockSpreadUtil;
+import de.t14d3.rapunzellib.events.block.BlockTransformPre;
+import de.t14d3.rapunzellib.events.block.BlockTransformUtil;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPost;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPre;
 import de.t14d3.rapunzellib.events.entity.EntityEventPayloads;
@@ -49,11 +58,13 @@ import de.t14d3.rapunzellib.inventory.RInventory;
 import de.t14d3.rapunzellib.objects.block.RBlock;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.RItemType;
+import de.t14d3.rapunzellib.registry.RBlockType;
 import org.spongepowered.api.ResourceKey;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
 import org.spongepowered.api.block.transaction.BlockTransaction;
 import org.spongepowered.api.block.transaction.BlockTransactionReceipt;
+import org.spongepowered.api.block.transaction.NotificationTicket;
 import org.spongepowered.api.block.transaction.Operations;
 import org.spongepowered.api.entity.Entity;
 import org.spongepowered.api.entity.explosive.fused.FusedExplosive;
@@ -63,6 +74,7 @@ import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.Order;
 import org.spongepowered.api.event.block.ChangeBlockEvent;
 import org.spongepowered.api.event.block.InteractBlockEvent;
+import org.spongepowered.api.event.block.NotifyNeighborBlockEvent;
 import org.spongepowered.api.event.entity.AttackEntityEvent;
 import org.spongepowered.api.event.entity.DamageEntityEvent;
 import org.spongepowered.api.event.entity.InteractEntityEvent;
@@ -194,6 +206,140 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
                 if (needsPlacePost) bus.dispatchPost(new BlockPlacePost(rPlayer, placeBlock, true));
                 if (needsPlaceAsync) bus.dispatchAsync(new BlockPlaceSnapshot(rPlayer.uuid(), worldRef, pos, Rapunzel.blocks().requireData(placed.state()).typeKey(), true));
+            }
+        }
+    }
+
+    /**
+     * Dispatches {@link BlockDestroyPre} from {@link ChangeBlockEvent.All}
+     * transactions where a real block is removed to air/fluid by a non-player
+     * world event (e.g. lava consuming blocks, leaves decaying).
+     * <p>
+     * Player-initiated changes (including player block breaking, which is
+     * dispatched as {@link BlockBreakPre}) are skipped to avoid double
+     * dispatch. {@link BlockFormPre}, {@link BlockSpreadPre}, and
+     * {@link BlockTransformPre} are dispatched from the same transactions by
+     * {@link #onChangeBlockFormSpreadTransformPre(ChangeBlockEvent.All)} using
+     * the shared block classification utils (mirroring the Fabric/NeoForge
+     * mixin bridge).
+     */
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onChangeBlockDestroyPre(ChangeBlockEvent.All event) {
+        if (!bus.hasPreListeners(BlockDestroyPre.class)) return;
+
+        // Player-initiated changes are dispatched as BlockBreakPre / BlockPlacePre
+        // by the other ChangeBlockEvent handlers; skip them here.
+        if (event.cause().first(ServerPlayer.class).isPresent()) return;
+
+        RWorld rWorld = Rapunzel.worlds().require(event.world());
+
+        for (BlockTransaction tx : event.transactions()) {
+            BlockSnapshot original = tx.original();
+            BlockSnapshot replacement = tx.finalReplacement();
+
+            String sourceKey = original.state().type().key(RegistryTypes.BLOCK_TYPE).asString();
+            String newKey = replacement.state().type().key(RegistryTypes.BLOCK_TYPE).asString();
+            if (!BlockDestroyUtil.isDestroyEvent(newKey, sourceKey)) continue;
+
+            RBlock block = Rapunzel.blocks().at(rWorld, toPos(original.position()));
+            BlockDestroyPre pre = new BlockDestroyPre(block, RBlockType.require(newKey), event.isCancelled());
+            bus.dispatchPre(pre);
+            if (pre.isDenied()) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+
+    /**
+     * Dispatches {@link BlockFormPre}, {@link BlockSpreadPre}, and
+     * {@link BlockTransformPre} from {@link ChangeBlockEvent.All} transactions
+     * using the same block-key classification as the shared Fabric/NeoForge
+     * mixin bridge, so all platforms behave identically (including firing
+     * alongside player break/place events, exactly like the mixins do).
+     * <p>
+     * Denied events invalidate only the affected transaction, mirroring the
+     * mixins' per-{@code setBlock} cancellation.
+     */
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onChangeBlockFormSpreadTransformPre(ChangeBlockEvent.All event) {
+        boolean needsForm = bus.hasPreListeners(BlockFormPre.class);
+        boolean needsSpread = bus.hasPreListeners(BlockSpreadPre.class);
+        boolean needsTransform = bus.hasPreListeners(BlockTransformPre.class);
+        if (!needsForm && !needsSpread && !needsTransform) return;
+
+        RWorld rWorld = Rapunzel.worlds().require(event.world());
+
+        for (BlockTransaction tx : event.transactions()) {
+            BlockSnapshot original = tx.original();
+            BlockSnapshot replacement = tx.finalReplacement();
+
+            String sourceKey = original.state().type().key(RegistryTypes.BLOCK_TYPE).asString();
+            String newKey = replacement.state().type().key(RegistryTypes.BLOCK_TYPE).asString();
+            if (sourceKey.equals(newKey)) continue;
+
+            RBlockPos pos = toPos(original.position());
+            RBlock block = Rapunzel.blocks().at(rWorld, pos);
+
+            if (needsForm && BlockFormUtil.isFormationEvent(newKey, sourceKey)) {
+                BlockFormPre pre = new BlockFormPre(block, newKey, event.isCancelled());
+                bus.dispatchPre(pre);
+                if (pre.isDenied()) {
+                    tx.setValid(false);
+                    continue;
+                }
+            }
+
+            if (needsSpread && BlockSpreadUtil.isSpreadEvent(newKey, sourceKey)) {
+                // Mirrors the shared mixin bridge, where the donor block is the
+                // same position as the spread target.
+                BlockSpreadPre pre = new BlockSpreadPre(block, block, event.isCancelled());
+                bus.dispatchPre(pre);
+                if (pre.isDenied()) {
+                    tx.setValid(false);
+                    continue;
+                }
+            }
+
+            if (needsTransform && BlockTransformUtil.isTransformEvent(newKey, sourceKey)) {
+                BlockTransformPre pre = new BlockTransformPre(block, newKey, event.isCancelled());
+                bus.dispatchPre(pre);
+                if (pre.isDenied()) {
+                    tx.setValid(false);
+                }
+            }
+        }
+    }
+
+    /**
+     * Dispatches {@link BlockPhysicsPre} from {@link NotifyNeighborBlockEvent},
+     * the Sponge equivalent of the shared {@code ServerLevel.neighborChanged}
+     * mixin hook. Each ticket identifies the block being notified (target) and
+     * the block type that changed (notifier); denying the event invalidates the
+     * ticket so the notification is skipped.
+     * <p>
+     * Sponge has no post-notify event, so {@link BlockPhysicsPost} is not
+     * available on this platform.
+     */
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onNotifyNeighborBlockPre(NotifyNeighborBlockEvent event) {
+        if (!bus.hasPreListeners(BlockPhysicsPre.class)) return;
+
+        for (NotificationTicket ticket : event.tickets()) {
+            Optional<ServerLocation> locOpt = ticket.target().location();
+            if (locOpt.isEmpty()) continue;
+
+            RWorld rWorld = Rapunzel.worlds().require(locOpt.get().world());
+            RBlock block = Rapunzel.blocks().at(rWorld, toPos(ticket.targetPosition()));
+
+            String changedKey = ticket.notifier().blockState().type().key(RegistryTypes.BLOCK_TYPE).asString();
+            BlockPhysicsPre pre = new BlockPhysicsPre(block, changedKey, event.isCancelled());
+            bus.dispatchPre(pre);
+            if (pre.isDenied()) {
+                ticket.setValid(false);
             }
         }
     }
@@ -661,8 +807,9 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         if (rInventory == null) return;
 
         int slot = slotIndex(event.container(), slotOpt.get());
+        InventoryClickType clickType = mapClickType(event);
 
-        InventoryClickPre pre = new InventoryClickPre(rPlayer, rInventory, slot, InventoryClickType.LEFT, event.isCancelled());
+        InventoryClickPre pre = new InventoryClickPre(rPlayer, rInventory, slot, clickType, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -682,8 +829,9 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         if (rInventory == null) return;
 
         int slot = slotIndex(event.container(), slotOpt.get());
+        InventoryClickType clickType = mapClickType(event);
 
-        bus.dispatchPost(new InventoryClickPost(rPlayer, rInventory, slot, InventoryClickType.LEFT, event.isCancelled()));
+        bus.dispatchPost(new InventoryClickPost(rPlayer, rInventory, slot, clickType, event.isCancelled()));
     }
 
     @Listener(order = Order.FIRST)
@@ -788,6 +936,19 @@ final class SpongeGameEventsBridge implements GameEventBridge {
             if (slots.get(i).equals(slot)) return i;
         }
         return -1;
+    }
+
+    private static InventoryClickType mapClickType(ClickContainerEvent event) {
+        // Sponge models click kinds as event subtypes; map to the shared enum.
+        if (event instanceof ClickContainerEvent.Shift) return InventoryClickType.SHIFT_LEFT;
+        if (event instanceof ClickContainerEvent.Middle) return InventoryClickType.MIDDLE;
+        if (event instanceof ClickContainerEvent.Double) return InventoryClickType.DOUBLE_CLICK;
+        if (event instanceof ClickContainerEvent.NumberPress) return InventoryClickType.NUMBER_KEY_1;
+        if (event instanceof ClickContainerEvent.Drop) return InventoryClickType.DROP;
+        if (event instanceof ClickContainerEvent.Primary) return InventoryClickType.LEFT;
+        if (event instanceof ClickContainerEvent.Secondary) return InventoryClickType.RIGHT;
+        if (event instanceof ClickContainerEvent.Drag) return InventoryClickType.LEFT;
+        return InventoryClickType.UNKNOWN;
     }
 
     private static ItemType usedItemType(org.spongepowered.api.event.Event event) {

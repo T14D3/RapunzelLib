@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "de.t14d3.rapunzellib.events.shared.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "BlockDestroyMixin",
+    "BlockFormMixin",
+    "BlockPhysicsMixin",
+    "BlockSpreadMixin",
+    "BlockTransformMixin",
+    "BucketEntityMixin",
+    "BucketItemMixin",
+    "ContainerClickMixin",
+    "EntityMoveMixin",
+    "ExplosionMixin",
+    "PlayerMoveMixin",
+    "TntPrimeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

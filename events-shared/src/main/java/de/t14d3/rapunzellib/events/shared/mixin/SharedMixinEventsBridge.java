@@ -23,6 +23,13 @@ public final class SharedMixinEventsBridge {
         SharedMixinBusHolder.setBus(eventBus);
     }
 
+    /**
+     * Clears the bridge so no further mixin dispatch occurs.
+     */
+    public static void shutdown() {
+        SharedMixinBusHolder.clear();
+    }
+
     public static @Nullable GameEventBus bus() {
         return SharedMixinBusHolder.bus();
     }

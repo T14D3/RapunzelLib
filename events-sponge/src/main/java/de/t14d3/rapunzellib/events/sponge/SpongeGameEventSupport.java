@@ -5,9 +5,14 @@ import de.t14d3.rapunzellib.events.GameEventSupportManifest;
 import de.t14d3.rapunzellib.events.block.BlockBreakPost;
 import de.t14d3.rapunzellib.events.block.BlockBreakPre;
 import de.t14d3.rapunzellib.events.block.BlockBreakSnapshot;
+import de.t14d3.rapunzellib.events.block.BlockDestroyPre;
+import de.t14d3.rapunzellib.events.block.BlockFormPre;
+import de.t14d3.rapunzellib.events.block.BlockPhysicsPre;
 import de.t14d3.rapunzellib.events.block.BlockPlacePost;
 import de.t14d3.rapunzellib.events.block.BlockPlacePre;
 import de.t14d3.rapunzellib.events.block.BlockPlaceSnapshot;
+import de.t14d3.rapunzellib.events.block.BlockSpreadPre;
+import de.t14d3.rapunzellib.events.block.BlockTransformPre;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPost;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPre;
 import de.t14d3.rapunzellib.events.entity.EntityHurtPost;
@@ -80,6 +85,20 @@ final class SpongeGameEventSupport {
             InventoryClosePost.class,
             InventoryClickPre.class,
             InventoryClickPost.class
+        )
+        .nativeSupport(
+            "Sponge ChangeBlockEvent.All: non-player removals to air/fluid",
+            BlockDestroyPre.class
+        )
+        .nativeSupport(
+            "Sponge ChangeBlockEvent.All transactions classified with shared block utils",
+            BlockFormPre.class,
+            BlockSpreadPre.class,
+            BlockTransformPre.class
+        )
+        .nativeSupport(
+            "Sponge NotifyNeighborBlockEvent tickets (no post equivalent)",
+            BlockPhysicsPre.class
         )
         .partialSupport(
             "Sponge only exposes primary block interaction here",

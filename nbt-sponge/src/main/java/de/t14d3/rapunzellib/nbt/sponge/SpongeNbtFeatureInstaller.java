@@ -2,6 +2,7 @@ package de.t14d3.rapunzellib.nbt.sponge;
 
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.context.RapunzelContext;
+import de.t14d3.rapunzellib.nbt.BlockEntityNbtSerializer;
 import de.t14d3.rapunzellib.nbt.NbtFeatureInstaller;
 import de.t14d3.rapunzellib.nbt.NbtFeatureInstallerSupport;
 import de.t14d3.rapunzellib.nbt.NbtSerializer;
@@ -24,5 +25,6 @@ public final class SpongeNbtFeatureInstaller implements NbtFeatureInstaller {
             adapter
         );
         context.register(NbtSerializer.class, new SpongeNbtSerializer());
+        context.register(BlockEntityNbtSerializer.class, new SpongeBlockEntityNbtSerializer<>());
     }
 }

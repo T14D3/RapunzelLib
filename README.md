@@ -1,25 +1,15 @@
 # RapunzelLib
 
-RapunzelLib is a Java 21 library for Minecraft plugins and mods that want one shared codebase across Paper, Velocity, Fabric, NeoForge, and Sponge. It gives each consumer its own context for config, messages, logging, scheduling, and lifecycle, while keeping shared runtime state for wrapper identity, attachments, registries, and messaging. Optional feature families cover commands, events, GUI, inventory, NBT, and networking.
+RapunzelLib is a Java 25 library for building Minecraft plugins and mods that run across **Paper, Fabric, NeoForge, Sponge, and Velocity** from a single shared codebase. It wraps platform-native APIs behind a unified data model - RPlayer, REntity, RBlock, RWorld, and registries - so your business logic never touches platform-specific code.
 
-## Why use it instead of platform APIs directly?
+A companion mod or plugin (shipped with each `platform-*` artifact) owns the global context. Your plugin borrows a consumer view from it, gaining access to config, messages, logging, scheduling, attachments, and whatever feature families you opt into. The runtime layer keeps wrapper identity and attachment storage shared and consistent regardless of which plugin requests a player - same UUID always resolves to the same RPlayer instance.
 
-- Use one mental model for bootstrap, config, messages, scheduling, wrappers, and registries across multiple runtimes.
-- Keep consumer-owned state isolated while sharing the state that must be global, such as player wrapper caches and attachment storage.
-- Keep cross-platform code in shared modules, while thin platform adapters stay in `platform-*` and `*-<platform>` artifacts.
-- Add only the feature families you need instead of committing to a giant all-in-one framework.
-- Still drop to native APIs when needed through wrapper handles and native interop.
+## Quick start
 
-Direct platform APIs are still the simpler choice when you only target one runtime and want deep platform-specific behavior everywhere. RapunzelLib helps most when you are trying to keep shared code honest across more than one platform.
-
-
-## Minimal dependency setup
-
-RapunzelLib is published under group `de.t14d3.rapunzellib`.
-
-For stable releases, the releases repository is enough:
+Published under `de.t14d3.rapunzellib`. Use the BOM for version alignment:
 
 ```kotlin
+// build.gradle.kts
 repositories {
     mavenCentral()
     maven("https://maven.t14d3.de/releases")
@@ -28,138 +18,187 @@ repositories {
 dependencies {
     implementation(platform("de.t14d3.rapunzellib:bom:<version>"))
     implementation("de.t14d3.rapunzellib:platform-paper")
-    // or: platform-velocity / platform-fabric / platform-neoforge / platform-sponge
 }
 ```
 
-If you use a `-SNAPSHOT` version, also add `maven("https://maven.t14d3.de/snapshots")`.
+Substitute `platform-paper` with the platform you need: `platform-fabric`, `platform-neoforge`, `platform-sponge`, or `platform-velocity`. Add the snapshots repository if you are using a `-SNAPSHOT` version.
 
-That gets you the core bootstrap path. `platform-*` modules create a consumer-owned `RapunzelContext`, register config/messages loading, scheduler, wrappers, registries, attachments, and default networking for that runtime. Shared wrapper and attachment identity is backed by the process-wide Rapunzel runtime rather than by sharing one consumer context. Internally that base wiring flows through `PlatformFeatures.install()`, so the platform service registration path is consistent with the optional feature families.
+## Bootstrap
 
-Add optional modules only when you compile against those APIs directly. For most applications, prefer the single platform-specific coordinate because it already brings the base feature module transitively:
+Each `platform-*` artifact bundles a standalone companion mod or plugin. Install that on your server first - it owns the single global `RapunzelContext`. Your plugin then borrows a consumer view:
 
-- Commands: `commands-paper`, `commands-fabric`, `commands-neoforge`, or `commands-sponge`
-- Events: `events-paper`, `events-fabric`, `events-neoforge`, or `events-sponge`
-- GUI: `gui-paper`, `gui-fabric`, `gui-neoforge`, or `gui-sponge`
-- Inventory: `inventory-paper`, `inventory-fabric`, `inventory-neoforge`, or `inventory-sponge`
-- NBT: `nbt-paper`, `nbt-fabric`, `nbt-neoforge`, or `nbt-sponge`
-- Networking APIs: `network`
-- DB-backed queueing and simple DB wrapper: `database-spool`
-
-Add the base feature modules (`commands`, `events`, `gui`, `inventory`, `nbt`) separately only when you have advanced shared-code modules that compile against the public API without also owning a concrete platform adapter dependency.
-
-In most consumer projects you do not need to depend on `common`, `platform-shared`, or any `*-shared` module directly.
-
-## Bootstrap from the native runtime entrypoint
-
-Call the platform bootstrap once your runtime gives you its real startup objects. Store the returned `RapunzelContext` on your plugin/mod instance and use that object as your primary entrypoint:
+**Paper** - install `RapunzelLibPaper.jar` on your server, then call `acquire()`:
 
 ```java
 public final class MyPlugin extends JavaPlugin {
-    private RapunzelContext rapunzel;
+    private BootstrapHandle handle;
 
     @Override
     public void onEnable() {
-        this.rapunzel = PaperRapunzelBootstrap.bootstrap(this);
-    }
-
-    public RapunzelContext rapunzel() {
-        return rapunzel;
+        handle = PaperRapunzelBootstrap.acquire(this);
     }
 
     @Override
     public void onDisable() {
-        Rapunzel.shutdown(this);
+        handle.close();
     }
 }
 ```
 
-Then pass the context into your own services, or access it through your plugin instance:
+**Fabric** - the companion mod is auto-bundled:
 
 ```java
-public final class MyFeature {
-    private final RapunzelContext rapunzel;
-
-    public MyFeature(RapunzelContext rapunzel) {
-        this.rapunzel = rapunzel;
-    }
-
-    public void reloadText() {
-        rapunzel.messages().reload();
-    }
-}
+BootstrapHandle handle = FabricRapunzelBootstrap.acquire("my-mod", server, MyMod.class);
 ```
 
-Platform entrypoints:
-
-- Paper: call `PaperRapunzelBootstrap.bootstrap(plugin)` in `onEnable()` and `Rapunzel.shutdown(plugin)` in `onDisable()`.
-- Velocity: call `VelocityRapunzelBootstrap.bootstrap(plugin, proxy, logger, dataDirectory)` once those injected objects are available.
-- Fabric: call `FabricRapunzelBootstrap.bootstrap(modId, server, resourceAnchor)` from a server lifecycle hook, not from the early mod initializer before a `MinecraftServer` exists. If the project also applies the `de.t14d3.rapunzellib` Gradle plugin with Loom, RapunzelLib auto-bundles its Fabric startup companion mod.
-- NeoForge: call `NeoForgeRapunzelBootstrap.bootstrap(modId, server, logger, dataDirectory, resourceAnchor)` once you have the running server and data directory. If the project also applies the `de.t14d3.rapunzellib` Gradle plugin with NeoForge ModDev, RapunzelLib auto-bundles its NeoForge startup companion mod.
-- Sponge: call `SpongeRapunzelBootstrap.bootstrap(container, dataDirectory, server)` from plugin startup wiring once the container and server are available.
-
-`resourceAnchor` should be a class from your own jar so RapunzelLib can load bundled defaults such as `config.yml` and `messages.yml`.
-
-If you want an explicit lifecycle object, every platform bootstrap also exposes `bootstrapHandle(...)`; keep the `BootstrapHandle` and call `handle.close()` during shutdown.
-
-## Contexts, runtime, and static access
-
-RapunzelLib separates consumer-owned context state from shared runtime state:
-
-- `RapunzelContext` is per consumer. It owns `dataDirectory()`, `logger()`, `configs()`, `messages()`, `scheduler()`, and the consumer service registry.
-- `RapunzelRuntime` is shared by the running RapunzelLib instance. It owns shared wrapper/accessor services, registry bridges, native interop, attachment stores/services, and the in-memory messenger.
-
-This means Plugin A and Plugin B get separate contexts, but the same player UUID can still resolve to the same shared wrapper instance and attachment container underneath.
-
-Prefer explicit context access in application code:
+**NeoForge, Sponge, Velocity** - same pattern with platform-specific parameters:
 
 ```java
-RapunzelContext ctx = plugin.rapunzel();
+NeoForgeRapunzelBootstrap.acquire("my-mod", server, logger, dataDir, MyMod.class);
+SpongeRapunzelBootstrap.acquire(container, dataDir, server);
+VelocityRapunzelBootstrap.acquire(plugin, proxy, logger, dataDir);
+```
+
+The `Class<?>` argument is a resource anchor - RapunzelLib loads `config.yml` and `messages.yml` from that class's jar.
+
+## Using the context
+
+After bootstrap, everything flows through `Rapunzel.context()`:
+
+```java
+RapunzelContext ctx = Rapunzel.context();
 RPlayer player = ctx.players().require(nativePlayer);
 String prefix = ctx.messages().raw("prefix");
+ctx.scheduler().runAsync(() -> doWork(player));
 ```
 
-Static access still exists, but it is intentionally conservative:
+The context provides: `players()`, `entities()`, `worlds()`, `blocks()`, `registries()`, `configs()`, `messages()`, `scheduler()`, `attachments()`, `nativeInterop()`, `services()`, and capability checks via `supports()` / `requireCapability()`.
 
-- If exactly one context exists, `Rapunzel.context()` and helpers such as `Rapunzel.players()` use it for compatibility.
-- If multiple contexts exist, static access requires a scoped context; otherwise it throws instead of guessing the wrong plugin.
-- Scheduled tasks submitted through `context.scheduler()` are scoped automatically.
+### Generated project wrapper (recommended)
 
-Use `Rapunzel.withContext(...)` only when you are adapting a callback that cannot easily receive your context directly:
+The Gradle plugin generates a `<ProjectName>Rapunzel` class that wraps all context access in static calls - no manual context threading needed across your shared codebase:
 
 ```java
-Rapunzel.withContext(rapunzel, () -> {
-    Rapunzel.players().require(nativePlayer);
-});
+// The plugin rewrites bootstrap calls to init the wrapper automatically
+PaperRapunzelBootstrap.acquire(this);
+
+// Anywhere in your code:
+RPlayer player = MyProjectRapunzel.players().require(nativePlayer);
 ```
 
-For new code, `ctx.players()` is preferred over `Rapunzel.players()`.
+See the [Gradle plugin docs](gradle-plugin/README.md) for the build configuration.
 
-## What the platform module buys you
+## Feature families
 
-- Bootstraps a `RapunzelContext`
-- Registers YAML config and MiniMessage-backed messages
-- Registers scheduler, wrapper accessors, registries, and attachment support
-- Sets up the default network transport for that runtime
+Each feature family is an optional add-on. Depend on the platform-specific artifact and call the installer. Features transitively pull in the base module:
 
-After bootstrap you can use your stored `RapunzelContext` for `players()`, `entities()`, `worlds()`, `blocks()`, `registries()`, and `attachments()`.
+```kotlin
+implementation("de.t14d3.rapunzellib:commands-paper")
+implementation("de.t14d3.rapunzellib:events-paper")
+implementation("de.t14d3.rapunzellib:gui-paper")
+implementation("de.t14d3.rapunzellib:inventory-paper")
+implementation("de.t14d3.rapunzellib:nbt-paper")
+implementation("de.t14d3.rapunzellib:visuals-paper")
+implementation("de.t14d3.rapunzellib:livetest-paper")
+```
 
-Services that do not have dedicated top-level accessors are available through `context.services()`, for example `context.services().get(Messenger.class)`.
+| Feature | Description | Installer |
+|---|---|---|
+| **Commands** | Cross-platform Brigadier dispatcher | `CommandFeatures.commands().registerRoot("cmd", commandNode)` |
+| **Events** | Unified game event bus | `GameEvents.bus().onPre(BlockBreakEvent.class, handler)` |
+| **GUI** | Inventory-based UI framework (buttons, sliders, dialogs, pagination) | `GuiFeatures.renderer()` |
+| **Inventory** | Cross-platform inventory wrapping | `InventoryFeatures.inventories().wrap(nativeInventory)` |
+| **NBT** | NBT codec, serialization, item-stack adapters | `NbtFeatures.itemStacks().find(stackHandle)` |
+| **Visuals** | Beacon beams, block displays, particles, glow outlines | `VisualFeatures.visuals().manager()` |
+| **LiveTest** | Bot-based integration testing via MCProtocolLib | `LiveTestFeatures.install().host().runTest(new MyTest())` |
 
-Optional feature families expose their own lazy-installing entrypoints after bootstrap:
+GUI depends on events, inventory, and NBT - installing it auto-installs those three. Visuals is independent.
 
-- `CommandFeatures.commands()`
-- `EventFeatures.bus()` (or `GameEvents.bus()` for the legacy alias)
-- `GuiFeatures.renderer()`
-- `InventoryFeatures.inventories()`
-- `NbtFeatures.itemStacks()`
+**Network and database-spool** work differently. The platform bootstrap registers an in-memory `Messenger` into the service registry. For Redis-backed multi-node messaging, add:
 
-`NbtFeatures.install()` also registers the platform item-stack adapters in the service registry, and the inventory / GUI platform adapters resolve those shared item services instead of constructing their own private adapter paths.
+```kotlin
+implementation("de.t14d3.rapunzellib:network")
+implementation("de.t14d3.rapunzellib:database-spool") // message queues via de.t14d3:spool
+```
 
-## Honest tradeoffs
+Then fetch them from the service registry: `ctx.services().get(Messenger.class)`.
 
-- There is no single global consumer context; consumers should store/pass their own `RapunzelContext`.
-- Static `Rapunzel.context()` is a compatibility and scoped-callback convenience, not the primary ownership model.
-- Platform differences are not hidden completely; for example Velocity is a proxy runtime and does not expose worlds, blocks, GUI, inventory, or game events.
-- Plugin messaging is convenient but delivery can depend on connected players; Redis is optional when you need a stronger transport.
-- Some ecosystem dependencies are snapshots or betas because the Minecraft tooling stack still depends on them.
+## Capability checks
+
+Write runtime-aware code with capability introspection:
+
+```java
+if (ctx.supports(RuntimeCapability.WORLDS)) {
+    RWorld world = ctx.worlds().get(/* world key */);
+} else {
+    // Velocity - proxy only, no worlds
+}
+```
+
+## Platform support
+
+| | Paper | Fabric | NeoForge | Sponge | Velocity |
+|---|---|---|---|---|---|
+| Commands | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Events | ✅ | ✅ | ✅ | ✅ | ✅ |
+| GUI | ✅ | ✅ | ✅ | ✅ | - |
+| Inventory | ✅ | ✅ | ✅ | ✅ | - |
+| NBT | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Visuals | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+Velocity is a proxy - worlds, blocks, GUI, and inventory are unavailable.
+
+## Architecture at a glance
+
+```
+api/                          Public API contracts + static facade
+common/                       Shared implementations (config, apps, attachments)
+platform-{shared,*}/          Platform adapters and companion mods/plugins
+{feature}/*                    Feature base API
+{feature}-shared/             Shared feature logic
+{feature}-{platform}/         Platform-specific feature wiring
+gradle-plugin/                Build software (code gen, dev runner, sidebar-validation)
+bom/                          BOM
+```
+
+The `*_shared` modules (`platform-shared`, `commands-shared`, `events-shared`, etc.) are internal. Do not depend on them directly - depend on `platform-*` or feature-platform modules.
+
+## Gradle Plugin
+
+```kotlin
+plugins {
+    id("de.t14d3.rapunzellib") version "<version>"
+}
+```
+
+Provides message validation, generated sources (registry catalogs, NBT schema, BlockDisplay metadata), a multi-server dev runner, and project scaffold templates. Details in the [gradle-plugin README](gradle-plugin/README.md).
+
+## Building from source
+
+Requires Java 25 and Gradle 9.4+.
+
+```bash
+git clone https://github.com/t14d3/RapunzelLib.git
+cd RapunzelLib
+
+# Build all configured Minecraft targets:
+./gradlew build
+
+# Or build for a specific target:
+./gradlew build -Prapunzellib.minecraftTarget=26.1.2
+
+# Run tests:
+./gradlew test
+
+# Generate documentation:
+./gradlew javadoc
+```
+
+Target versions are configured in `gradle/minecraft-targets.properties`. Build artifacts land in `build/libs/<version>/`.
+
+## Trade-offs
+
+- There is exactly one global context, bootstrapped by the companion plugin. Consumers borrow a view - do not call `bootstrap()` unless you are the companion.
+- Velocity is a proxy ∼ no worlds, blocks, GUI, or inventory. Use capability cheats at Runtime.
+- Some ecosystem dependencies are snapshots because the Minecraft tooling stack still depends on new snapshot options.
+- The `api/` module includes generated sources listing vanilla item types, block types, and entity types. These are written at build time and checked in.

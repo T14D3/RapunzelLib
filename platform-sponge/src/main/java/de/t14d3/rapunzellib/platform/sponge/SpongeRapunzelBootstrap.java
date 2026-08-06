@@ -8,7 +8,6 @@ import de.t14d3.rapunzellib.common.bootstrap.BootstrapServices;
 import de.t14d3.rapunzellib.common.context.ConsumerView;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
-import de.t14d3.rapunzellib.network.InMemoryMessenger;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.bootstrap.BackendNetworkInfoBootstrap;
 import de.t14d3.rapunzellib.network.bootstrap.BackendTransportBootstrap;
@@ -19,6 +18,7 @@ import de.t14d3.rapunzellib.network.queue.NetworkQueueTransportDecorator;
 import de.t14d3.rapunzellib.platform.PlatformFeatures;
 import de.t14d3.rapunzellib.platform.sponge.attachments.SpongeAttachmentService;
 import de.t14d3.rapunzellib.platform.sponge.attachments.SpongePersistentAttachmentsStore;
+import de.t14d3.rapunzellib.platform.sponge.network.SpongePluginMessenger;
 import de.t14d3.rapunzellib.platform.sponge.scheduler.SpongeScheduler;
 import de.t14d3.rapunzellib.runtime.EngineFamily;
 import de.t14d3.rapunzellib.runtime.LifecycleOwner;
@@ -130,10 +130,10 @@ public final class SpongeRapunzelBootstrap {
                     PlatformFeatures.install(ctx);
                 },
                 new BackendTransportBootstrap.Hooks(
-                    NetworkQueueTransportDecorator.pluginHooks(() -> new InMemoryMessenger(pluginId, "velocity"))
+                    NetworkQueueTransportDecorator.pluginHooks(() -> new SpongePluginMessenger(container, logger))
                 ),
-                Messenger.class,
-                null,
+                SpongePluginMessenger.class,
+                SpongePluginMessenger::setNetworkServerName,
                 (ctx, hookScheduler, hookLogger, transport, pluginMessenger, effectiveMessenger) -> {
                     if (transport.pluginMessenger() == null) {
                         return;

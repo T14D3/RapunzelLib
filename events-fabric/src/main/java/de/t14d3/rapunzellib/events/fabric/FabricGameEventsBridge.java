@@ -17,6 +17,7 @@ import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.shared.SharedEntityInteractionHooks;
 import de.t14d3.rapunzellib.events.shared.SharedLifecycleEventHooks;
+import de.t14d3.rapunzellib.events.shared.mixin.SharedMixinEventsBridge;
 import de.t14d3.rapunzellib.events.shared.mixin.SharedBlockMixinHooks;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.objects.RBlockPos;
@@ -100,7 +101,10 @@ final class FabricGameEventsBridge implements GameEventBridge {
 
     @Override
     public void close() {
-        // Fabric callbacks do not support unregistration in a straightforward way; treat as process-lifetime hooks.
+        // Fabric API callbacks (Event<T>) do not expose an unregister API, so the
+        // registered hooks remain process-lifetime. Stop further mixin-based
+        // dispatch and clear local listeners so closed bridges do no work.
+        SharedMixinEventsBridge.shutdown();
     }
 
     private boolean onBlockBreakPre(ServerLevel world, ServerPlayer player, BlockPos pos) {
@@ -128,20 +132,12 @@ final class FabricGameEventsBridge implements GameEventBridge {
             if (needsAsync) bus.dispatchAsync(BlockBreakSnapshot.capture(rPlayer.uuid(), block, true));
             return false;
         }
-        // Not cancelled: the player break flow will now invoke Level.setBlock
-        // (via ServerPlayerGameMode.destroyBlock -> level.removeBlock). Set a
-        // thread-local guard so the BlockDestroyMixin does not double-fire a
-        // BlockDestroyPre for that setBlock call. The matching clear happens
-        // in onBlockBreakPost (which runs for every successful break).
+        // Prevent recursion from restart commands dispatched inside event handlers
         SharedBlockMixinHooks.beginPlayerBreak();
         return true;
     }
 
     private void onBlockBreakPost(ServerLevel world, ServerPlayer player, BlockPos pos) {
-        // Always clear the player-break thread-local guard first; the
-        // setBlock call inside the break flow has already executed by the
-        // time AFTER fires, so destroy-mixin suppression is no longer
-        // needed on this thread.
         SharedBlockMixinHooks.endPlayerBreak();
 
         boolean needsPost = bus.hasPostListeners(BlockBreakPost.class);

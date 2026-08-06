@@ -146,10 +146,8 @@ include(
     "gradle-plugin",
 )
 
-// Workaround for NeoForge ModDev (net.neoforged.moddev) IntelliJ sync:
-// During IntelliJ import (`idea.sync.active=true`), ModDev applies idea-ext on the root project.
-// When multiple NeoForge subprojects do that in the same import, it can clash on the root "settings" extension.
-// Limit the IntelliJ-specific integration to the platform module during sync.
+// NeoForge ModDev applies idea-ext on every subproject during sync. Only one can own
+// the root "settings" extension, so suppress the extra NeoForge subprojects.
 val originalIdeaSyncActive: String? = System.getProperty("idea.sync.active")
 val disableIdeaSyncForProjects = setOf(":commands-neoforge", ":events-neoforge", ":nbt-neoforge", ":gui-neoforge", ":inventory-neoforge")
 val ideaSyncKey = "idea.sync.active"

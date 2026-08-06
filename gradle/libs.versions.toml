@@ -30,7 +30,6 @@ sponge-api = "11.0.0"
 
 # Mixin for NeoForge
 mixin = "0.8.7"
-mixin-plugin = "0.8-SNAPSHOT"
 
 visualizer = "0.1.0"
 nmcp = "1.6.1"
@@ -42,9 +41,6 @@ dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 
 userdev = { id = "io.papermc.paperweight.userdev" }
 vanilla-gradle = { id = "org.spongepowered.gradle.vanilla" }
-neoforge-moddev = { id = "net.neoforged.moddev" }
-fabric-loom = { id = "net.fabricmc.fabric-loom" }
-mixin = { id = "org.spongepowered.mixin", version.ref = "mixin-plugin" }
 rapunzellib = { id = "de.t14d3.rapunzellib" }
 visualizer-collector-java = { id = "de.t14d3.visualizer.collector-java", version.ref = "visualizer" }
 visualizer-bundler = { id = "de.t14d3.visualizer.bundler", version.ref = "visualizer" }
@@ -83,7 +79,6 @@ adventure-serializer-plain = { module = "net.kyori:adventure-text-serializer-pla
 adventure-platform-fabric = { module = "net.kyori:adventure-platform-fabric", version.ref = "adventure-platform-fabric" }
 adventure-platform-neoforge = { module = "net.kyori:adventure-platform-neoforge", version.ref = "adventure-platform-neoforge" }
 
-fabric-api = { module = "net.fabricmc.fabric-api:fabric-api" }
 fabric-command-api-v2 = { module = "net.fabricmc.fabric-api:fabric-command-api-v2", version.ref = "fabric-command-api-v2" }
 fabric-events-interaction-v0 = { module = "net.fabricmc.fabric-api:fabric-events-interaction-v0", version.ref = "fabric-events-interaction-v0" }
 fabric-lifecycle-events-v1 = { module = "net.fabricmc.fabric-api:fabric-lifecycle-events-v1", version.ref = "fabric-lifecycle-events-v1" }

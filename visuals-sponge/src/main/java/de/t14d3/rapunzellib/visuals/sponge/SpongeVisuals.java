@@ -9,7 +9,7 @@ public final class SpongeVisuals implements Visuals {
     private final SpongeVisualManager manager;
 
     public SpongeVisuals(@NotNull RapunzelContext context) {
-        this.manager = new SpongeVisualManager();
+        this.manager = new SpongeVisualManager(context);
     }
 
     @Override

@@ -1,6 +1,10 @@
 package de.t14d3.rapunzellib.platform.sponge.objects;
 
 import de.t14d3.rapunzellib.PlatformId;
+import de.t14d3.rapunzellib.inventory.Inventories;
+import de.t14d3.rapunzellib.inventory.PlayerInventory;
+import de.t14d3.rapunzellib.inventory.RInventory;
+import de.t14d3.rapunzellib.objects.RGameMode;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RNativeHandle;
 import de.t14d3.rapunzellib.objects.RServerPlayer;
@@ -10,14 +14,18 @@ import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.api.data.Keys;
+import org.spongepowered.api.entity.living.player.gamemode.GameMode;
+import org.spongepowered.api.entity.living.player.gamemode.GameModes;
 import org.spongepowered.api.entity.living.player.server.ServerPlayer;
+import org.spongepowered.api.util.Tristate;
 import org.spongepowered.api.world.server.ServerWorld;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
-final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RServerPlayer {
+final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RServerPlayer, PlayerInventory {
     private final SpongeWorlds worlds;
 
     SpongePlayer(ServerPlayer handle, @NotNull SpongeAttachmentService attachmentService, @NotNull SpongeWorlds worlds) {
@@ -143,5 +151,70 @@ final class SpongePlayer extends RNativeHandle<ServerPlayer> implements RServerP
     @Override
     public boolean isRemoved() {
         return handle().isRemoved();
+    }
+
+    @Override
+    public @NotNull RInventory inventory() {
+        return inventories().require(handle().inventory());
+    }
+
+    @Override
+    public @NotNull RInventory armor() {
+        return inventories().require(handle().inventory().armor());
+    }
+
+    @Override
+    public @NotNull RInventory enderChest() {
+        return inventories().require(handle().enderChestInventory());
+    }
+
+    @Override
+    public void gameMode(@NotNull RGameMode gameMode) {
+        handle().offer(Keys.GAME_MODE, toSpongeGameMode(gameMode));
+    }
+
+    @Override
+    public @NotNull RGameMode gameMode() {
+        return toRapunzelGameMode(handle().gameMode().get());
+    }
+
+    @Override
+    public void op(boolean op) {
+        // Sponge models the vanilla operator status as the "minecraft.command"
+        // permission on the player's subject data.
+        handle().subjectData().setPermission(
+            Set.of(),
+            "minecraft.command",
+            op ? Tristate.TRUE : Tristate.FALSE
+        ).join();
+    }
+
+    @Override
+    public boolean op() {
+        return handle().hasPermission("minecraft.command");
+    }
+
+    private @NotNull Inventories inventories() {
+        return de.t14d3.rapunzellib.Rapunzel.context().services()
+            .find(Inventories.class)
+            .orElseThrow(() -> new UnsupportedOperationException(
+                "Inventory feature not installed. Add a dependency on the inventory-sponge module."));
+    }
+
+    private static @NotNull GameMode toSpongeGameMode(@NotNull RGameMode gameMode) {
+        return switch (gameMode) {
+            case SURVIVAL -> GameModes.SURVIVAL.get();
+            case CREATIVE -> GameModes.CREATIVE.get();
+            case ADVENTURE -> GameModes.ADVENTURE.get();
+            case SPECTATOR -> GameModes.SPECTATOR.get();
+        };
+    }
+
+    private static @NotNull RGameMode toRapunzelGameMode(@NotNull GameMode gameMode) {
+        if (GameModes.SURVIVAL.get().equals(gameMode)) return RGameMode.SURVIVAL;
+        if (GameModes.CREATIVE.get().equals(gameMode)) return RGameMode.CREATIVE;
+        if (GameModes.ADVENTURE.get().equals(gameMode)) return RGameMode.ADVENTURE;
+        if (GameModes.SPECTATOR.get().equals(gameMode)) return RGameMode.SPECTATOR;
+        return RGameMode.SURVIVAL;
     }
 }

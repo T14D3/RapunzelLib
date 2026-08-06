@@ -126,14 +126,7 @@ public final class PaperRapunzelBootstrap {
         );
     }
 
-    // ── Legacy entry point for backward compatibility ────────────────────────
-    // Kept so existing consumers don't break during migration. Delegates to
-    // acquire() which is the correct path when a platform context already exists.
-
-    /**
-     * @deprecated Consumer plugins should use {@link #acquire(JavaPlugin)} instead.
-     *             This method still works by acquiring the platform context.
-     */
+    // Kept for backward compatibility - delegates to acquire().
     @Deprecated
     public static RapunzelContext bootstrap(JavaPlugin plugin) {
         return acquire(plugin).context();

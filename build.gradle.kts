@@ -148,15 +148,6 @@ allprojects {
     group = "de.t14d3.rapunzellib"
     version = buildVersion
 
-    // When building for a specific Minecraft version in the parallel multi-version
-    // build (Option 1: isolated build directories), redirect each project's buildDir
-    // to a version-specific location so concurrent inner builds do not conflict.
-    val versionBuildRoot = providers.gradleProperty("rapunzellib.versionBuildRoot").orNull
-    if (versionBuildRoot != null) {
-        val relativePath = project.path.replace(':', '/').trimStart('/').ifEmpty { "root" }
-        buildDir = file("$versionBuildRoot/$relativePath")
-    }
-
     activeTargetVersionDefaults.forEach { (alias, version) ->
         setDefaultProjectProperty("rapunzellib.version.$alias", version)
     }
@@ -214,7 +205,7 @@ subprojects {
         dependencies {
             add(
                 "dokkaPlugin",
-                "org.jetbrains.dokka:kotlin-as-java-plugin:2.2.0"
+                "org.jetbrains.dokka:kotlin-as-java-plugin:${libs.versions.dokka.get()}"
             )
         }
     }
@@ -234,43 +225,21 @@ collectAllJars.configure {
     }
 }
 
-// After each Gradle build, aggregate all subproject JAR outputs into root build/libs/<version>/
-// When the parallel multi-version build ran (build/minecraft-builds/ exists), collect from
-// each version's isolated directory tree into a version-specific libs/ subdirectory.
+// Single-version builds (including subprocesses of buildAllMinecraftVersions) aggregate
+// JARs into build/libs/<version>/. For multi-version builds, each subprocess handles its
+// own aggregation - skip here so the parent build doesn't mislabel the last version's JARs.
 gradle.buildFinished {
-    val mcBuildsDir = rootProject.layout.buildDirectory.dir("minecraft-builds").get().asFile
+    if (!hasExplicitMinecraftTarget.get()) return@buildFinished
 
-    if (mcBuildsDir.isDirectory()) {
-        // Parallel multi-version build: collect each version's JARs into build/libs/<version>/
-        mcBuildsDir.listFiles { f -> f.isDirectory }?.forEach { versionDir ->
-            val version = versionDir.name
-            val targetDir = rootProject.layout.buildDirectory.dir("libs/$version").get().asFile
-            targetDir.mkdirs()
-            rootProject.subprojects.forEach { subproject ->
-                val relativePath = subproject.path.replace(':', '/').trimStart('/').ifEmpty { "root" }
-                val buildLibs = File(versionDir, "$relativePath/libs")
-                if (buildLibs.isDirectory()) {
-                    buildLibs.listFiles { f -> f.name.endsWith(".jar") }?.forEach { jarFile ->
-                        val destFile = File(targetDir, jarFile.name)
-                        if (!destFile.exists()) {
-                            jarFile.copyTo(destFile)
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        // Single-version build: original behaviour
-        val targetDir = rootProject.layout.buildDirectory.dir("libs/$collectedJarVersion").get().asFile
-        targetDir.mkdirs()
-        rootProject.subprojects.forEach { subproject ->
-            val buildLibs = File(subproject.buildDir, "libs")
-            if (buildLibs.isDirectory()) {
-                buildLibs.listFiles { f -> f.name.endsWith(".jar") }?.forEach { jarFile ->
-                    val destFile = File(targetDir, jarFile.name)
-                    if (!destFile.exists()) {
-                        jarFile.copyTo(destFile)
-                    }
+    val targetDir = rootProject.layout.buildDirectory.dir("libs/$collectedJarVersion").get().asFile
+    targetDir.mkdirs()
+    rootProject.subprojects.forEach { subproject ->
+        val buildLibs = File(subproject.buildDir, "libs")
+        if (buildLibs.isDirectory()) {
+            buildLibs.listFiles { f -> f.name.endsWith(".jar") }?.forEach { jarFile ->
+                val destFile = File(targetDir, jarFile.name)
+                if (!destFile.exists()) {
+                    jarFile.copyTo(destFile)
                 }
             }
         }
@@ -295,19 +264,14 @@ minecraftTargetVersions.get().forEach { minecraftVersion ->
         environment("JAVA_HOME", System.getenv("JAVA_HOME")?.takeIf { it.isNotBlank() }
             ?: System.getProperty("java.home"))
 
-        val versionBuildRoot = rootProject.layout.buildDirectory
-            .dir("minecraft-builds/$minecraftVersion").get().asFile
-
         commandLine(
             wrapper.absolutePath,
             "build",
-            "--no-daemon",
             *gradle.startParameter.projectProperties
                 .filterKeys { it != "rapunzellib.minecraftTarget" }
                 .flatMap { (key, value) -> listOf("-P$key=$value") }
                 .toTypedArray(),
-            "-Prapunzellib.minecraftTarget=$minecraftVersion",
-            "-Prapunzellib.versionBuildRoot=${versionBuildRoot.absolutePath}"
+            "-Prapunzellib.minecraftTarget=$minecraftVersion"
         )
     }
 }
@@ -335,25 +299,29 @@ tasks.register("buildAllMinecraftVersions") {
 
         logger.lifecycle("═══ Sequential multi-version build ═══")
         for (version in versions) {
-            val vRoot = rootProject.layout.buildDirectory
-                .dir("minecraft-builds/$version").get().asFile
-            val logFile = vRoot.resolve("build.log")
+            val logDir = rootProject.layout.buildDirectory.dir("logs").get().asFile
+            logDir.mkdirs()
+            val logFile = File(logDir, "$version.log")
 
             val command = listOf(
-                wrapperFile.absolutePath, "build", "--no-daemon"
+                wrapperFile.absolutePath, "build"
             ) + forwardedProps + listOf(
-                "-Prapunzellib.minecraftTarget=$version",
-                "-Prapunzellib.versionBuildRoot=${vRoot.absolutePath}"
+                "-Prapunzellib.minecraftTarget=$version"
             )
 
-            logger.lifecycle("Building for Minecraft $version -> build/minecraft-builds/$version/build.log")
+            logger.lifecycle("Building for Minecraft $version -> see build/logs/$version.log")
 
-            val exitCode = ProcessBuilder(command)
+            val pb = ProcessBuilder(command)
                 .directory(rootProject.rootDir)
                 .redirectOutput(logFile)
                 .redirectErrorStream(true)
-                .start()
-                .waitFor()
+
+            pb.environment()["JAVA_HOME"] =
+                System.getenv("JAVA_HOME")
+                    ?.takeIf { it.isNotBlank() }
+                    ?: System.getProperty("java.home")
+
+            val exitCode = pb.start().waitFor()
 
             results.add(version to exitCode)
 

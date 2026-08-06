@@ -167,20 +167,10 @@ public class RpcBotService implements BotService, AutoCloseable {
     private void handleMessage(JsonObject msg) {
         String type = msg.get("type").getAsString();
 
-        // Server-pushed events:
-        //  * "ready"  - a bot finished connecting
-        //  * "chat"  - chat received by a bot
-        //  * "disconnected"  - a bot dropped its connection (full or transfer)
-        //  * "server"  - bot arrived on a new server (post-transfer)
-        //  * "inventory"  - bot's inventory state updated
-        //
-        // Events are distinguished from RPC responses by the absence of an "id"
-        // field: broadcasts never carry a request id, while every RPC response
-        // echoes the id of the request it answers.  Without this check, query
-        // responses whose type happens to match an event type (e.g. "abilities",
-        // "inventory", "entity", "explosion") would be swallowed by the event
-        // dispatch and never reach completePending(), causing the corresponding
-        // request future to hang until the caller's timeout.
+        // Server-pushed events: "ready", "chat", "disconnected", "server", "inventory".
+        // Events carry no request id; RPC responses echo theirs. Without this disambiguator,
+        // response-type overlaps (e.g. "abilities", "inventory") would be routed to event
+        // dispatch and leave the caller hanging.
         if (isEvent(type) && !msg.has("id")) {
             String botName = msg.has("bot") ? msg.get("bot").getAsString() : "";
             String message = msg.has("message") ? msg.get("message").getAsString() : "";
@@ -837,18 +827,8 @@ public class RpcBotService implements BotService, AutoCloseable {
 
     @Override
     public @NotNull CompletableFuture<BotAbilities> queryAbilities(@NotNull String name, @NotNull Duration timeout) {
-        // Always use the RPC path.  The push-event cache cannot be used as
-        // a short-circuit because the first event (bot join) carries the
-        // default survival-mode abilities, and by the time the test changes
-        // to creative mode the cache already holds creative=false.  The
-        // updated creative=true push event arrives too late.
-        //
-        // The event/response collision in handleMessage has been fixed (the
-        // "id" field disambiguator), so the query_abilities RPC response
-        // correctly reaches completePending().
-        //
-        // We still populate the cache from the RPC response so subsequent
-        // queries in the same test can use it.
+        // Always use RPC - the push-event cache is stale by the time a current query arrives.
+        // The cache is still populated from RPC responses so subsequent queries can use it.
         JsonObject req = new JsonObject();
         req.addProperty("type", "query_abilities");
         req.addProperty("bot", name);

@@ -199,10 +199,9 @@ public final class BuildLogicPluginSupport {
             if (result.contains("-----BEGIN PGP")) {
                 return result;
             }
-            // Decoded OK but doesn't look like PGP - maybe it was already raw armored?
-            // Fall through to passthrough.
+            // Armor already raw (not base64-encoded) - passthrough unchanged
         } catch (IllegalArgumentException ignored) {
-            // Not valid base64 - maybe already in raw armored form
+            // Armor already raw (not base64-encoded) - passthrough unchanged
         }
         // Passthrough
         return trimmed;

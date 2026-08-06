@@ -39,8 +39,9 @@ import java.util.function.Supplier;
  *
  * <p>Provides static factory methods to access all RapunzelLib subsystems including
  * registries, entities, players, worlds, configuration, messaging, scheduling, and
- * attachment support. Also manages the lifecycle of {@link RapunzelContext} instances
- * through bootstrap and shutdown operations.</p>
+ * attachment support. Manages a single global {@link RapunzelContext} bootstrapped
+ * by the platform plugin/mod. Consumer plugins acquire a borrower view of the shared
+ * context via {@link #acquire}.</p>
  *
  * <p>This class is thread-safe. All public methods are safe to call from any thread
  * unless otherwise noted.</p>
@@ -48,11 +49,10 @@ import java.util.function.Supplier;
 public final class Rapunzel {
     private static final Object DEFAULT_OWNER = Rapunzel.class;
     private static final Object LOCK = new Object();
-    private static final ThreadLocal<RapunzelContext> CURRENT_CONTEXT = new ThreadLocal<>();
     private static final RapunzelRuntime RUNTIME = RapunzelRuntime.getInstance();
     private static final Map<Object, BootstrapHandle> ownerHandles = new LinkedHashMap<>();
     private static final Map<Object, BootstrapHandle> borrowerHandles = new LinkedHashMap<>();
-    private static final Map<Object, RapunzelContext> contexts = new LinkedHashMap<>();
+    private static volatile RapunzelContext context;
     private static volatile PlatformBootstrapHost registeredPlatformHost;
 
     private Rapunzel() {
@@ -64,84 +64,35 @@ public final class Rapunzel {
     }
 
     /**
-     * Returns whether at least one context has been bootstrapped.
+     * Returns whether the single global context has been bootstrapped.
      *
-     * @return true if any context is active
+     * @return true if the context is active
      */
     public static boolean isBootstrapped() {
-        synchronized (LOCK) {
-            return !contexts.isEmpty();
-        }
+        return context != null;
     }
 
     /**
-     * Returns the current or only active {@link RapunzelContext}.
+     * Returns the single global {@link RapunzelContext}.
      *
-     * @return the current context
-     * @throws IllegalStateException if no context is active or multiple contexts exist without scoping
+     * @return the active context
+     * @throws IllegalStateException if no context has been bootstrapped
      */
     public static @NotNull RapunzelContext context() {
-        return findContext().orElseThrow(() -> new IllegalStateException(ambiguousContextMessage()));
+        RapunzelContext current = context;
+        if (current == null) {
+            throw new IllegalStateException("RapunzelLib context not bootstrapped yet");
+        }
+        return current;
     }
 
     /**
-     * Finds the current or only active context, if available.
+     * Finds the single global context, if available.
      *
-     * @return an {@link Optional} containing the context, or empty if inactive or ambiguous
+     * @return an {@link Optional} containing the context, or empty if not bootstrapped
      */
     public static @NotNull Optional<RapunzelContext> findContext() {
-        RapunzelContext scoped = CURRENT_CONTEXT.get();
-        if (scoped != null) {
-            return Optional.of(scoped);
-        }
-        synchronized (LOCK) {
-            return contexts.size() == 1 ? contexts.values().stream().findFirst() : Optional.empty();
-        }
-    }
-
-    /**
-     * Executes the given action within the scope of the specified context.
-     *
-     * <p>Within the scoped block, {@link #context()} returns the given context,
-     * enabling static accessor methods to resolve correctly when multiple
-     * contexts are active. The previous context is restored afterward.</p>
-     *
-     * @param context the context to scope to
-     * @param action  the action to execute within the scoped context
-     */
-    public static void withContext(@NotNull RapunzelContext context, @NotNull Runnable action) {
-        Objects.requireNonNull(action, "action");
-        withContext(context, () -> {
-            action.run();
-            return null;
-        });
-    }
-
-    /**
-     * Executes the given supplier within the scope of the specified context and returns its result.
-     *
-     * <p>Within the scoped block, {@link #context()} returns the given context.
-     * The previous context is restored in the finally block.</p>
-     *
-     * @param context the context to scope to
-     * @param action  the supplier to execute within the scoped context
-     * @param <T>     the return type of the supplier
-     * @return the value returned by the supplier
-     */
-    public static <T> T withContext(@NotNull RapunzelContext context, @NotNull Supplier<T> action) {
-        Objects.requireNonNull(context, "context");
-        Objects.requireNonNull(action, "action");
-        RapunzelContext previous = CURRENT_CONTEXT.get();
-        CURRENT_CONTEXT.set(context);
-        try {
-            return action.get();
-        } finally {
-            if (previous == null) {
-                CURRENT_CONTEXT.remove();
-            } else {
-                CURRENT_CONTEXT.set(previous);
-            }
-        }
+        return Optional.ofNullable(context);
     }
 
     /** Returns the {@link ServiceRegistry} from the current context. */
@@ -260,11 +211,12 @@ public final class Rapunzel {
     }
 
     /**
-     * Bootstraps a new context for the given owner.
+     * Bootstraps the single global context for the given owner.
      *
      * @param owner      the plugin or module that will own the context
      * @param newContext the context to bootstrap
      * @return a {@link BootstrapHandle} representing the owner's lifecycle participation
+     * @throws IllegalStateException if a context is already bootstrapped by a different owner
      */
     public static @NotNull BootstrapHandle bootstrap(@NotNull Object owner, @NotNull RapunzelContext newContext) {
         Objects.requireNonNull(newContext, "newContext");
@@ -272,7 +224,7 @@ public final class Rapunzel {
     }
 
     /**
-     * Bootstraps a new context for the given owner, created on demand via the supplier.
+     * Bootstraps the single global context for the given owner, created on demand via the supplier.
      *
      * <p>If the owner already has an open handle, the existing one is returned
      * and the supplier is not invoked.</p>
@@ -280,6 +232,7 @@ public final class Rapunzel {
      * @param owner          the plugin or module that will own the context
      * @param contextFactory a supplier that creates the context when needed
      * @return a {@link BootstrapHandle} representing the owner's lifecycle participation
+     * @throws IllegalStateException if a context is already bootstrapped by a different owner
      */
     public static @NotNull BootstrapHandle bootstrap(
         @NotNull Object owner,
@@ -293,31 +246,22 @@ public final class Rapunzel {
             if (existing != null && !existing.isClosed()) {
                 return existing;
             }
+            if (context != null && !ownerHandles.containsKey(owner)) {
+                throw new IllegalStateException(
+                    "RapunzelLib context has already been bootstrapped by a different owner. "
+                        + "Use Rapunzel.acquire() to obtain a consumer view.");
+            }
 
             RapunzelContext created = Objects.requireNonNull(contextFactory.get(), "contextFactory.get()");
             BootstrapHandle handle = new BootstrapHandle(owner, created, BootstrapOwnerRole.OWNER, () -> Rapunzel.shutdown(owner));
-            contexts.put(owner, created);
+            context = created;
             ownerHandles.put(owner, handle);
             return handle;
         }
     }
 
     /**
-     * Bootstraps or acquires an existing handle for the given owner.
-     *
-     * @param owner          the owner object
-     * @param contextFactory supplier that creates the context if no existing handle is found
-     * @return a {@link BootstrapHandle} for managing the lifecycle
-     */
-    public static @NotNull BootstrapHandle bootstrapOrAcquire(
-        @NotNull Object owner,
-        @NotNull Supplier<? extends RapunzelContext> contextFactory
-    ) {
-        return bootstrap(owner, contextFactory);
-    }
-
-    /**
-     * Acquires a borrower handle to the single active context.
+     * Acquires a borrower handle to the single global context.
      *
      * <p>Borrowers share the context without owning it. When the borrower's handle
      * is closed, only the borrower reference is released; the context itself is
@@ -325,7 +269,7 @@ public final class Rapunzel {
      *
      * @param owner the borrower object (plugin or module)
      * @return a {@link BootstrapHandle} for the borrowed context
-     * @throws IllegalStateException if no single active context exists
+     * @throws IllegalStateException if no context has been bootstrapped
      */
     public static @NotNull BootstrapHandle acquire(@NotNull Object owner) {
         Objects.requireNonNull(owner, "owner");
@@ -335,15 +279,16 @@ public final class Rapunzel {
             if (owned != null) {
                 return owned;
             }
-            if (contexts.size() != 1) {
-                throw new IllegalStateException(ambiguousContextMessage());
+            if (context == null) {
+                throw new IllegalStateException(
+                    "No active RapunzelLib context. "
+                        + "Ensure the platform plugin has been loaded and has bootstrapped.");
             }
             BootstrapHandle existing = borrowerHandles.get(owner);
             if (existing != null) {
                 return existing;
             }
-            RapunzelContext current = contexts.values().iterator().next();
-            BootstrapHandle borrowed = new BootstrapHandle(owner, current, BootstrapOwnerRole.BORROWER, () -> Rapunzel.shutdown(owner));
+            BootstrapHandle borrowed = new BootstrapHandle(owner, context, BootstrapOwnerRole.BORROWER, () -> Rapunzel.shutdown(owner));
             borrowerHandles.put(owner, borrowed);
             return borrowed;
         }
@@ -374,7 +319,7 @@ public final class Rapunzel {
             if (owned != null) {
                 return owned;
             }
-            if (contexts.isEmpty()) {
+            if (context == null) {
                 throw new IllegalStateException(
                     "No active RapunzelLib context. "
                         + "Ensure the platform plugin has been loaded and has bootstrapped.");
@@ -397,48 +342,50 @@ public final class Rapunzel {
         bootstrap(DEFAULT_OWNER, newContext);
     }
 
-    /**
-     * Shuts down the context owned by the given owner.
-     *
-     * <p>Removes the owner's handle and closes the associated context.
-     * If the owner is a borrower, only the borrower reference is removed.</p>
-     *
-     * @param owner the owner whose context to shut down
-     */
-    public static void shutdown(@NotNull Object owner) {
-        Objects.requireNonNull(owner, "owner");
-        RapunzelContext toClose;
-        synchronized (LOCK) {
-            borrowerHandles.remove(owner);
-            ownerHandles.remove(owner);
-            toClose = contexts.remove(owner);
-        }
-        closeContext(toClose);
-    }
-
-    /** Shuts down the context owned by the default owner. */
+    /** Shuts down the context for the default owner. */
     public static void shutdown() {
         shutdown(DEFAULT_OWNER);
     }
 
     /**
-     * Shuts down all active contexts and the shared runtime.
+     * Shuts down the context owned or borrowed by the given owner.
      *
-     * <p>Closes every tracked context in order and then shuts down the
-     * shared {@link RapunzelRuntime}. Errors from individual close operations
-     * are logged but do not prevent remaining contexts from closing.</p>
+     * <p>If the owner is the bootstrap owner, the global context is closed and
+     * the field is cleared. If the owner is a borrower, only the borrower
+     * reference is removed.</p>
+     *
+     * @param owner the owner whose participation to shut down
+     */
+    public static void shutdown(@NotNull Object owner) {
+        Objects.requireNonNull(owner, "owner");
+        RapunzelContext toClose = null;
+        synchronized (LOCK) {
+            borrowerHandles.remove(owner);
+            BootstrapHandle removed = ownerHandles.remove(owner);
+            if (removed != null) {
+                toClose = context;
+                context = null;
+            }
+        }
+        closeContext(toClose);
+    }
+
+    /**
+     * Shuts down the global context and the shared runtime.
+     *
+     * <p>Closes the context and then shuts down the shared {@link RapunzelRuntime}.
+     * Errors from close operations are logged but do not prevent the runtime from
+     * shutting down.</p>
      */
     public static void shutdownAll() {
-        RapunzelContext[] toClose;
+        RapunzelContext toClose;
         synchronized (LOCK) {
             borrowerHandles.clear();
             ownerHandles.clear();
-            toClose = contexts.values().toArray(RapunzelContext[]::new);
-            contexts.clear();
+            toClose = context;
+            context = null;
         }
-        for (RapunzelContext context : toClose) {
-            closeContext(context);
-        }
+        closeContext(toClose);
         try {
             RUNTIME.shutdown();
         } catch (Exception e) {
@@ -468,9 +415,8 @@ public final class Rapunzel {
      */
     public static @NotNull BootstrapState bootstrapState() {
         synchronized (LOCK) {
-            RapunzelContext singleContext = contexts.size() == 1 ? contexts.values().iterator().next() : null;
-            Object singleOwner = contexts.size() == 1 ? contexts.keySet().iterator().next() : null;
-            return new BootstrapState(singleContext, singleOwner, borrowerHandles.size(), registeredPlatformHost);
+            Object singleOwner = ownerHandles.size() == 1 ? ownerHandles.keySet().iterator().next() : null;
+            return new BootstrapState(context, singleOwner, borrowerHandles.size(), registeredPlatformHost);
         }
     }
 
@@ -502,21 +448,6 @@ public final class Rapunzel {
      */
     public static @NotNull Optional<PlatformBootstrapHost> registeredPlatformBootstrapHost() {
         return Optional.ofNullable(registeredPlatformHost);
-    }
-
-    /**
-     * Builds an ambiguous-context error message based on the current state.
-     *
-     * @return a descriptive error message
-     */
-    private static @NotNull String ambiguousContextMessage() {
-        synchronized (LOCK) {
-            if (contexts.isEmpty()) {
-                return "RapunzelLib context not bootstrapped yet";
-            }
-            return "RapunzelLib context is ambiguous because " + contexts.size()
-                + " consumer contexts are active. Use your plugin-owned RapunzelContext or Rapunzel.withContext(...).";
-        }
     }
 
     /**

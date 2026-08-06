@@ -31,6 +31,7 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
 
     private final ProxyServer proxy;
     private final Logger logger;
+    private final Object plugin;
     private final Gson gson = JsonCodecs.gson();
     private final AtomicLong lastUndeliverableLog = new AtomicLong(0L);
 
@@ -46,6 +47,7 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
     private volatile Messenger undeliverableForwarder;
 
     public VelocityPluginMessenger(Object plugin, ProxyServer proxy, Logger logger) {
+        this.plugin = plugin;
         this.proxy = proxy;
         this.logger = logger;
 
@@ -220,7 +222,9 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
 
     @Override
     public void close() {
-        // Velocity does not currently expose a stable unregister API for this pattern across versions.
+        proxy.getEventManager().unregisterListeners(plugin);
+        proxy.getChannelRegistrar().unregister(CHANNEL_ID);
+        listeners.clear();
     }
 }
 

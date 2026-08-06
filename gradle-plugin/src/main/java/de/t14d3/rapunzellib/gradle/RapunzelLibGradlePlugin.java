@@ -184,7 +184,8 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
                 project.getTasks().named(mainSourceSet.getSourcesJarTaskName()).configure(t -> t.dependsOn(activeMainTask));
             }
             if (project.getTasks().findByName("javadoc") != null) {
-                File javadocSourceDir = multiversionOutputDir(project, activeVersion, "generated-sources/multiversion");
+                // Must match the active version's output dir used in createAndWirePreprocessTasks
+                File javadocSourceDir = new File(project.getBuildDir(), "generated-sources/multiversion");
                 Set<File> javadocSourceDirs = new LinkedHashSet<>(mainSourceSet.getJava().getSrcDirs());
                 String srcDirCanonical = canonicalPath(sourceDir);
                 javadocSourceDirs.removeIf(f -> canonicalPath(f).equals(srcDirCanonical));
@@ -228,7 +229,12 @@ public final class RapunzelLibGradlePlugin implements Plugin<Project> {
             TaskProvider<PreprocessSourcesTask> task = createVersionTask(project, version, sourceDir, taskPrefix, outputRoot);
             if (version.equals(activeVersion)) {
                 activeTask = task;
-                activeOutputDir = multiversionOutputDir(project, version, outputRoot);
+                // Use a version-independent output path so Gradle's incremental
+                // compilation detects unchanged source files across sequential
+                // version builds (same relative paths -> content-hash comparison works).
+                activeOutputDir = new File(project.getBuildDir(), outputRoot);
+                File finalActiveOutputDir = activeOutputDir;
+                task.configure(t -> t.getOutputDir().set(finalActiveOutputDir));
             }
         }
 
