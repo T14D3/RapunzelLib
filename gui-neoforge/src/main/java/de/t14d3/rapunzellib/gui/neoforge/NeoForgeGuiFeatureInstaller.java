@@ -4,6 +4,7 @@ import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.gui.AbstractGuiFeatureInstaller;
 import de.t14d3.rapunzellib.gui.GuiRenderer;
+import de.t14d3.rapunzellib.gui.shared.map.SharedMapGuiRenderer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -20,7 +21,8 @@ public final class NeoForgeGuiFeatureInstaller extends AbstractGuiFeatureInstall
         return List.of(
             NeoForgeGuiRenderer.inventory(),
             NeoForgeGuiRenderer.dialog(),
-            NeoForgeGuiRenderer.auto()
+            NeoForgeGuiRenderer.auto(),
+            SharedMapGuiRenderer.INSTANCE
         );
     }
 

@@ -406,12 +406,17 @@ public final class DevRunnerOrchestrator {
             }
         }
 
-        // Track servers that have completed testing via line listener
+        // Track servers that have completed testing via line listener.
+        // NOTE: this listener MUST be registered before the runall commands are
+        // dispatched above, otherwise a fast-completing test suite (e.g. only
+        // single-server stub tests) can finish before the listener attaches and
+        // the orchestrator would wait for the full run timeout.
         java.util.Set<String> serversCompleted = java.util.concurrent.ConcurrentHashMap.newKeySet();
         DevRunnerConsole.LineListener completionListener = (sourceName, line, isError) -> {
             if (!isError && line != null && line.contains("All tests completed")) {
-                serversCompleted.add(sourceName);
-                System.out.println("[devrunner] Server '" + sourceName + "' completed all tests.");
+                if (serversCompleted.add(sourceName)) {
+                    System.out.println("[devrunner] Server '" + sourceName + "' completed all tests.");
+                }
             }
         };
         console.addLineListener(completionListener);

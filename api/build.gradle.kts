@@ -17,6 +17,14 @@ val activePaperApiVersion = providers.gradleProperty("rapunzellib.version.${acti
     .orElse(providers.provider { findProperty("rapunzellib.version.paper-api") as? String })
     .orElse(activeMinecraftTarget.map { "$it-R0.1-SNAPSHOT" })
 
+/** True when the given Minecraft version is at least major.minor (e.g. 26.2). */
+fun minecraftVersionAtLeast(version: String, major: Int, minor: Int): Boolean {
+    val parts = version.split(".").mapNotNull { it.toIntOrNull() }
+    val versionMajor = parts.getOrElse(0) { 0 }
+    val versionMinor = parts.getOrElse(1) { 0 }
+    return versionMajor > major || (versionMajor == major && versionMinor >= minor)
+}
+
 val mainCompileClasspath = the<SourceSetContainer>().named("main").map { it.compileClasspath }
 val paperMappedServerJar = project(":platform-paper").layout.projectDirectory.file(".gradle/caches/paperweight/taskCache/mappedServerJar.jar")
 val paperDevBundleRuntime =
@@ -72,6 +80,10 @@ rapunzellib {
             source {
                 mojangEntityTypes()
                 classpath.from(mainCompileClasspath)
+                // Minecraft 26.2 moved the static entity type fields from EntityType to EntityTypes.
+                if (minecraftVersionAtLeast(activeMinecraftTarget.get(), 26, 2)) {
+                    staticFieldOwnerClassName.set("net.minecraft.world.entity.EntityTypes")
+                }
             }
             verifyAgainst("paper") {
                 bukkitEntityTypes()

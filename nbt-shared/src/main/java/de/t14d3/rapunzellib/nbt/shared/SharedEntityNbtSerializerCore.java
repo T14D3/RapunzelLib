@@ -10,6 +10,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySpawnReason;
+// #if VERSION >= 26.2
+import net.minecraft.world.entity.EntitySpawnRequest;
+// #endif
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
@@ -61,11 +64,21 @@ public final class SharedEntityNbtSerializerCore<L extends SharedEntityLocation>
         try {
             RNbtCompound tree = EntityRootNbt.Fields.POS.write(data.data(), position(location));
             tree = EntityRootNbt.Fields.ROTATION.write(tree, rotation(location));
+            // Serialize writes the entity NBT via Entity.saveWithoutId, which omits the
+            // "id" key, but EntityType.create resolves the type solely from the NBT's
+            // "id" string (input.read("id", CODEC)); without it the spawn is skipped as
+            // "Skipping Entity with id [invalid]". Re-inject the id carried by the
+            // transport-level entity type id, like Pos/Rotation above.
+            tree = EntityRootNbt.Fields.ID.write(tree, data.entityTypeId());
             CompoundTag nbt = SharedNbtIoSupport.fromTree(tree);
 
             ServerLevel level = location.level();
             ValueInput input = TagValueInput.create(ProblemReporter.DISCARDING, level.registryAccess(), nbt);
+            // #if VERSION >= 26.2
+            Optional<Entity> spawned = EntityType.create(input, level, new EntitySpawnRequest(EntitySpawnReason.LOAD, false));
+            // #else
             Optional<Entity> spawned = EntityType.create(input, level, EntitySpawnReason.LOAD);
+            // #endif
 
             if (spawned.isEmpty()) {
                 throw new SerializationException("Failed to spawn entity: " + data.entityTypeId());

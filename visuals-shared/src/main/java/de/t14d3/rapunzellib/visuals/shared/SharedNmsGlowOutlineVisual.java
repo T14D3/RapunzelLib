@@ -65,7 +65,11 @@ public final class SharedNmsGlowOutlineVisual extends SharedNmsVisual<GlowOutlin
                 entityId, entityUuid,
                 center.x, center.y, center.z,
                 0, 0,
+                // #if VERSION >= 26.2
+                net.minecraft.world.entity.EntityTypes.BLOCK_DISPLAY,
+                // #else
                 EntityType.BLOCK_DISPLAY,
+                // #endif
                 0,
                 Vec3.ZERO,
                 0

@@ -441,6 +441,10 @@ public final class SnakeYamlConfig implements YamlConfig {
     private void copyDefaultToDisk() {
         try (InputStream in = resources.open(defaultResourcePath).orElse(null)) {
             if (in == null) {
+                logger.warn(
+                    "Bundled default resource '{}' not found on the classpath; creating empty config file {}",
+                    defaultResourcePath, file
+                );
                 Files.createFile(file);
                 return;
             }

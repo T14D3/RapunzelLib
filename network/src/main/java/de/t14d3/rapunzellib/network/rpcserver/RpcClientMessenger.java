@@ -412,15 +412,15 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
             return;
         }
 
-        // Deliver to local listeners
-        deliverToLocalListeners(channel, data, config.serverName());
+ // Deliver to local listeners
+ deliverToLocalListeners(channel, data, config.serverName());
 
-        // Send to proxy for broadcast
-        RpcProtocolMessage message = RpcProtocolMessage.message(
-            channel, data, null, config.serverName()
-        );
-        sendProtocolMessage(message);
-    }
+ // Send to proxy for broadcast
+ RpcProtocolMessage message = RpcProtocolMessage.message(
+ channel, data, null, config.serverName(), "ALL"
+ );
+ sendProtocolMessage(message);
+ }
 
     @Override
     public void sendToServer(@NotNull String channel, @NotNull String serverName, @NotNull String data) {
@@ -433,18 +433,18 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
             return;
         }
 
-        // If targeting this server, deliver locally
-        if (serverName.equalsIgnoreCase(config.serverName())) {
-            deliverToLocalListeners(channel, data, config.serverName());
-            return;
-        }
+ // If targeting this server, deliver locally
+ if (serverName.equalsIgnoreCase(config.serverName())) {
+ deliverToLocalListeners(channel, data, config.serverName());
+ return;
+ }
 
-        // Send to proxy for routing
-        RpcProtocolMessage message = RpcProtocolMessage.message(
-            channel, data, serverName, config.serverName()
-        );
-        sendProtocolMessage(message);
-    }
+ // Send to proxy for routing
+ RpcProtocolMessage message = RpcProtocolMessage.message(
+ channel, data, serverName, config.serverName(), "SERVER"
+ );
+ sendProtocolMessage(message);
+ }
 
     @Override
     public void sendToProxy(@NotNull String channel, @NotNull String data) {
@@ -456,12 +456,12 @@ public class RpcClientMessenger implements Messenger, AutoCloseable {
             return;
         }
 
-        // Send to proxy (target is null for proxy delivery)
-        RpcProtocolMessage message = RpcProtocolMessage.message(
-            channel, data, null, config.serverName()
-        );
-        sendProtocolMessage(message);
-    }
+ // Send to proxy (target is PROXY so the server never forwards it to backends)
+ RpcProtocolMessage message = RpcProtocolMessage.message(
+ channel, data, null, config.serverName(), "PROXY"
+ );
+ sendProtocolMessage(message);
+ }
 
     private synchronized boolean sendProtocolMessage(@NotNull RpcProtocolMessage message) {
         if (!connected.get() || output == null) {

@@ -27,6 +27,17 @@ public interface BotEventListener {
      * @param type    the event type (e.g., "CHAT", "POSITION", "HEALTH", "READY", "ERROR")
      * @param botName the name of the bot that produced the event
      * @param message the event message or payload
+     * @param server  the logical server the event was produced on; empty when
+     *                the producer did not tag the event with a server
      */
-    record BotEvent(@NotNull String type, @NotNull String botName, @NotNull String message) {}
+    record BotEvent(@NotNull String type, @NotNull String botName, @NotNull String message, @NotNull String server) {
+
+        /**
+         * Legacy constructor for producers without server context.
+         * The event is tagged with an empty server.
+         */
+        BotEvent(@NotNull String type, @NotNull String botName, @NotNull String message) {
+            this(type, botName, message, "");
+        }
+    }
 }

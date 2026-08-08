@@ -64,6 +64,13 @@ public class RpcProtocolMessage {
     private String data;
     private String targetServer;
     private String sourceServer;
+    /**
+     * Optional routing hint for MESSAGE envelopes: {@code "ALL"}, {@code "SERVER"},
+     * {@code "PROXY"} or {@code null} (legacy, treated as broadcast by the server).
+     * Allows the proxy to distinguish proxy-addressed envelopes (e.g. RPC requests)
+     * from broadcasts so they are never forwarded to backend servers.
+     */
+    private String target;
     private Long timestamp;
 
     /**
@@ -99,12 +106,29 @@ public class RpcProtocolMessage {
      */
     public static RpcProtocolMessage message(@NotNull String channel, @NotNull String data,
                                               @Nullable String targetServer, @NotNull String sourceServer) {
+        return message(channel, data, targetServer, sourceServer, null);
+    }
+
+    /**
+     * Creates a MESSAGE envelope for application data with an explicit routing target.
+     *
+     * @param channel      the message channel for routing
+     * @param data         the serialized message payload
+     * @param targetServer the target server name (only meaningful when target is {@code "SERVER"})
+     * @param sourceServer the originating server name
+     * @param target       routing hint: {@code "ALL"}, {@code "SERVER"}, {@code "PROXY"} or null (broadcast)
+     * @return a new MESSAGE protocol message
+     */
+    public static RpcProtocolMessage message(@NotNull String channel, @NotNull String data,
+                                              @Nullable String targetServer, @NotNull String sourceServer,
+                                              @Nullable String target) {
         RpcProtocolMessage msg = new RpcProtocolMessage();
         msg.type = Type.MESSAGE;
         msg.channel = channel;
         msg.data = data;
         msg.targetServer = targetServer;
         msg.sourceServer = sourceServer;
+        msg.target = target;
         msg.timestamp = System.currentTimeMillis();
         return msg;
     }
@@ -191,6 +215,14 @@ public class RpcProtocolMessage {
 
     public void setSourceServer(@Nullable String sourceServer) {
         this.sourceServer = sourceServer;
+    }
+
+    public @Nullable String getTarget() {
+        return target;
+    }
+
+    public void setTarget(@Nullable String target) {
+        this.target = target;
     }
 
     public @Nullable Long getTimestamp() {

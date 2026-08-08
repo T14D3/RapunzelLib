@@ -22,7 +22,7 @@ fabric-loader = "0.19.2"
 snakeyaml = "2.0"
 gson = "2.10.1"
 slf4j = "2.0.16"
-asm = "9.7.1"
+asm = "9.9.1"
 brigadier = "1.0.18"
 
 velocity-api = "3.4.0-SNAPSHOT"

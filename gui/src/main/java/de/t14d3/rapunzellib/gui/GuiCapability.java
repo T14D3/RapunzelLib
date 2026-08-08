@@ -17,5 +17,17 @@ public enum GuiCapability {
     ITEM_DISPLAY,
     PAGINATION,
     MODAL,
-    SCROLLABLE
+    SCROLLABLE,
+    /**
+     * The renderer draws GUI content onto a 128x128 map item canvas instead of an inventory.
+     */
+    MAP_RENDERING,
+    /**
+     * The renderer can display live world terrain as the map background.
+     */
+    LIVE_TERRAIN,
+    /**
+     * The renderer delivers clicks with pixel and block coordinates.
+     */
+    PIXEL_INPUT
 }

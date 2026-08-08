@@ -4,7 +4,9 @@ import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.attachments.AttachmentSupport;
 import de.t14d3.rapunzellib.attachments.RAttachmentContainer;
 import de.t14d3.rapunzellib.commands.ConsoleCommandDispatcher;
+import de.t14d3.rapunzellib.common.message.YamlMessageFormatService;
 import de.t14d3.rapunzellib.config.ConfigService;
+import de.t14d3.rapunzellib.config.SnakeYamlConfigService;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.context.ServiceRegistry;
@@ -61,6 +63,21 @@ public final class ConsumerView implements RapunzelContext {
     private final LifecycleOwner consumerOwner;
     private final List<AutoCloseable> closeables = new ArrayList<>();
 
+    /**
+     * The consumer's own config and message services.
+     * <p>
+     * These must be scoped to the consumer, not to the shared platform
+     * context: {@link ConfigService} resolves bundled default resources
+     * through the consumer's {@link ResourceProvider} (i.e. the consumer
+     * plugin's jar), and {@link MessageFormatService} must read and write
+     * {@code messages.yml} in the consumer's own data directory. Delegating
+     * to the shared services would look for defaults inside the platform
+     * jar and put {@code messages.yml} in the platform plugin's folder.
+     * </p>
+     */
+    private final ConfigService consumerConfigs;
+    private final MessageFormatService consumerMessages;
+
     public ConsumerView(
         @NotNull RapunzelContext shared,
         @NotNull Logger logger,
@@ -73,6 +90,10 @@ public final class ConsumerView implements RapunzelContext {
         this.consumerDataDir = dataDirectory;
         this.consumerResources = resources;
         this.consumerOwner = owner;
+        this.consumerConfigs = new SnakeYamlConfigService(resources, logger);
+        this.consumerMessages = new YamlMessageFormatService(
+            consumerConfigs, logger, dataDirectory.resolve("messages.yml"), "messages.yml"
+        );
     }
 
     // -- Shared runtime (global) --------------------------------------------------
@@ -140,12 +161,12 @@ public final class ConsumerView implements RapunzelContext {
 
     @Override
     public @NotNull ConfigService configs() {
-        return shared.configs();
+        return consumerConfigs;
     }
 
     @Override
     public @NotNull MessageFormatService messages() {
-        return shared.messages();
+        return consumerMessages;
     }
 
     @Override

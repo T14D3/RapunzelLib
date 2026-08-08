@@ -6,6 +6,7 @@ import de.t14d3.rapunzellib.events.GameEventSupportManifest;
 import de.t14d3.rapunzellib.events.GameEventSupportManifests;
 import de.t14d3.rapunzellib.gui.AbstractGuiFeatureInstaller;
 import de.t14d3.rapunzellib.gui.GuiRenderer;
+import de.t14d3.rapunzellib.gui.shared.map.SharedMapGuiRenderer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -28,7 +29,8 @@ public final class PaperGuiFeatureInstaller extends AbstractGuiFeatureInstaller 
         return List.of(
             PaperGuiRenderer.inventory(),
             PaperGuiRenderer.dialog(),
-            PaperGuiRenderer.auto()
+            PaperGuiRenderer.auto(),
+            SharedMapGuiRenderer.INSTANCE
         );
     }
 

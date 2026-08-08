@@ -72,17 +72,19 @@ public class BotTcpServer implements AutoCloseable {
     }
 
     private void wireEventListeners() {
-        botManager.setChatEventListener((botName, message) ->
-                broadcast(event("chat", botName, "message", safeString(message))));
-        botManager.setDisconnectListener((botName, reason) ->
-                broadcast(event("disconnected", botName, "message", reason != null ? reason : "")));
-        botManager.setServerJoinListener((botName, serverHost) ->
-                broadcast(event("server", botName, "message", serverHost != null ? serverHost : "")));
+        botManager.setChatEventListener((botName, server, message) -> {
+            System.out.println("[devrunner] EVENT chat bot=" + botName + " server=" + server + " msg=" + safeString(message));
+            broadcast(event("chat", botName, server, "message", safeString(message)));
+        });
+        botManager.setDisconnectListener((botName, server, reason) ->
+                broadcast(event("disconnected", botName, server, "message", reason != null ? reason : "")));
+        botManager.setServerJoinListener((botName, server, serverHost) ->
+                broadcast(event("server", botName, server, "message", serverHost != null ? serverHost : "")));
         botManager.setInventoryListener(this::pushInventoryEvent);
-        botManager.setEntityListener((botName, ignored) -> pushEntityEvent(botName));
+        botManager.setEntityListener((botName, server, ignored) -> pushEntityEvent(botName, server));
         botManager.setAbilitiesListener(this::pushAbilitiesEvent);
-        botManager.setBlockListener((botName, ignored) -> pushBlockEvent(botName));
-        botManager.setExplosionListener((botName, ignored) -> pushExplosionEvent(botName));
+        botManager.setBlockListener((botName, server, ignored) -> pushBlockEvent(botName, server));
+        botManager.setExplosionListener((botName, server, ignored) -> pushExplosionEvent(botName, server));
     }
 
     /** Starts the server and returns the actual port it's listening on. */
@@ -145,12 +147,14 @@ public class BotTcpServer implements AutoCloseable {
     private JsonObject handleRequest(JsonObject request) {
         String type = request.get("type").getAsString();
         String botName = request.has("bot") ? request.get("bot").getAsString() : "";
+        // Logical server the request targets; empty for legacy clients (they
+        // fall back to any bot with the given name).
+        String server = request.has("server") ? request.get("server").getAsString() : "";
         long id = request.has("id") ? request.get("id").getAsLong() : -1;
 
         try {
             switch (type) {
                 case "connect" -> {
-                    String server = request.get("server").getAsString();
                     String address = addressResolver.resolve(server);
                     if (address == null) {
                         return error(id, "Unknown server: " + server);
@@ -158,16 +162,16 @@ public class BotTcpServer implements AutoCloseable {
                     String[] parts = address.split(":");
                     String host = parts[0];
                     int p = Integer.parseInt(parts[1]);
-                    botManager.connectBot(botName, host, p);
+                    botManager.connectBot(botName, server, host, p);
                     // Broadcast a "server" event with the logical server name so
                     // that RpcBotService.awaitServer() can match it by name
                     // (the BotManager's internal serverJoinListener broadcasts the
                     // raw IP address, which is not what awaitServer expects).
-                    broadcast(event("server", botName, "message", server));
+                    broadcast(event("server", botName, server, "message", server));
                     return ok(id);
                 }
                 case "disconnect" -> {
-                    botManager.disconnectBot(botName);
+                    botManager.disconnectBot(botName, server);
                     return ok(id);
                 }
                 case "dig" -> {
@@ -175,7 +179,7 @@ public class BotTcpServer implements AutoCloseable {
                     int y = request.get("y").getAsInt();
                     int z = request.get("z").getAsInt();
                     int dir = request.get("dir").getAsInt();
-                    botManager.digBlock(botName, x, y, z, dir);
+                    botManager.digBlock(botName, server, x, y, z, dir);
                     return ok(id);
                 }
                 case "use" -> {
@@ -184,46 +188,46 @@ public class BotTcpServer implements AutoCloseable {
                     int z = request.get("z").getAsInt();
                     int hand = request.get("hand").getAsInt();
                     int dir = request.get("dir").getAsInt();
-                    botManager.useItemOn(botName, x, y, z, hand, dir);
+                    botManager.useItemOn(botName, server, x, y, z, hand, dir);
                     return ok(id);
                 }
                 case "exec" -> {
                     String cmd = request.get("command").getAsString();
-                    botManager.execute(botName, cmd);
+                    botManager.execute(botName, server, cmd);
                     return ok(id);
                 }
                 case "move_to" -> {
                     int x = request.get("x").getAsInt();
                     int y = request.get("y").getAsInt();
                     int z = request.get("z").getAsInt();
-                    botManager.moveTo(botName, x, y, z);
+                    botManager.moveTo(botName, server, x, y, z);
                     return ok(id);
                 }
                 case "attack" -> {
                     int entityId = request.get("entityId").getAsInt();
-                    botManager.attackEntity(botName, entityId);
+                    botManager.attackEntity(botName, server, entityId);
                     return ok(id);
                 }
                 case "interact" -> {
                     int entityId = request.get("entityId").getAsInt();
                     int hand = request.get("hand").getAsInt();
-                    botManager.interactEntity(botName, entityId, hand);
+                    botManager.interactEntity(botName, server, entityId, hand);
                     return ok(id);
                 }
                 case "swing" -> {
                     int hand = request.get("hand").getAsInt();
-                    botManager.swingHand(botName, hand);
+                    botManager.swingHand(botName, server, hand);
                     return ok(id);
                 }
                 case "set_slot" -> {
                     int slot = request.get("slot").getAsInt();
-                    botManager.setHeldItemSlot(botName, slot);
+                    botManager.setHeldItemSlot(botName, server, slot);
                     return ok(id);
                 }
                 // ── Inventory read ──
                 case "query_inventory" -> {
                     int containerId = request.get("containerId").getAsInt();
-                    BotClient.ContainerSnapshot snap = botManager.queryInventory(botName, containerId);
+                    BotClient.ContainerSnapshot snap = botManager.queryInventory(botName, server, containerId);
                     if (snap == null) return error(id, "Bot not connected or container not tracked");
                     return inventoryResponse(id, snap);
                 }
@@ -233,20 +237,20 @@ public class BotTcpServer implements AutoCloseable {
                     int slot = request.get("slot").getAsInt();
                     int button = request.get("button").getAsInt();
                     String clickType = request.get("clickType").getAsString();
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    botManager.clickContainer(botName, containerId, slot, button, clickType);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    botManager.clickContainer(botName, server, containerId, slot, button, clickType);
                     return ok(id);
                 }
                 case "close_container" -> {
                     int containerId = request.get("containerId").getAsInt();
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    botManager.closeContainer(botName, containerId);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    botManager.closeContainer(botName, server, containerId);
                     return ok(id);
                 }
                 case "drop_item" -> {
                     boolean dropAll = request.get("dropAll").getAsBoolean();
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    botManager.dropHeldItem(botName, dropAll);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    botManager.dropHeldItem(botName, server, dropAll);
                     return ok(id);
                 }
                 case "creative_slot" -> {
@@ -255,17 +259,17 @@ public class BotTcpServer implements AutoCloseable {
                     int amount = request.get("amount").getAsInt();
                     // componentsJson is intentionally ignored - the slim
                     // transport carries only id+amount.
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    botManager.setCreativeSlot(botName, slot, itemId, amount);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    botManager.setCreativeSlot(botName, server, slot, itemId, amount);
                     return ok(id);
                 }
                 // ── Tab-completion (B) ──
                 case "tab_complete" -> {
                     String text = request.get("text").getAsString();
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
                     try {
                         java.util.List<BotClient.Suggestion> suggestions =
-                                botManager.queryTabComplete(botName, text, 30_000);
+                                botManager.queryTabComplete(botName, server, text, 30_000);
                         JsonObject res = new JsonObject();
                         res.addProperty("type", "tab_complete");
                         res.addProperty("id", id);
@@ -284,32 +288,32 @@ public class BotTcpServer implements AutoCloseable {
                 }
                 // ── Entity snapshots (B/C) ──
                 case "query_entities_full" -> {
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "entities_full");
                     res.addProperty("id", id);
                     JsonArray arr = new JsonArray();
-                    for (BotClient.EntitySnapshot s : botManager.entitySnapshots(botName)) arr.add(entityJson(s));
+                    for (BotClient.EntitySnapshot s : botManager.entitySnapshots(botName, server)) arr.add(entityJson(s));
                     res.add("entities", arr);
                     return res;
                 }
                 // ── Block snapshots ──
                 case "query_blocks" -> {
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "blocks");
                     res.addProperty("id", id);
                     JsonArray arr = new JsonArray();
-                    for (BotClient.BlockSnapshot s : botManager.blockSnapshots(botName)) arr.add(blockJson(s));
+                    for (BotClient.BlockSnapshot s : botManager.blockSnapshots(botName, server)) arr.add(blockJson(s));
                     res.add("blocks", arr);
                     return res;
                 }
                 case "clear_blocks" -> {
-                    botManager.clearBlockSnapshots(botName);
+                    botManager.clearBlockSnapshots(botName, server);
                     return ok(id);
                 }
                 case "query_explosion" -> {
-                    BotClient.ExplosionSnapshot snap = botManager.latestExplosion(botName);
+                    BotClient.ExplosionSnapshot snap = botManager.latestExplosion(botName, server);
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "explosion");
                     res.addProperty("id", id);
@@ -323,8 +327,8 @@ public class BotTcpServer implements AutoCloseable {
                 }
                 case "query_entity" -> {
                     int entityId = request.get("entityId").getAsInt();
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    BotClient.EntitySnapshot s = botManager.entitySnapshot(botName, entityId);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    BotClient.EntitySnapshot s = botManager.entitySnapshot(botName, server, entityId);
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "entity");
                     res.addProperty("id", id);
@@ -337,8 +341,8 @@ public class BotTcpServer implements AutoCloseable {
                 }
                 // ── Player self-state (C) ──
                 case "query_abilities" -> {
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    BotClient.AbilitiesSnapshot a = botManager.abilities(botName);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    BotClient.AbilitiesSnapshot a = botManager.abilities(botName, server);
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "abilities");
                     res.addProperty("id", id);
@@ -353,8 +357,8 @@ public class BotTcpServer implements AutoCloseable {
                     return res;
                 }
                 case "respawn" -> {
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    botManager.respawn(botName);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    botManager.respawn(botName, server);
                     return ok(id);
                 }
                 case "player_input" -> {
@@ -365,25 +369,25 @@ public class BotTcpServer implements AutoCloseable {
                     boolean jump = bool(request, "jump");
                     boolean sneak = bool(request, "sneak");
                     boolean sprint = bool(request, "sprint");
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    botManager.sendPlayerInput(botName, forward, backward, left, right, jump, sneak, sprint);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    botManager.sendPlayerInput(botName, server, forward, backward, left, right, jump, sneak, sprint);
                     return ok(id);
                 }
                 case "set_flying" -> {
                     boolean flying = request.get("flying").getAsBoolean();
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    botManager.setFlying(botName, flying);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    botManager.setFlying(botName, server, flying);
                     return ok(id);
                 }
                 case "use_item" -> {
                     int hand = request.get("hand").getAsInt();
-                    if (!botManager.hasBot(botName)) return error(id, "Bot not found: " + botName);
-                    botManager.useItem(botName, hand);
+                    if (!botManager.hasBot(botName, server)) return error(id, "Bot not found: " + botName);
+                    botManager.useItem(botName, server, hand);
                     return ok(id);
                 }
                 // ── Existing read-only queries ──
                 case "query_position" -> {
-                    double[] pos = botManager.queryPosition(botName);
+                    double[] pos = botManager.queryPosition(botName, server);
                     if (pos == null) return error(id, "Bot not found");
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "position");
@@ -396,7 +400,7 @@ public class BotTcpServer implements AutoCloseable {
                     return res;
                 }
                 case "query_health" -> {
-                    float[] health = botManager.queryHealth(botName);
+                    float[] health = botManager.queryHealth(botName, server);
                     if (health == null) return error(id, "Bot not found");
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "health");
@@ -407,7 +411,7 @@ public class BotTcpServer implements AutoCloseable {
                     return res;
                 }
                 case "query_held_item" -> {
-                    int[] item = botManager.queryHeldItem(botName);
+                    int[] item = botManager.queryHeldItem(botName, server);
                     if (item == null) return error(id, "Bot not found");
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "held_item");
@@ -416,7 +420,7 @@ public class BotTcpServer implements AutoCloseable {
                     return res;
                 }
                 case "query_gamemode" -> {
-                    String gm = botManager.queryGameMode(botName);
+                    String gm = botManager.queryGameMode(botName, server);
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "gamemode");
                     res.addProperty("id", id);
@@ -424,7 +428,7 @@ public class BotTcpServer implements AutoCloseable {
                     return res;
                 }
                 case "query_open_container" -> {
-                    int containerId = botManager.queryOpenContainerId(botName);
+                    int containerId = botManager.queryOpenContainerId(botName, server);
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "open_container");
                     res.addProperty("id", id);
@@ -433,7 +437,7 @@ public class BotTcpServer implements AutoCloseable {
                 }
                 case "query_entities" -> {
                     String typeName = request.get("entityType").getAsString();
-                    int[] ids = botManager.findEntities(botName, typeName);
+                    int[] ids = botManager.findEntities(botName, server, typeName);
                     JsonObject res = new JsonObject();
                     res.addProperty("type", "entities");
                     res.addProperty("id", id);
@@ -453,10 +457,11 @@ public class BotTcpServer implements AutoCloseable {
 
     // ── Event broadcasting ─────────────────────────────────────────────────
 
-    private static JsonObject event(String type, String botName, String key, String value) {
+    private static JsonObject event(String type, String botName, String server, String key, String value) {
         JsonObject o = new JsonObject();
         o.addProperty("type", type);
         o.addProperty("bot", botName);
+        if (server != null && !server.isEmpty()) o.addProperty("server", server);
         if (value != null) o.addProperty(key, value);
         return o;
     }
@@ -465,27 +470,30 @@ public class BotTcpServer implements AutoCloseable {
         return s == null ? "" : s;
     }
 
-    private void pushInventoryEvent(String botName, int containerId) {
-        BotClient.ContainerSnapshot snap = botManager.queryInventory(botName, containerId);
+    private void pushInventoryEvent(String botName, String server, int containerId) {
+        BotClient.ContainerSnapshot snap = botManager.queryInventory(botName, server, containerId);
         if (snap == null) return;
         JsonObject o = inventoryPayload(botName, snap);
+        if (server != null && !server.isEmpty()) o.addProperty("server", server);
         broadcast(o);
     }
 
-    private void pushEntityEvent(String botName) {
+    private void pushEntityEvent(String botName, String server) {
         JsonObject o = new JsonObject();
         o.addProperty("type", "entity");
         o.addProperty("bot", botName);
+        if (server != null && !server.isEmpty()) o.addProperty("server", server);
         JsonArray arr = new JsonArray();
-        for (BotClient.EntitySnapshot s : botManager.entitySnapshots(botName)) arr.add(entityJson(s));
+        for (BotClient.EntitySnapshot s : botManager.entitySnapshots(botName, server)) arr.add(entityJson(s));
         o.add("entities", arr);
         broadcast(o);
     }
 
-    private void pushAbilitiesEvent(String botName, BotClient.AbilitiesSnapshot snap) {
+    private void pushAbilitiesEvent(String botName, String server, BotClient.AbilitiesSnapshot snap) {
         JsonObject o = new JsonObject();
         o.addProperty("type", "abilities");
         o.addProperty("bot", botName);
+        if (server != null && !server.isEmpty()) o.addProperty("server", server);
         if (snap != null) {
             o.addProperty("invincible", snap.invincible);
             o.addProperty("canFly", snap.canFly);
@@ -497,22 +505,24 @@ public class BotTcpServer implements AutoCloseable {
         broadcast(o);
     }
 
-    private void pushBlockEvent(String botName) {
+    private void pushBlockEvent(String botName, String server) {
         JsonObject o = new JsonObject();
         o.addProperty("type", "block");
         o.addProperty("bot", botName);
+        if (server != null && !server.isEmpty()) o.addProperty("server", server);
         JsonArray arr = new JsonArray();
-        for (BotClient.BlockSnapshot s : botManager.blockSnapshots(botName)) arr.add(blockJson(s));
+        for (BotClient.BlockSnapshot s : botManager.blockSnapshots(botName, server)) arr.add(blockJson(s));
         o.add("blocks", arr);
         broadcast(o);
     }
 
-    private void pushExplosionEvent(String botName) {
-        BotClient.ExplosionSnapshot snap = botManager.latestExplosion(botName);
+    private void pushExplosionEvent(String botName, String server) {
+        BotClient.ExplosionSnapshot snap = botManager.latestExplosion(botName, server);
         if (snap == null) return;
         JsonObject o = new JsonObject();
         o.addProperty("type", "explosion");
         o.addProperty("bot", botName);
+        if (server != null && !server.isEmpty()) o.addProperty("server", server);
         o.addProperty("x", snap.x());
         o.addProperty("y", snap.y());
         o.addProperty("z", snap.z());

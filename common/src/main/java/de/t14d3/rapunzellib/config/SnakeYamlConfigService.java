@@ -86,6 +86,10 @@ public final class SnakeYamlConfigService implements ConfigService {
         String normalized = normalizeResourcePath(defaultResourcePath);
         try (InputStream in = resources.open(normalized).orElse(null)) {
             if (in == null) {
+                logger.warn(
+                    "Bundled default resource '{}' not found on the classpath; creating empty config file {}",
+                    normalized, targetFile
+                );
                 Files.createFile(targetFile);
                 return;
             }

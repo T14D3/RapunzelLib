@@ -146,6 +146,10 @@ public final class SharedNmsBeaconBeamVisual extends SharedNmsVisual<BeaconBeamC
     }
 
     private static BlockState getStainedGlassState(DyeColor color) {
+        // #if VERSION >= 26.2
+        // Minecraft 26.2 groups colored blocks into a ColorCollection keyed by DyeColor.
+        return Blocks.STAINED_GLASS.pick(color).defaultBlockState();
+        // #else
         return switch (color) {
             case WHITE -> Blocks.WHITE_STAINED_GLASS.defaultBlockState();
             case ORANGE -> Blocks.ORANGE_STAINED_GLASS.defaultBlockState();
@@ -164,6 +168,7 @@ public final class SharedNmsBeaconBeamVisual extends SharedNmsVisual<BeaconBeamC
             case RED -> Blocks.RED_STAINED_GLASS.defaultBlockState();
             case BLACK -> Blocks.BLACK_STAINED_GLASS.defaultBlockState();
         };
+        // #endif
     }
 
     private static DyeColor toDyeColor(@NotNull NamedTextColor color) {

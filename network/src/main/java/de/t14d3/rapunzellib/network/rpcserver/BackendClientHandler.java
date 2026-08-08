@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,6 +63,7 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners;
  private final Map<String, BackendClientHandler> clients;
  private final String localServerName;
+ private final RoutingHooks routingHooks;
 
  /**
  * Creates a new backend client handler.
@@ -80,6 +82,28 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  @NotNull Map<String, CopyOnWriteArrayList<MessageListener>> listeners,
  @NotNull Map<String, BackendClientHandler> clients,
  @NotNull String localServerName) throws IOException {
+ this(socket, gson, logger, config, listeners, clients, localServerName, RoutingHooks.NONE);
+ }
+
+ /**
+ * Creates a new backend client handler with routing hooks.
+ *
+ * @param socket the client socket
+ * @param gson the Gson instance for JSON serialization
+ * @param logger the logger instance
+ * @param config the RPC server configuration
+ * @param listeners the shared listener registry
+ * @param clients the shared client handler registry
+ * @param localServerName the name of this proxy server
+ * @param routingHooks optional routing hooks for backends not connected over TCP
+ * @throws IOException if streams cannot be created
+ */
+ public BackendClientHandler(@NotNull Socket socket, @NotNull Gson gson, @NotNull Logger logger,
+ @NotNull RpcServerConfig config,
+ @NotNull Map<String, CopyOnWriteArrayList<MessageListener>> listeners,
+ @NotNull Map<String, BackendClientHandler> clients,
+ @NotNull String localServerName,
+ @NotNull RoutingHooks routingHooks) throws IOException {
  this.socket = socket;
  this.gson = gson;
  this.logger = logger;
@@ -87,6 +111,7 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  this.listeners = listeners;
  this.clients = clients;
  this.localServerName = localServerName;
+ this.routingHooks = routingHooks;
 
  this.socket.setSoTimeout((int) config.heartbeatTimeoutMillis());
  this.socket.setKeepAlive(true);
@@ -220,6 +245,7 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  String data = message.getData();
  String targetServer = message.getTargetServer();
  String sourceServer = message.getSourceServer();
+ String target = message.getTarget();
 
  if (channel == null || data == null) {
  logger.warn("Invalid MESSAGE from {}: missing channel or data", serverName);
@@ -232,23 +258,60 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  }
 
  // Route the message
- routeMessage(channel, data, targetServer, sourceServer);
+ routeMessage(channel, data, targetServer, sourceServer, target);
  }
 
  private void routeMessage(@NotNull String channel, @NotNull String data,
- @Nullable String targetServer, @NotNull String sourceServer) {
+ @Nullable String targetServer, @NotNull String sourceServer,
+ @Nullable String target) {
  // Deliver to local listeners
  deliverToLocalListeners(channel, data, sourceServer);
 
- // Route to target server if specified
+ // Proxy-addressed envelopes (e.g. RPC requests) must never be forwarded
+ // to backend servers.
+ if (target != null && "PROXY".equalsIgnoreCase(target)) {
+ return;
+ }
+
+ // Targeted envelopes: route to the target backend only.
+ if (target != null && "SERVER".equalsIgnoreCase(target)) {
  if (targetServer != null && !targetServer.equalsIgnoreCase(localServerName)) {
+ routeToBackend(channel, data, sourceServer, targetServer);
+ }
+ return;
+ }
+
+ // Legacy targeted envelopes (no explicit target hint).
+ if (target == null && targetServer != null && !targetServer.isBlank()) {
+ if (!targetServer.equalsIgnoreCase(localServerName)) {
+ routeToBackend(channel, data, sourceServer, targetServer);
+ }
+ return;
+ }
+
+ // Broadcast to all other backends (except source)
+ broadcastToBackends(channel, data, sourceServer);
+ }
+
+ private void routeToBackend(@NotNull String channel, @NotNull String data,
+ @NotNull String sourceServer, @NotNull String targetServer) {
  BackendClientHandler target = clients.get(targetServer);
  if (target != null) {
  target.sendToServer(channel, data, sourceServer);
+ return;
  }
- } else if (targetServer == null) {
- // Broadcast to all other backends (except source)
- broadcastToBackends(channel, data, sourceServer);
+ if (!tryExternalForward(channel, data, sourceServer, targetServer)) {
+ logger.debug("Target server '{}' not connected over TCP or plugin messaging", targetServer);
+ }
+ }
+
+ private boolean tryExternalForward(@NotNull String channel, @NotNull String data,
+ @NotNull String sourceServer, @NotNull String targetServer) {
+ try {
+ return routingHooks.externalForward().forward(channel, data, sourceServer, targetServer);
+ } catch (Exception e) {
+ logger.debug("External forward failed for target {}", targetServer, e);
+ return false;
  }
  }
 
@@ -268,6 +331,33 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  }
 
  private void broadcastToBackends(@NotNull String channel, @NotNull String data, @NotNull String sourceServer) {
+ Collection<String> knownBackends = null;
+ try {
+ knownBackends = routingHooks.knownBackends().get();
+ } catch (Exception e) {
+ logger.debug("knownBackends supplier failed", e);
+ }
+
+ if (knownBackends != null && !knownBackends.isEmpty()) {
+ // Route over the known backend list so backends that are only reachable
+ // via plugin messaging (no TCP bridge) are still delivered to.
+ for (String backendName : knownBackends) {
+ if (backendName == null || backendName.isBlank()) continue;
+ if (backendName.equalsIgnoreCase(sourceServer)) continue;
+ if (backendName.equalsIgnoreCase(localServerName)) continue;
+ BackendClientHandler client;
+ synchronized (clients) {
+ client = clients.get(backendName);
+ }
+ if (client != null) {
+ client.sendToServer(channel, data, sourceServer);
+ } else {
+ tryExternalForward(channel, data, sourceServer, backendName);
+ }
+ }
+ return;
+ }
+
  RpcProtocolMessage message = RpcProtocolMessage.message(channel, data, null, sourceServer);
 
  synchronized (clients) {

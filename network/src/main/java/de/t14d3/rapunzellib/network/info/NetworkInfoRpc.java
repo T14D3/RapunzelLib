@@ -25,6 +25,13 @@ public final class NetworkInfoRpc {
     public static final String LIST_SERVERS = "list_servers";
     /** RPC method to list all online players. */
     public static final String LIST_PLAYERS = "list_players";
+    /**
+     * RPC method (answered by backends) to list the players online on a single
+     * backend. The proxy merges these answers into {@link #LIST_PLAYERS} so
+     * players that connect directly to a backend (without traversing the proxy)
+     * are still visible on the network.
+     */
+    public static final String LIST_LOCAL_PLAYERS = "list_local_players";
 
     private static final Type STRING_LIST_TYPE = new TypeToken<List<String>>() {
     }.getType();
@@ -45,6 +52,13 @@ public final class NetworkInfoRpc {
     public static final RpcMethod<Void, List<NetworkPlayerInfo>> LIST_PLAYERS_METHOD = RpcMethod.of(
         SERVICE,
         LIST_PLAYERS,
+        Void.class,
+        PLAYER_LIST_TYPE
+    );
+    /** RPC method descriptor for listing the players online on a single backend. */
+    public static final RpcMethod<Void, List<NetworkPlayerInfo>> LIST_LOCAL_PLAYERS_METHOD = RpcMethod.of(
+        SERVICE,
+        LIST_LOCAL_PLAYERS,
         Void.class,
         PLAYER_LIST_TYPE
     );

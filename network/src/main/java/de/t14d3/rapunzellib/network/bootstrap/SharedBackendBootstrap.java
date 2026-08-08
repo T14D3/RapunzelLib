@@ -477,6 +477,20 @@ public final class SharedBackendBootstrap {
                 : null;
             if (pluginMessenger != null) {
                 context.register(pluginMessengerType, pluginMessenger);
+
+                // Bind the locally resolved server name immediately so the plugin
+                // messenger knows its identity before the proxy's NetworkInfo RPC
+                // round-trip completes (the RPC may still refresh it later). Without
+                // this fallback the messenger emits envelopes with sourceServer
+                // "unknown" and cross-server targeting stays broken whenever the RPC
+                // cannot be answered (proxy not reachable, no carrier, no responder).
+                String resolvedServerName = resolvedNames.serverName();
+                if (pluginNetworkServerNameHook != null
+                    && resolvedServerName != null
+                    && !resolvedServerName.isBlank()) {
+                    pluginNetworkServerNameHook.accept(pluginMessenger, resolvedServerName);
+                    logger.info("[Network] Bound plugin messenger server name from config/env: {}", resolvedServerName);
+                }
             }
 
             Messenger effectiveMessenger = TransportBootstrapResultApplier.apply(context, logger, transport);

@@ -77,6 +77,7 @@ public class RpcServerMessenger implements Messenger, AutoCloseable {
  private final RpcServerConfig config;
  private final Logger logger;
  private final Gson gson = JsonCodecs.gson();
+ private final RoutingHooks routingHooks;
 
  private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
  private final Map<String, BackendClientHandler> clients = new ConcurrentHashMap<>();
@@ -106,8 +107,22 @@ public class RpcServerMessenger implements Messenger, AutoCloseable {
  * @throws IllegalArgumentException if config or logger is null
  */
  public RpcServerMessenger(@NotNull RpcServerConfig config, @NotNull Logger logger) {
+ this(config, logger, RoutingHooks.NONE);
+ }
+
+ /**
+ * Creates a new RPC server messenger with custom logger and routing hooks.
+ *
+ * @param config the RPC server configuration
+ * @param logger the logger instance
+ * @param routingHooks hooks for routing to backends that are not TCP-connected
+ * @throws IllegalArgumentException if config or logger is null
+ */
+ public RpcServerMessenger(@NotNull RpcServerConfig config, @NotNull Logger logger,
+ @NotNull RoutingHooks routingHooks) {
  this.config = Objects.requireNonNull(config, "config");
  this.logger = Objects.requireNonNull(logger, "logger");
+ this.routingHooks = Objects.requireNonNull(routingHooks, "routingHooks");
 
  startServer();
  }
@@ -161,7 +176,7 @@ public class RpcServerMessenger implements Messenger, AutoCloseable {
 
  // Create handler and submit to executor
  BackendClientHandler handler = new BackendClientHandler(
- clientSocket, gson, logger, config, listeners, clients, config.serverName()
+ clientSocket, gson, logger, config, listeners, clients, config.serverName(), routingHooks
  );
  clientExecutor.submit(handler);
 
@@ -195,7 +210,7 @@ public class RpcServerMessenger implements Messenger, AutoCloseable {
 
  // Broadcast to all connected backends
  RpcProtocolMessage message = RpcProtocolMessage.message(
- channel, data, null, config.serverName()
+ channel, data, null, config.serverName(), "ALL"
  );
 
  synchronized (clients) {
@@ -225,7 +240,41 @@ public class RpcServerMessenger implements Messenger, AutoCloseable {
  // Send to specific backend
  BackendClientHandler client = clients.get(serverName);
  if (client != null) {
- client.sendToServer(channel, data, config.serverName());
+ client.sendMessage(RpcProtocolMessage.message(channel, data, serverName, config.serverName(), "SERVER"));
+ } else {
+ logger.debug("Target server '{}' not connected", serverName);
+ }
+ }
+
+ /**
+ * Sends a message to a specific backend, preserving the original source server
+ * name (used when relaying envelopes that originated on another backend).
+ *
+ * @param channel      the message channel
+ * @param serverName   the target backend server name
+ * @param data         the serialized payload
+ * @param sourceServer the originating server name to report to the target
+ */
+ public void sendToServer(@NotNull String channel, @NotNull String serverName,
+ @NotNull String data, @NotNull String sourceServer) {
+ Objects.requireNonNull(channel, "channel");
+ Objects.requireNonNull(serverName, "serverName");
+ Objects.requireNonNull(data, "data");
+ Objects.requireNonNull(sourceServer, "sourceServer");
+
+ if (!running.get()) {
+ logger.debug("Cannot sendToServer: server not running");
+ return;
+ }
+
+ if (serverName.equalsIgnoreCase(config.serverName())) {
+ deliverToLocalListeners(channel, data, sourceServer);
+ return;
+ }
+
+ BackendClientHandler client = clients.get(serverName);
+ if (client != null) {
+ client.sendMessage(RpcProtocolMessage.message(channel, data, serverName, sourceServer, "SERVER"));
  } else {
  logger.debug("Target server '{}' not connected", serverName);
  }

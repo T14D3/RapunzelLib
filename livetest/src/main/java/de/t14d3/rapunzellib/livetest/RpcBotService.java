@@ -48,9 +48,12 @@ public class RpcBotService implements BotService, AutoCloseable {
     private static final String PORT_PROPERTY = "rapunzellib.bot.rpc.port";
     private static final int DEFAULT_PORT = 26566;
 
-    private final Socket socket;
-    private final PrintWriter writer;
-    private final BufferedReader reader;
+    private volatile Socket socket;
+    private final String host;
+    private final int port;
+    private volatile PrintWriter writer;
+    private volatile BufferedReader reader;
+    private final Object writeLock = new Object();
     private final AtomicLong requestIdCounter = new AtomicLong(1);
     private final Map<Long, CompletableFuture<JsonObject>> pending = new ConcurrentHashMap<>();
     private final EventDispatcher dispatcher = new EventDispatcher();
@@ -77,6 +80,15 @@ public class RpcBotService implements BotService, AutoCloseable {
     // slot is registered after the event has already been dispatched.
     private final Map<String, String> serverCache = new ConcurrentHashMap<>();
 
+    // Bots owned by this client: botName -> set of logical servers the bot has
+    // been connected to. Used to scope outgoing requests and to filter incoming
+    // events (multiple backend servers share one bot TCP server and may use the
+    // same bot names concurrently).
+    private final Map<String, java.util.Set<String>> botServers = new ConcurrentHashMap<>();
+    // Last server each bot was connected to; requests for that bot are routed
+    // to that server.
+    private final Map<String, String> botPrimaryServer = new ConcurrentHashMap<>();
+
     // Local cache of the latest abilities snapshot per bot. Populated on
     // "abilities" events so that queryAbilities() can return immediately
     // without waiting for an RPC round-trip - and as a fallback in case the
@@ -90,17 +102,32 @@ public class RpcBotService implements BotService, AutoCloseable {
     }
 
     public RpcBotService(String host, int port) {
+        this.host = host;
+        this.port = port;
+        this.socket = connectSocket(host, port);
         try {
-            this.socket = new Socket();
-            socket.connect(new InetSocketAddress(host, port), 5_000);
-            socket.setSoTimeout(0); // we have our own timeouts via the dispatcher
             this.writer = new PrintWriter(
                     new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
             this.reader = new BufferedReader(
                     new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         } catch (IOException e) {
+            throw new RuntimeException("Failed to open BotRPC transport to " + host + ":" + port, e);
+        }
+        startReaderThread(this.reader);
+    }
+
+    private static Socket connectSocket(String host, int port) {
+        try {
+            Socket fresh = new Socket();
+            fresh.connect(new InetSocketAddress(host, port), 5_000);
+            fresh.setSoTimeout(0); // we have our own timeouts via the dispatcher
+            return fresh;
+        } catch (IOException e) {
             throw new RuntimeException("Failed to connect to BotRPC server at " + host + ":" + port, e);
         }
+    }
+
+    private void startReaderThread(BufferedReader reader) {
         Thread readerThread = new Thread(this::readLoop, "rpc-bot-reader");
         readerThread.setDaemon(true);
         readerThread.start();
@@ -111,6 +138,16 @@ public class RpcBotService implements BotService, AutoCloseable {
     private CompletableFuture<JsonObject> sendRequest(JsonObject request) {
         long id = requestIdCounter.getAndIncrement();
         request.addProperty("id", id);
+        // Route the request to the server this client connected the bot to.
+        // The BotTcpServer pools bots per (name, server); without the server
+        // field the request could hit a same-named bot on another server.
+        if (request.has("bot") && !request.has("server")) {
+            String bot = request.get("bot").getAsString();
+            String srv = botPrimaryServer.get(bot);
+            if (srv != null && !srv.isEmpty()) {
+                request.addProperty("server", srv);
+            }
+        }
         CompletableFuture<JsonObject> future = new CompletableFuture<>();
         pending.put(id, future);
         // Time out pending requests even if the server never replies.
@@ -121,10 +158,79 @@ public class RpcBotService implements BotService, AutoCloseable {
                         "BotRPC request " + request.get("type").getAsString() + " timed out"));
             }
         }, 30, TimeUnit.SECONDS);
-        synchronized (this) {
-            writer.println(GSON.toJson(request));
+        if (!writeLine(request)) {
+            // The transport broke (PrintWriter swallows IOExceptions, so a dead
+            // socket would otherwise silently drop every request). Try once to
+            // restore it; if that fails, fail loudly instead of hanging.
+            try {
+                reconnectTransport();
+                if (writeLine(request)) {
+                    return future;
+                }
+            } catch (IOException e) {
+                // fall through to the loud failure below
+            }
+            pending.remove(id);
+            serverCache.clear();
+            future.completeExceptionally(new RuntimeException(
+                    "BotRPC connection lost; request '" + request.get("type").getAsString()
+                            + "' for bot '" + request.get("bot").getAsString() + "' was not delivered"));
         }
         return future;
+    }
+
+    /**
+     * Writes a request line to the TCP transport. Returns {@code false} when
+     * the underlying socket is broken (the PrintWriter error flag is set).
+     */
+    private boolean writeLine(JsonObject request) {
+        synchronized (writeLock) {
+            PrintWriter w = writer;
+            if (w == null || w.checkError()) return false;
+            try {
+                w.println(GSON.toJson(request));
+            } catch (RuntimeException e) {
+                return false;
+            }
+            return !w.checkError();
+        }
+    }
+
+    /**
+     * Replaces a broken TCP transport with a fresh connection. The old socket
+     * is abandoned without closing it so the old reader thread keeps idling
+     * instead of failing the shared pending map; a new reader handles the new
+     * connection. Stale caches are cleared so {@code awaitServer()} cannot
+     * false-positive on arrivals from the dead connection.
+     */
+    private synchronized void reconnectTransport() throws IOException {
+        PrintWriter w = writer;
+        if (w == null || !w.checkError()) {
+            return; // already healthy (or another thread reconnected first)
+        }
+        Socket fresh = connectSocket(host, port);
+        PrintWriter freshWriter;
+        BufferedReader freshReader;
+        try {
+            freshWriter = new PrintWriter(
+                    new OutputStreamWriter(fresh.getOutputStream(), StandardCharsets.UTF_8), true);
+            freshReader = new BufferedReader(
+                    new InputStreamReader(fresh.getInputStream(), StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            try {
+                fresh.close();
+            } catch (IOException ignored) {
+            }
+            throw e;
+        }
+        // Publish the new transport *before* starting the reader so the old
+        // reader's finally block can no longer fail the pending requests.
+        this.socket = fresh;
+        this.writer = freshWriter;
+        this.reader = freshReader;
+        serverCache.clear();
+        System.err.println("[rpc-bot] transport reconnected to " + host + ":" + port);
+        startReaderThread(freshReader);
     }
 
     private void sendAndForget(JsonObject request) {
@@ -139,9 +245,10 @@ public class RpcBotService implements BotService, AutoCloseable {
     }
 
     private void readLoop() {
+        BufferedReader myReader = this.reader;
         try {
             String line;
-            while (running && (line = reader.readLine()) != null) {
+            while (running && (line = myReader.readLine()) != null) {
                 if (line.isBlank()) continue;
                 try {
                     JsonObject msg = GSON.fromJson(line, JsonObject.class);
@@ -154,13 +261,19 @@ public class RpcBotService implements BotService, AutoCloseable {
             }
         } catch (IOException e) {
             if (running) {
-                dispatcher.failAll(new RuntimeException("BotRPC connection lost", e));
+                // Only the current connection may fail the awaits - an
+                // abandoned connection replaced by a reconnect must not.
+                if (this.reader == myReader) {
+                    dispatcher.failAll(new RuntimeException("BotRPC connection lost", e));
+                }
             }
         } finally {
-            for (CompletableFuture<JsonObject> f : pending.values()) {
-                f.completeExceptionally(new RuntimeException("BotRPC connection closed"));
+            if (this.reader == myReader) {
+                for (CompletableFuture<JsonObject> f : pending.values()) {
+                    f.completeExceptionally(new RuntimeException("BotRPC connection closed"));
+                }
+                pending.clear();
             }
-            pending.clear();
         }
     }
 
@@ -173,8 +286,25 @@ public class RpcBotService implements BotService, AutoCloseable {
         // dispatch and leave the caller hanging.
         if (isEvent(type) && !msg.has("id")) {
             String botName = msg.has("bot") ? msg.get("bot").getAsString() : "";
+            // Only handle events for bots this client connected. The bot TCP
+            // server is shared by multiple backend servers which may use the
+            // same bot names concurrently, so events also carry the logical
+            // server and must match one this bot was connected to.
+            java.util.Set<String> knownServers = botServers.get(botName);
+            if (knownServers == null) {
+                return;
+            }
+            String evtServer = msg.has("server") ? msg.get("server").getAsString() : "";
+            if (!evtServer.isEmpty() && !knownServers.contains(evtServer)) {
+                return;
+            }
             String message = msg.has("message") ? msg.get("message").getAsString() : "";
-            BotEventListener.BotEvent event = new BotEventListener.BotEvent(type.toUpperCase(), botName, message);
+            // Tag the event with its source server so await predicates can be
+            // scoped to (bot, server): the devrunner broadcasts every event to
+            // every backend, and cross-server tests connect the same bot name
+            // to several servers at once.
+            BotEventListener.BotEvent event =
+                    new BotEventListener.BotEvent(type.toUpperCase(), botName, message, evtServer);
             if ("INVENTORY".equalsIgnoreCase(type)) {
                 // Cache the latest inventory so awaitInventory can match immediately.
                 BotInventory snap = parseInventoryPayload(msg);
@@ -283,6 +413,9 @@ public class RpcBotService implements BotService, AutoCloseable {
 
     @Override
     public @NotNull CompletableFuture<Bot> connect(@NotNull String name, @NotNull String serverName) {
+        botServers.computeIfAbsent(name, n -> java.util.concurrent.ConcurrentHashMap.newKeySet())
+                .add(serverName);
+        botPrimaryServer.put(name, serverName);
         JsonObject req = new JsonObject();
         req.addProperty("type", "connect");
         req.addProperty("bot", name);
@@ -482,6 +615,7 @@ public class RpcBotService implements BotService, AutoCloseable {
         EventDispatcher.AwaitSlot slot = new EventDispatcher.AwaitSlot(event -> {
             if (!"INVENTORY".equals(event.type())) return false;
             if (!name.equals(event.botName())) return false;
+            if (!serverMatchesScope(event, botPrimaryServer.get(name))) return false;
             BotInventory snap = getCachedInventory(name, containerId);
             return snap != null && matcher.test(snap);
         });
@@ -612,6 +746,7 @@ public class RpcBotService implements BotService, AutoCloseable {
                 new EventDispatcher.AwaitSlot(event -> {
                     if (!"ENTITY".equals(event.type())) return false;
                     if (!name.equals(event.botName())) return false;
+                    if (!serverMatchesScope(event, botPrimaryServer.get(name))) return false;
                     BotEntity found = findCachedEntity(name, matcher);
                     return found != null;
                 });
@@ -649,6 +784,7 @@ public class RpcBotService implements BotService, AutoCloseable {
         EventDispatcher.AwaitSlot slot = new EventDispatcher.AwaitSlot(event -> {
             if (!"BLOCK".equals(event.type())) return false;
             if (!botName.equals(event.botName())) return false;
+            if (!serverMatchesScope(event, botPrimaryServer.get(botName))) return false;
             return hasCachedBlock(botName, x, y, z, expectedStateId);
         });
         dispatcher.registerAwait(slot);
@@ -729,6 +865,7 @@ public class RpcBotService implements BotService, AutoCloseable {
         EventDispatcher.AwaitSlot slot = new EventDispatcher.AwaitSlot(event -> {
             if (!"EXPLOSION".equals(event.type())) return false;
             if (!botName.equals(event.botName())) return false;
+            if (!serverMatchesScope(event, botPrimaryServer.get(botName))) return false;
             ExplosionSnapshot snap = explosionCache.get(botName);
             return snap != null && snap.radius() >= minRadius;
         });
@@ -967,7 +1104,7 @@ public class RpcBotService implements BotService, AutoCloseable {
         }
 
         // 2) Otherwise subscribe to subsequent SERVER events.
-        return awaitEvent(name, event -> {
+        return awaitEventUnscoped(name, event -> {
             if (!"SERVER".equals(event.type())) return false;
             String m = event.message();
             return m != null && (m.equals(target) || m.equals(target.toLowerCase()));
@@ -976,6 +1113,42 @@ public class RpcBotService implements BotService, AutoCloseable {
 
     @Override
     public @NotNull CompletableFuture<BotEventListener.BotEvent> awaitEvent(
+            @NotNull String name,
+            @NotNull Predicate<BotEventListener.BotEvent> predicate,
+            @NotNull Duration timeout) {
+        // Scope the await to the (bot, server) pair this client connected the
+        // bot to. The devrunner broadcasts every event to every backend, and
+        // cross-server tests connect the same bot name to several servers, so
+        // an event tagged with a DIFFERENT server must not satisfy a local
+        // await. The scope is the bot's primary server at registration time.
+        String scopeServer = botPrimaryServer.get(name);
+        EventDispatcher.AwaitSlot slot = new EventDispatcher.AwaitSlot(event ->
+                name.equals(event.botName())
+                        && serverMatchesScope(event, scopeServer)
+                        && predicate.test(event));
+        dispatcher.registerAwait(slot);
+        return slot.future.orTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
+                .handle((event, ex) -> {
+                    dispatcher.removeAwait(slot);
+                    if (ex != null) {
+                        Throwable cause = ex instanceof java.util.concurrent.CompletionException ? ex.getCause() : ex;
+                        if (cause instanceof java.util.concurrent.TimeoutException) {
+                            throw new RuntimeException("awaitEvent(" + name + ") timed out after " + timeout.toMillis() + "ms");
+                        }
+                        throw new RuntimeException("awaitEvent(" + name + ") failed: " + cause.getMessage(), cause);
+                    }
+                    return event;
+                });
+    }
+
+    /**
+     * {@link #awaitEvent} without the (bot, primary-server) scope. Used by
+     * {@link #awaitServer}, whose "server" events are tagged with the bot's
+     * CURRENT server - which is exactly what the predicate matches against
+     * and may differ from the server the bot was originally connected to
+     * (cross-server transfers).
+     */
+    private @NotNull CompletableFuture<BotEventListener.BotEvent> awaitEventUnscoped(
             @NotNull String name,
             @NotNull Predicate<BotEventListener.BotEvent> predicate,
             @NotNull Duration timeout) {
@@ -994,6 +1167,19 @@ public class RpcBotService implements BotService, AutoCloseable {
                     }
                     return event;
                 });
+    }
+
+    /**
+     * True when the event's server tag matches the server the await was scoped
+     * to. Events without a server tag (legacy producers) and awaits for bots
+     * with no known primary server are allowed through unchanged.
+     */
+    private static boolean serverMatchesScope(@NotNull BotEventListener.BotEvent event,
+                                              @Nullable String scopeServer) {
+        if (scopeServer == null || scopeServer.isEmpty()) return true;
+        String evtServer = event.server();
+        if (evtServer == null || evtServer.isEmpty()) return true;
+        return scopeServer.equals(evtServer);
     }
 
     @Override

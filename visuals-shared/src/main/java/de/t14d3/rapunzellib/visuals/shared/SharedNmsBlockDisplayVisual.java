@@ -109,7 +109,11 @@ public final class SharedNmsBlockDisplayVisual extends SharedNmsVisual<BlockDisp
             entityUuid,
             location.x(), location.y(), location.z(),
             0, 0,
+            // #if VERSION >= 26.2
+            net.minecraft.world.entity.EntityTypes.BLOCK_DISPLAY,
+            // #else
             EntityType.BLOCK_DISPLAY,
+            // #endif
             0,
             Vec3.ZERO,
             0

@@ -185,7 +185,99 @@ public final class SpoolDatabase implements AutoCloseable {
             }
 
             ExecutorService flushExecutor = Executors.newSingleThreadExecutor(flushThreadFactory);
-            return new SpoolDatabase(em, flushExecutor, logger);
+            return new SpoolDatabase(em, new TrackingExecutor(flushExecutor, logger, 10_000L), logger);
+        }
+    }
+
+    /**
+     * Delegating {@link ExecutorService} that logs any task running longer than
+     * the given threshold (with the stack trace at completion). A stuck task on
+     * the single-thread flush executor silently stalls every queued DB
+     * write/flush (e.g. homes never persisting), so visibility matters.
+     */
+    private static final class TrackingExecutor implements ExecutorService {
+        private final ExecutorService delegate;
+        private final Logger logger;
+        private final long timeoutMillis;
+
+        TrackingExecutor(ExecutorService delegate, Logger logger, long timeoutMillis) {
+            this.delegate = delegate;
+            this.logger = logger;
+            this.timeoutMillis = timeoutMillis;
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            long started = System.currentTimeMillis();
+            delegate.execute(() -> {
+                try {
+                    command.run();
+                } finally {
+                    long took = System.currentTimeMillis() - started;
+                    if (took > timeoutMillis) {
+                        logger.error("[DBFlush] Task took {}ms (>{}ms) on the flush executor - possible stall; stack:", took, timeoutMillis);
+                        for (StackTraceElement el : Thread.currentThread().getStackTrace()) {
+                            logger.error("    at {}", el);
+                        }
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void shutdown() { delegate.shutdown(); }
+
+        @Override
+        public java.util.List<Runnable> shutdownNow() { return delegate.shutdownNow(); }
+
+        @Override
+        public boolean isShutdown() { return delegate.isShutdown(); }
+
+        @Override
+        public boolean isTerminated() { return delegate.isTerminated(); }
+
+        @Override
+        public boolean awaitTermination(long timeout, java.util.concurrent.TimeUnit unit) throws InterruptedException {
+            return delegate.awaitTermination(timeout, unit);
+        }
+
+        @Override
+        public <T> java.util.concurrent.Future<T> submit(java.util.concurrent.Callable<T> task) {
+            java.util.concurrent.CompletableFuture<T> cf = new java.util.concurrent.CompletableFuture<>();
+            execute(() -> {
+                try { cf.complete(task.call()); } catch (Throwable t) { cf.completeExceptionally(t); }
+            });
+            return cf;
+        }
+
+        @Override
+        public <T> java.util.concurrent.Future<T> submit(Runnable task, T result) {
+            return submit(java.util.concurrent.Executors.callable(task, result));
+        }
+
+        @Override
+        public java.util.concurrent.Future<?> submit(Runnable task) {
+            return submit(java.util.concurrent.Executors.callable(task));
+        }
+
+        @Override
+        public <T> java.util.List<java.util.concurrent.Future<T>> invokeAll(java.util.Collection<? extends java.util.concurrent.Callable<T>> tasks) throws InterruptedException {
+            return delegate.invokeAll(tasks);
+        }
+
+        @Override
+        public <T> java.util.List<java.util.concurrent.Future<T>> invokeAll(java.util.Collection<? extends java.util.concurrent.Callable<T>> tasks, long timeout, java.util.concurrent.TimeUnit unit) throws InterruptedException {
+            return delegate.invokeAll(tasks, timeout, unit);
+        }
+
+        @Override
+        public <T> T invokeAny(java.util.Collection<? extends java.util.concurrent.Callable<T>> tasks) throws InterruptedException, java.util.concurrent.ExecutionException {
+            return delegate.invokeAny(tasks);
+        }
+
+        @Override
+        public <T> T invokeAny(java.util.Collection<? extends java.util.concurrent.Callable<T>> tasks, long timeout, java.util.concurrent.TimeUnit unit) throws InterruptedException, java.util.concurrent.ExecutionException, java.util.concurrent.TimeoutException {
+            return delegate.invokeAny(tasks, timeout, unit);
         }
     }
 }

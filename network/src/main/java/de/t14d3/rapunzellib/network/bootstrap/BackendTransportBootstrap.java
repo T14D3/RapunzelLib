@@ -181,6 +181,7 @@ public final class BackendTransportBootstrap {
                 DecoratedPluginTransport decorated = decoratePluginTransport(pluginMessenger, transportContext, pluginHooks);
                 pluginEffective = decorated.messenger();
                 queueCloseable = decorated.closeable();
+                pluginEffective = maybeWrapTcpBridge(pluginEffective, transportContext, logger);
                 services.register(Messenger.class, pluginEffective);
                 if (pluginHooks != null && pluginHooks.onPluginEffective() != null) {
                     pluginHooks.onPluginEffective().accept(pluginMessenger, pluginEffective);
@@ -257,6 +258,31 @@ public final class BackendTransportBootstrap {
         }
         DecoratedPluginTransport decorated = pluginHooks.transportDecorator().decorate(pluginMessenger, transportContext, pluginHooks);
         return decorated != null ? decorated : DecoratedPluginTransport.passthrough(pluginMessenger);
+    }
+
+    /**
+     * Wraps the plugin transport in a companion TCP bridge on backend servers.
+     *
+     * <p>Plugin messaging can only reach the proxy through a player connection
+     * that traverses it. The bridge adds a player-independent TCP link to the
+     * proxy's companion RPC server so envelopes still flow when players connect
+     * directly to the backend or no carrier is available. The proxy side of the
+     * bridge is only started on Velocity; here we skip the proxy role and the
+     * case where the dedicated RPC transport is explicitly enabled (which would
+     * otherwise open a duplicate connection).</p>
+     */
+    private static Messenger maybeWrapTcpBridge(
+        Messenger pluginEffective,
+        TransportContext context,
+        Logger logger
+    ) {
+        if (context.platformId() == de.t14d3.rapunzellib.PlatformId.VELOCITY) {
+            return pluginEffective;
+        }
+        if (context.transportConfig().getBoolean("network.rpcServer.enabled", false)) {
+            return pluginEffective;
+        }
+        return PluginTransportTcpBridge.wrap(pluginEffective, context.transportConfig(), logger);
     }
 
     private static boolean shouldInitializePluginTransport(MessengerTransportBootstrap.TransportPriority priority) {

@@ -158,6 +158,10 @@ allprojects {
     }
 
     repositories {
+        // mavenLocal first so locally published snapshot fixes (e.g. the Spool
+        // SQLite auto-increment DDL fix) take precedence over the remote
+        // snapshot repository, which may lag behind.
+        mavenLocal()
         mavenCentral()
         maven("${reposiliteBaseUrl.trimEnd('/')}/releases")
         maven("${reposiliteBaseUrl.trimEnd('/')}/snapshots")

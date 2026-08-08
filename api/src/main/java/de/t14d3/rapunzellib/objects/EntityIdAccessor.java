@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.objects;
 
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 
 import java.lang.reflect.Field;
@@ -20,7 +21,11 @@ public final class EntityIdAccessor {
 
     static {
         try {
+            // #if VERSION >= 26.2
+            Field entityId = ServerLevel.class.getDeclaredField("ENTITY_COUNTER");
+            // #else
             Field entityId = Entity.class.getDeclaredField("ENTITY_COUNTER");
+            // #endif
             entityId.setAccessible(true);
             if (entityId.get(null) instanceof AtomicInteger atomicInteger) {
                 counter = atomicInteger;

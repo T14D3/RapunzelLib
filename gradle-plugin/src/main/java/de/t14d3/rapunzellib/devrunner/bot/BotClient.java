@@ -17,6 +17,7 @@ import org.geysermc.mcprotocollib.protocol.data.game.entity.player.Hand;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.PlayerAction;
 import org.geysermc.mcprotocollib.protocol.data.game.inventory.ContainerAction;
 import org.geysermc.mcprotocollib.protocol.data.game.inventory.ContainerActionType;
+import org.geysermc.mcprotocollib.protocol.data.game.inventory.ContainerType;
 import org.geysermc.mcprotocollib.protocol.data.game.inventory.DropItemAction;
 import org.geysermc.mcprotocollib.protocol.data.game.inventory.ClickItemAction;
 import org.geysermc.mcprotocollib.protocol.data.game.inventory.ShiftClickItemAction;
@@ -104,6 +105,31 @@ public class BotClient {
 
     private double x, y, z;
     private float yaw, pitch;
+    // Whether a server-reported position has been received yet. Movement
+    // confirmations must not be sent before the first ClientboundPlayerPositionPacket:
+    // with the initial cache of (0,0,0), a confirm packet would be a bogus
+    // teleport and Paper's anti-cheat would fail-move the bot (setting
+    // awaitingPositionFromClient, which silently drops subsequent interact
+    // packets).
+    private volatile boolean hasPosition = false;
+    // Whether the bot is currently dead (health <= 0). Dead players are
+    // "immobile" on the server, which silently drops every use/attack packet,
+    // so the bot auto-respawns as soon as death is detected.
+    private volatile boolean dead = false;
+    private final AtomicInteger respawnAttempts = new AtomicInteger(0);
+    // Paper 26.x starts a ~3s "client loaded" timeout when a player joins the
+    // server AND restarts it after every respawn; while it runs, the server
+    // silently drops every use-item/use-item-on/interact packet
+    // (hasClientLoaded() == false). Physical actions are held back until the
+    // window has passed. Both timestamps are Long.MIN_VALUE until the
+    // corresponding server event has been observed.
+    private static final long CLIENT_READY_DELAY_MS = 3500L;
+    private volatile long lastJoinNanos = Long.MIN_VALUE;
+    private volatile long lastRespawnNanos = Long.MIN_VALUE;
+    // The bot's current sneaking state (last sendPlayerInput value). The
+    // serverbound interact packet carries its own sneak flag which overwrites
+    // the player's shift state server-side, so it must mirror the bot's state.
+    private volatile boolean sneaking = false;
     private float health;
     private int food;
     private float saturation;
@@ -160,7 +186,7 @@ public class BotClient {
         this.port = port;
         this.currentServer = host + ":" + port;
         // Pre-seed the player inventory so consumers can always query containerId 0.
-        containers.put(0, new ContainerState(0, PLAYER_INVENTORY_SIZE));
+        containers.put(0, new ContainerState(0, PLAYER_INVENTORY_SIZE, -1));
     }
 
     public void connect() throws Exception {
@@ -181,6 +207,7 @@ public class BotClient {
                 if (packet instanceof ClientboundLoginPacket loginPacket) {
                     connected.set(true);
                     loginFuture.complete(null);
+                    lastJoinNanos = System.nanoTime();
                     botEntityId = loginPacket.getEntityId();
                     if (loginPacket.getCommonPlayerSpawnInfo() != null
                             && loginPacket.getCommonPlayerSpawnInfo().getGameMode() != null) {
@@ -224,9 +251,17 @@ public class BotClient {
         }
         if (message.startsWith("/")) {
             String command = message.substring(1);
+            System.out.println("[devrunner] Bot '" + name + "' SENDING command: /" + command);
             session.send(new ServerboundChatCommandPacket(command));
         } else {
-            session.send(new ServerboundChatPacket(message, System.currentTimeMillis(), 0L, new byte[0], 0, new BitSet(), 0));
+            System.out.println("[devrunner] Bot '" + name + "' SENDING chat: " + message);
+            // Signature MUST be null (not an empty array): Paper 26.2 reads the
+            // signature as a fixed 256-byte MessageSignature blob without a
+            // length prefix, so an empty array (bool=true + varint(0)) makes the
+            // decoder try to consume 256 bytes and throws a DecoderException.
+            // A null signature serialises to a single `false` boolean and is
+            // accepted by servers with enforce-secure-profile=false.
+            session.send(new ServerboundChatPacket(message, System.currentTimeMillis(), 0L, null, 0, new BitSet(), 0));
         }
     }
 
@@ -262,30 +297,36 @@ public class BotClient {
 
     public void useItemOn(int x, int y, int z, int hand, int direction) {
         if (!connected.get() || session == null) {
+            System.out.println("[devrunner] Bot '" + name + "' useItemOn SKIPPED (not connected)");
             return;
         }
+        Runnable action = () -> {
+            if (!connected.get() || session == null) return;
+            confirmPosition();
 
-        confirmPosition();
+            session.send(new ServerboundSwingPacket(Hand.MAIN_HAND));
 
-        session.send(new ServerboundSwingPacket(Hand.MAIN_HAND));
+            Vector3i pos = Vector3i.from(x, y, z);
+            Direction dir = Direction.values()[direction];
+            Hand handEnum = hand == 0 ? Hand.MAIN_HAND : Hand.OFF_HAND;
 
-        Vector3i pos = Vector3i.from(x, y, z);
-        Direction dir = Direction.values()[direction];
-        Hand handEnum = hand == 0 ? Hand.MAIN_HAND : Hand.OFF_HAND;
+            int seq = interactionSequence.getAndIncrement();
 
-        int seq = interactionSequence.getAndIncrement();
-
-        session.send(new ServerboundUseItemOnPacket(
-                pos,
-                dir,
-                handEnum,
-                0.5f,
-                0.5f,
-                0.5f,
-                false,
-                false,
-                seq
-        ));
+            System.out.println("[devrunner] Bot '" + name + "' USE-ITEM-ON at " + x + "," + y + "," + z
+                    + " face=" + dir + " hand=" + handEnum + " (dead=" + dead + ")");
+            session.send(new ServerboundUseItemOnPacket(
+                    pos,
+                    dir,
+                    handEnum,
+                    0.5f,
+                    0.5f,
+                    0.5f,
+                    false,
+                    false,
+                    seq
+            ));
+        };
+        runWhenClientReady(action);
     }
 
     public void attackEntity(int entityId) {
@@ -296,9 +337,33 @@ public class BotClient {
 
     public void interactEntity(int entityId, int hand) {
         if (!connected.get() || session == null) return;
-        Hand handEnum = hand == 0 ? Hand.MAIN_HAND : Hand.OFF_HAND;
-        session.send(new ServerboundInteractPacket(entityId, handEnum, null, false));
-        session.send(new ServerboundSwingPacket(handEnum));
+        Runnable action = () -> {
+            if (!connected.get() || session == null) return;
+            Hand handEnum = hand == 0 ? Hand.MAIN_HAND : Hand.OFF_HAND;
+            System.out.println("[devrunner] Bot '" + name + "' INTERACT-ENTITY " + entityId
+                    + " hand=" + handEnum + " sneak=" + sneaking + " (dead=" + dead + ")");
+            // The packet's sneak flag overwrites the player's shift state
+            // server-side, so it must mirror the bot's current sneaking state
+            // (otherwise the server would silently un-sneak the bot and
+            // sneak-gated interactions would never fire).
+            //
+            // The location must never be null: the 26.2 protocol serialises it
+            // unconditionally (length-prefixed Vec3) and the server's
+            // PlayerInteractAtEntityEvent construction dereferences it, so a
+            // null would NPE the client-side encoder and silently drop the
+            // packet. Use the tracked entity position, falling back to the
+            // bot's own position.
+            org.cloudburstmc.math.vector.Vector3d location;
+            EntitySnapshot snap = entitySnapshots.get(entityId);
+            if (snap != null) {
+                location = org.cloudburstmc.math.vector.Vector3d.from(snap.x, snap.y, snap.z);
+            } else {
+                location = org.cloudburstmc.math.vector.Vector3d.from(x, y, z);
+            }
+            session.send(new ServerboundInteractPacket(entityId, handEnum, location, sneaking));
+            session.send(new ServerboundSwingPacket(handEnum));
+        };
+        runWhenClientReady(action);
     }
 
     public void swingHand(int hand) {
@@ -541,6 +606,27 @@ public class BotClient {
     }
 
     /**
+     * Sends a respawn request when the bot is dead and re-arms the check a
+     * second later, so a respawn that races the death-screen setup is retried.
+     */
+    private void requestRespawn() {
+        if (!connected.get() || session == null || !dead) return;
+        session.send(new ServerboundClientCommandPacket(ClientCommand.PERFORM_RESPAWN));
+        int attempts = respawnAttempts.incrementAndGet();
+        if (attempts >= 5) {
+            return; // give up after repeated refusals; avoid an infinite retry loop
+        }
+        io.netty.channel.Channel ch = session.getChannel();
+        if (ch != null && ch.eventLoop() != null) {
+            ch.eventLoop().schedule(() -> {
+                if (dead && connected.get() && respawnAttempts.get() < 5) {
+                    requestRespawn();
+                }
+            }, 1, TimeUnit.SECONDS);
+        }
+    }
+
+    /**
      * Sends the bot's current input flags via {@code ServerboundPlayerInputPacket}.
      * In 1.21+ this is how sneak/sprint is communicated (no longer via
      * {@code ServerboundPlayerCommandPacket}).
@@ -548,6 +634,7 @@ public class BotClient {
     public void sendPlayerInput(boolean forward, boolean backward, boolean left, boolean right,
                                 boolean jump, boolean sneak, boolean sprint) {
         if (!connected.get() || session == null) return;
+        this.sneaking = sneak;
         session.send(new ServerboundPlayerInputPacket(forward, backward, left, right, jump, sneak, sprint));
     }
 
@@ -564,13 +651,59 @@ public class BotClient {
      */
     public void useItem(int hand) {
         if (!connected.get() || session == null) return;
-        Hand handEnum = hand == 0 ? Hand.MAIN_HAND : Hand.OFF_HAND;
-        int seq = actionSequence++;
-        session.send(new ServerboundUseItemPacket(handEnum, seq, yaw, pitch));
+        Runnable action = () -> {
+            if (!connected.get() || session == null) return;
+            confirmPosition();
+            Hand handEnum = hand == 0 ? Hand.MAIN_HAND : Hand.OFF_HAND;
+            int seq = actionSequence++;
+            System.out.println("[devrunner] Bot '" + name + "' USE-ITEM hand=" + handEnum
+                    + " (dead=" + dead + ")");
+            session.send(new ServerboundUseItemPacket(handEnum, seq, yaw, pitch));
+        };
+        runWhenClientReady(action);
+    }
+
+    /**
+     * Executes a physical action immediately, or holds it until the server's
+     * "client loaded" window has elapsed. Paper 26.x runs a ~3s timeout after
+     * a player joins and restarts it after every respawn; while it runs, the
+     * server silently drops every use/use-on/interact packet
+     * ({@code hasClientLoaded()} is false).
+     *
+     * <p>The {@link #lastJoinNanos}/{@link #lastRespawnNanos} sentinels are
+     * {@code Long.MIN_VALUE} until the corresponding server event was seen.
+     * {@code nanoTime() - Long.MIN_VALUE} overflows and wraps negative, which
+     * would turn {@code waitMs} into a huge positive value and schedule the
+     * action ~292 years in the future - silently dropping every physical
+     * action. Sentinels are treated as "no window to wait for".</p>
+     */
+    private void runWhenClientReady(Runnable action) {
+        long nowNanos = System.nanoTime();
+        long waitMs = 0;
+        if (lastJoinNanos != Long.MIN_VALUE) {
+            long elapsedSinceJoin = (nowNanos - lastJoinNanos) / 1_000_000L;
+            waitMs = Math.max(waitMs, CLIENT_READY_DELAY_MS - elapsedSinceJoin);
+        }
+        if (lastRespawnNanos != Long.MIN_VALUE) {
+            long elapsedSinceRespawn = (nowNanos - lastRespawnNanos) / 1_000_000L;
+            waitMs = Math.max(waitMs, CLIENT_READY_DELAY_MS - elapsedSinceRespawn);
+        }
+        if (waitMs <= 0 || session == null) {
+            action.run();
+            return;
+        }
+        io.netty.channel.Channel ch = session.getChannel();
+        if (ch == null || ch.eventLoop() == null) {
+            action.run();
+            return;
+        }
+        ch.eventLoop().schedule(action, waitMs, TimeUnit.MILLISECONDS);
     }
 
     public void moveTo(double targetX, double targetY, double targetZ) {
-        if (!connected.get() || session == null) return;
+        if (!connected.get() || session == null || !hasPosition) return;
+        System.out.println("[devrunner] Bot '" + name + "' MOVE to " + targetX + "," + targetY + "," + targetZ
+                + " (connected=" + connected.get() + ")");
         session.send(new ServerboundMovePlayerPosRotPacket(true, false, targetX, targetY, targetZ, yaw, pitch));
     }
 
@@ -580,23 +713,54 @@ public class BotClient {
      * clients that have not recently confirmed their position via a movement
      * packet.  Calling this before every player-initiated action ensures the
      * server accepts it.
+     *
+     * <p>No-op until the server has reported a position (see {@link #hasPosition}) -
+     * sending the initial (0,0,0) cache would trigger a fail-move instead.</p>
      */
     private void confirmPosition() {
-        if (!connected.get() || session == null) return;
+        if (!connected.get() || session == null || !hasPosition) return;
         session.send(new ServerboundMovePlayerPosRotPacket(true, false, x, y, z, yaw, pitch));
     }
 
     // ── Inventory ──────────────────────────────────────────────────────────
 
     /**
-     * Maps a {@code ClientboundOpenScreenPacket} type ordinal to a slot count.
+     * Maps an {@code ClientboundOpenScreenPacket} menu type to its container
+     * slot count (excluding the trailing player-inventory section that the
+     * server appends to {@code ClientboundContainerSetContentPacket} on
+     * 1.21.2+). Returns {@code -1} for unknown types - the snapshot then
+     * keeps whatever the content packet reported.
      */
-    private static int containerSizeForType(int typeOrdinal) {
-        // Generic 1-row chest = 9, each row adds 9. Players = 46. Workbench = 10.
-        // The vanilla {@code MenuType} registry indexes vary slightly between
-        // versions; to be robust we treat any unknown type as a 27-slot chest.
-        int[] sizes = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        return typeOrdinal >= 0 && typeOrdinal < sizes.length ? sizes[typeOrdinal] : 27;
+    private static int containerSizeForType(ContainerType type) {
+        if (type == null) return -1;
+        return switch (type) {
+            case GENERIC_9X1 -> 9;
+            case GENERIC_9X2 -> 18;
+            case GENERIC_9X3 -> 27;
+            case GENERIC_9X4 -> 36;
+            case GENERIC_9X5 -> 45;
+            case GENERIC_9X6 -> 54;
+            case GENERIC_3X3 -> 9;
+            case CRAFTER_3x3 -> 9;
+            case ANVIL -> 3;
+            case BEACON -> 1;
+            case BLAST_FURNACE -> 3;
+            case BREWING_STAND -> 5;
+            case CRAFTING -> 0;
+            case ENCHANTMENT -> 2;
+            case FURNACE -> 3;
+            case GRINDSTONE -> 3;
+            case HOPPER -> 5;
+            case LECTERN -> 1;
+            case LOOM -> 4;
+            case MERCHANT -> 3;
+            case SHULKER_BOX -> 27;
+            case SMITHING -> 4;
+            case SMOKER -> 3;
+            case CARTOGRAPHY -> 3;
+            case STONECUTTER -> 2;
+            default -> -1;
+        };
     }
 
     /**
@@ -769,13 +933,16 @@ public class BotClient {
      */
     private static final class ContainerState {
         final int containerId;
+        /** Expected container slot count from the OpenScreen menu type, or -1 if unknown. */
+        final int containerSize;
         int stateId;
         ItemStack[] slots;
         ItemStack cursorItem;
         final java.util.Map<Integer, Integer> properties = new java.util.HashMap<>();
 
-        ContainerState(int containerId, int initialSize) {
+        ContainerState(int containerId, int initialSize, int containerSize) {
             this.containerId = containerId;
+            this.containerSize = containerSize;
             this.slots = new ItemStack[Math.max(initialSize, 0)];
             this.cursorItem = null;
         }
@@ -784,7 +951,17 @@ public class BotClient {
             this.stateId = stateId;
             int len = incoming != null ? incoming.length : 0;
             // Player inventory never shrinks below the standard size.
-            int newSize = containerId == 0 ? Math.max(PLAYER_INVENTORY_SIZE, len) : len;
+            int newSize;
+            if (containerId != 0 && containerSize > 0) {
+                // 1.21.2+ SetContent packets append the player-inventory
+                // section after the container's own slots (e.g. 27 + 36 for a
+                // chest menu); the container snapshot must only expose the
+                // container's section.
+                len = Math.min(len, containerSize);
+                newSize = len;
+            } else {
+                newSize = containerId == 0 ? Math.max(PLAYER_INVENTORY_SIZE, len) : len;
+            }
             ItemStack[] fresh = new ItemStack[newSize];
             int copy = Math.min(len, newSize);
             for (int i = 0; i < copy; i++) fresh[i] = incoming[i];
@@ -830,9 +1007,15 @@ public class BotClient {
         }
 
         synchronized ContainerSnapshot toSnapshot() {
-            // Defensive copy
-            ItemStack[] copy = new ItemStack[slots != null ? slots.length : 0];
-            if (slots != null) System.arraycopy(slots, 0, copy, 0, slots.length);
+            // Defensive copy. For open containers with a known menu size, only
+            // the container's own slots are exposed (the buffer may also hold
+            // trailing player-inventory slots received on 1.21.2+).
+            int cap = slots != null ? slots.length : 0;
+            if (containerId != 0 && containerSize > 0) {
+                cap = Math.min(cap, containerSize);
+            }
+            ItemStack[] copy = new ItemStack[cap];
+            if (slots != null) System.arraycopy(slots, 0, copy, 0, cap);
             return new ContainerSnapshot(containerId, stateId, copy, cursorItem);
         }
     }
@@ -846,6 +1029,7 @@ public class BotClient {
                 z = posPacket.getPosition().getZ();
                 yaw = posPacket.getYRot();
                 pitch = posPacket.getXRot();
+                hasPosition = true;
                 session.send(new ServerboundAcceptTeleportationPacket(posPacket.getId()));
                 return;
             }
@@ -853,14 +1037,29 @@ public class BotClient {
                 health = healthPacket.getHealth();
                 food = healthPacket.getFood();
                 saturation = healthPacket.getSaturation();
+                if (health <= 0.0f) {
+                    // Dead players are immobile on the server: every use/attack
+                    // packet is silently dropped. Auto-respawn so the bot keeps
+                    // working (also covers rejoining with persisted health=0).
+                    if (!dead) {
+                        dead = true;
+                        respawnAttempts.set(0);
+                        System.out.println("[devrunner] Bot '" + name + "' DIED (health=0), requesting respawn");
+                    }
+                    requestRespawn();
+                } else if (dead) {
+                    dead = false;
+                    respawnAttempts.set(0);
+                    lastRespawnNanos = System.nanoTime();
+                    System.out.println("[devrunner] Bot '" + name + "' respawned, holding physical actions "
+                            + CLIENT_READY_DELAY_MS + "ms");
+                }
                 return;
             }
             if (packet instanceof ClientboundOpenScreenPacket openScreen) {
                 openContainerId = openScreen.getContainerId();
-                int size = openScreen.getType() != null
-                        ? containerSizeForType(openScreen.getType().ordinal())
-                        : 0;
-                containers.put(openContainerId, new ContainerState(openContainerId, Math.max(size, 0)));
+                int size = containerSizeForType(openScreen.getType());
+                containers.put(openContainerId, new ContainerState(openContainerId, Math.max(size, 0), size));
                 fireInventoryChanged(openContainerId);
                 return;
             }
@@ -871,7 +1070,7 @@ public class BotClient {
                 if (cid == 0) {
                     // Closing the player inventory view isn't a real thing -
                     // the player inventory is always tracked at containerId 0.
-                    containers.putIfAbsent(0, new ContainerState(0, PLAYER_INVENTORY_SIZE));
+                    containers.putIfAbsent(0, new ContainerState(0, PLAYER_INVENTORY_SIZE, -1));
                 }
                 fireInventoryChanged(0);
                 return;
@@ -879,7 +1078,7 @@ public class BotClient {
             if (packet instanceof ClientboundContainerSetContentPacket content) {
                 int cid = content.getContainerId();
                 ContainerState st = containers.computeIfAbsent(cid,
-                        k -> new ContainerState(cid, content.getItems() != null ? content.getItems().length : PLAYER_INVENTORY_SIZE));
+                        k -> new ContainerState(cid, content.getItems() != null ? content.getItems().length : PLAYER_INVENTORY_SIZE, -1));
                 st.applyFull(content.getStateId(), content.getItems(), content.getCarriedItem());
                 cursorItemContainerId = cid;
                 fireInventoryChanged(cid);
@@ -888,7 +1087,7 @@ public class BotClient {
             if (packet instanceof ClientboundContainerSetSlotPacket slotPacket) {
                 int cid = slotPacket.getContainerId();
                 ContainerState st = containers.computeIfAbsent(cid,
-                        k -> new ContainerState(cid, PLAYER_INVENTORY_SIZE));
+                        k -> new ContainerState(cid, PLAYER_INVENTORY_SIZE, -1));
                 st.applySlot(slotPacket.getStateId(), slotPacket.getSlot(), slotPacket.getItem());
                 if (slotPacket.getSlot() < 0 && slotPacket.getItem() != null) {
                     st.setCursor(slotPacket.getItem());
@@ -900,7 +1099,7 @@ public class BotClient {
             if (packet instanceof ClientboundSetCursorItemPacket cursor) {
                 ContainerState st = containers.get(cursorItemContainerId);
                 if (st == null) st = containers.computeIfAbsent(0,
-                        k -> new ContainerState(0, PLAYER_INVENTORY_SIZE));
+                        k -> new ContainerState(0, PLAYER_INVENTORY_SIZE, -1));
                 st.setCursor(cursor.getContents());
                 fireInventoryChanged(st.containerId);
                 return;
@@ -915,7 +1114,7 @@ public class BotClient {
             }
             if (packet instanceof ClientboundSetPlayerInventoryPacket invSlot) {
                 ContainerState st = containers.computeIfAbsent(0,
-                        k -> new ContainerState(0, PLAYER_INVENTORY_SIZE));
+                        k -> new ContainerState(0, PLAYER_INVENTORY_SIZE, -1));
                 st.applySlotUnknownState(invSlot.getSlot(), invSlot.getContents());
                 fireInventoryChanged(0);
                 return;
@@ -1100,6 +1299,7 @@ public class BotClient {
             }
             String message = extractChatMessage(packet);
             if (message != null) {
+                System.out.println("[devrunner] Bot '" + name + "' CHAT RECEIVED: " + message);
                 chatMessages.add(message);
                 for (Consumer<String> callback : chatCallbacks) {
                     try {

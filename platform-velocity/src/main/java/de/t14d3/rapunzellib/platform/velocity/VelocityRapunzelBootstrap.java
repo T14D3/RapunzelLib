@@ -20,9 +20,13 @@ import de.t14d3.rapunzellib.network.info.NetworkInfoService;
 import de.t14d3.rapunzellib.network.NetworkDefaults;
 import de.t14d3.rapunzellib.network.queue.NetworkQueueTransportDecorator;
 import de.t14d3.rapunzellib.network.runtime.DefaultNetworkRuntimeGateway;
+import de.t14d3.rapunzellib.network.runtime.NetworkLinkKind;
 import de.t14d3.rapunzellib.network.runtime.NetworkRuntime;
 import de.t14d3.rapunzellib.network.runtime.NetworkRuntimeGateway;
 import de.t14d3.rapunzellib.network.runtime.NetworkRuntimeClassifier;
+import de.t14d3.rapunzellib.network.rpcserver.RpcServerConfig;
+import de.t14d3.rapunzellib.network.rpcserver.RpcServerMessenger;
+import de.t14d3.rapunzellib.network.rpcserver.RoutingHooks;
 import de.t14d3.rapunzellib.platform.PlatformFeatures;
 import de.t14d3.rapunzellib.platform.velocity.network.VelocityNetworkInfoResponder;
 import de.t14d3.rapunzellib.platform.velocity.network.VelocityNetworkInfoService;
@@ -38,6 +42,7 @@ import org.slf4j.Logger;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class VelocityRapunzelBootstrap {
     private VelocityRapunzelBootstrap() {
@@ -114,6 +119,10 @@ public final class VelocityRapunzelBootstrap {
             Messenger messenger = inMemory;
             try {
                 String ownerId = runtime.persistentOwnerId(dataDirectory);
+                // The TCP bridge is created after the transport bootstrap (it needs
+                // the plugin messenger for its external-forward hook); a holder lets
+                // the queue's canSendToServer override consult it.
+                AtomicReference<RpcServerMessenger> tcpBridgeRef = new AtomicReference<>();
                 BackendTransportBootstrap.Result transport = BackendTransportBootstrap.bootstrap(
                     transportConfig,
                     PlatformId.VELOCITY,
@@ -133,10 +142,15 @@ public final class VelocityRapunzelBootstrap {
                                     return false;
                                 }
                                 String target = targetServer.trim();
-                                return proxy.getAllPlayers().stream()
-                                    .anyMatch(player -> player.getCurrentServer()
-                                        .map(server -> server.getServerInfo().getName().equalsIgnoreCase(target))
-                                        .orElse(false));
+                                if (proxy.getAllPlayers().stream().anyMatch(player -> player.getCurrentServer()
+                                    .map(server -> server.getServerInfo().getName().equalsIgnoreCase(target))
+                                    .orElse(false))) {
+                                    return true;
+                                }
+                                // No plugin-message carrier on the target backend, but it
+                                // may be reachable over the companion TCP bridge.
+                                RpcServerMessenger bridge = tcpBridgeRef.get();
+                                return bridge != null && bridge.isServerConnected(target);
                             },
                             null,
                             (pluginTransport, pluginEffective) -> {
@@ -151,6 +165,10 @@ public final class VelocityRapunzelBootstrap {
 
                 if (transport.pluginMessenger() instanceof VelocityPluginMessenger pluginMessenger) {
                     ctx.register(VelocityPluginMessenger.class, pluginMessenger);
+                    RpcServerMessenger bridge = startPluginTransportTcpBridge(transportConfig, pluginMessenger, proxy, logger, ctx);
+                    if (bridge != null) {
+                        tcpBridgeRef.set(bridge);
+                    }
                 }
 
                 messenger = TransportBootstrapResultApplier.apply(ctx, logger, transport);
@@ -166,12 +184,33 @@ public final class VelocityRapunzelBootstrap {
                 );
             }
 
+            // The proxy must answer NetworkInfo RPCs (WHO_AM_I, list_servers, list_players)
+            // that backends send over the plugin-messaging channel; without a responder the
+            // backend can never resolve its network server name and cross-server addressing
+            // stays broken. The gateway registered by the transport applier already covers
+            // this when plugin messaging is the canonical transport. When a different
+            // transport is canonical (Redis/RPC), also answer plugin-channel RPCs via a
+            // dedicated plugin-messaging gateway so plugin-transport backends still resolve.
+            NetworkRuntimeGateway responderGateway = ctx.services().get(NetworkRuntimeGateway.class);
+            if (responderGateway.runtime().canonicalLink().kind() != NetworkLinkKind.PLUGIN_MESSAGING) {
+                ctx.services().find(VelocityPluginMessenger.class).ifPresent(pluginMessenger -> {
+                    VelocityNetworkInfoResponder pluginResponder = new VelocityNetworkInfoResponder(
+                        DefaultNetworkRuntimeGateway.compatibility(pluginMessenger),
+                        proxy,
+                        logger
+                    );
+                    ctx.register(VelocityNetworkInfoResponder.class, pluginResponder);
+                    ctx.registerCloseable(pluginResponder);
+                });
+            }
+
             VelocityNetworkInfoResponder networkInfoResponder = new VelocityNetworkInfoResponder(
-                ctx.services().get(NetworkRuntimeGateway.class),
+                responderGateway,
                 proxy,
                 logger
             );
             ctx.register(VelocityNetworkInfoResponder.class, networkInfoResponder);
+            ctx.registerCloseable(networkInfoResponder);
 
             VelocityNetworkInfoService networkInfo = new VelocityNetworkInfoService(
                 ctx.services().get(NetworkRuntime.class),
@@ -195,6 +234,60 @@ public final class VelocityRapunzelBootstrap {
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
+
+    /**
+     * Starts the companion TCP bridge (RPC server) for the plugin transport.
+     *
+     * <p>Plugin messaging can only reach the proxy through a player connection
+     * that traverses it. On networks where players connect directly to backends
+     * (or no carrier is available) the plugin channel alone cannot carry
+     * envelopes. This bridge lets backends connect to the proxy over plain TCP
+     * and exchange the same envelopes, while the plugin channel remains the
+     * carrier whenever a player connection is available.</p>
+     *
+     * @return the started bridge, or null if it could not be started
+     */
+    private static RpcServerMessenger startPluginTransportTcpBridge(
+        de.t14d3.rapunzellib.config.YamlConfig transportConfig,
+        VelocityPluginMessenger pluginMessenger,
+        ProxyServer proxy,
+        Logger logger,
+        RapunzelContext ctx
+    ) {
+        try {
+            String serverName = firstNonBlank(
+                MessengerTransportBootstrap.resolveNames(transportConfig, PlatformId.VELOCITY).serverName(),
+                NetworkDefaults.DEFAULT_PROXY_SERVER_NAME
+            );
+            String bindHost = firstNonBlank(
+                transportConfig.getString("network.rpcServer.host", null),
+                NetworkDefaults.DEFAULT_RPC_BIND_HOST
+            );
+            long port = transportConfig.getLong("network.rpcServer.port", NetworkDefaults.DEFAULT_RPC_PORT);
+            int portInt = (port >= 1 && port <= 65535) ? (int) port : NetworkDefaults.DEFAULT_RPC_PORT;
+
+            RpcServerConfig config = RpcServerConfig.builder(serverName)
+                .bindHost(bindHost)
+                .port(portInt)
+                .build();
+            RoutingHooks routingHooks = new RoutingHooks(
+                () -> proxy.getAllServers().stream()
+                    .map(rs -> rs.getServerInfo().getName())
+                    .toList(),
+                (channel, data, sourceServer, targetServer) ->
+                    pluginMessenger.forwardViaPluginChannel(targetServer, channel, data, sourceServer)
+            );
+            RpcServerMessenger bridge = new RpcServerMessenger(config, logger, routingHooks);
+            pluginMessenger.attachTcpBridge(bridge);
+            ctx.registerCloseable(bridge);
+            logger.info("[Network] Plugin transport TCP bridge listening on {}:{}", bindHost, portInt);
+            return bridge;
+        } catch (Exception e) {
+            logger.warn("[Network] Failed to start plugin transport TCP bridge; "
+                + "plugin-messaging carriers will be used exclusively", e);
+            return null;
+        }
+    }
 
     private static InputStream openResource(Object plugin, String path) {
         if (path == null) return null;

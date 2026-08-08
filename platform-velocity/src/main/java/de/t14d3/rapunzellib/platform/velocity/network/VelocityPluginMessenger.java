@@ -13,6 +13,7 @@ import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.NetworkConstants;
 import de.t14d3.rapunzellib.network.NetworkEnvelope;
 import de.t14d3.rapunzellib.network.json.JsonCodecs;
+import de.t14d3.rapunzellib.network.rpcserver.RpcServerMessenger;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
@@ -38,6 +39,14 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
     private final Map<String, CopyOnWriteArrayList<MessageListener>> listeners = new ConcurrentHashMap<>();
 
     /**
+     * Optional companion TCP bridge (RPC server) that backends use to reach the
+     * proxy when no player connection traverses it (players connected directly
+     * to backends, or no carrier available). See
+     * {@code de.t14d3.rapunzellib.network.bootstrap.PluginTransportTcpBridge}.
+     */
+    private volatile RpcServerMessenger tcpBridge;
+
+    /**
      * Optional forwarder used when Velocity cannot forward a backend->backend plugin message because the
      * target backend has no online player to act as a plugin message carrier.
      *
@@ -57,6 +66,28 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
 
     public void setUndeliverableForwarder(Messenger undeliverableForwarder) {
         this.undeliverableForwarder = undeliverableForwarder;
+    }
+
+    /**
+     * Attaches the companion TCP bridge (RPC server) to this messenger.
+     *
+     * <p>The bridge is used (a) to forward proxy-originated envelopes to
+     * backends that have no plugin-message carrier, and (b) as the receiving
+     * side of backend envelopes when backends send over TCP instead of the
+     * plugin channel. Envelopes received over TCP are delivered to exactly the
+     * same listeners as plugin-channel envelopes.</p>
+     *
+     * @param tcpBridge the RPC server bridge, or null to detach
+     */
+    public void attachTcpBridge(RpcServerMessenger tcpBridge) {
+        this.tcpBridge = tcpBridge;
+        if (tcpBridge == null) return;
+        // Mirror any listeners registered before the bridge was attached.
+        for (Map.Entry<String, CopyOnWriteArrayList<MessageListener>> entry : listeners.entrySet()) {
+            for (MessageListener listener : entry.getValue()) {
+                tcpBridge.registerListener(entry.getKey(), listener);
+            }
+        }
     }
 
     @Subscribe
@@ -123,6 +154,10 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
     @Override
     public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         listeners.computeIfAbsent(channel, k -> new CopyOnWriteArrayList<>()).add(listener);
+        RpcServerMessenger bridge = tcpBridge;
+        if (bridge != null) {
+            bridge.registerListener(channel, listener);
+        }
     }
 
     @Override
@@ -130,6 +165,13 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
         List<MessageListener> list = listeners.get(channel);
         if (list == null) return;
         list.remove(listener);
+        if (list.isEmpty()) {
+            listeners.remove(channel);
+        }
+        RpcServerMessenger bridge = tcpBridge;
+        if (bridge != null) {
+            bridge.unregisterListener(channel, listener);
+        }
     }
 
     @Override
@@ -161,6 +203,44 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
         Optional<com.velocitypowered.api.proxy.server.RegisteredServer> rsOpt = proxy.getServer(serverName);
         if (rsOpt.isEmpty()) return false;
 
+        // Plugin channel first: preserves the original envelope (and its source)
+        // verbatim.
+        Optional<Player> carrier = proxy.getAllPlayers().stream()
+            .filter(p -> p.getCurrentServer().map(sc -> sc.getServerInfo().getName().equalsIgnoreCase(serverName)).orElse(false))
+            .findFirst();
+        if (carrier.isPresent()) {
+            Optional<ServerConnection> connection = carrier.get().getCurrentServer();
+            if (connection.isPresent()) {
+                byte[] bytes = gson.toJson(env).getBytes(StandardCharsets.UTF_8);
+                connection.get().sendPluginMessage(CHANNEL_ID, bytes);
+                return true;
+            }
+        }
+
+        // No player carrier on the target backend - try the companion TCP bridge
+        // (backends connected directly to the proxy over TCP), preserving the
+        // original source server name.
+        RpcServerMessenger bridge = tcpBridge;
+        if (bridge != null && bridge.isServerConnected(serverName)) {
+            bridge.sendToServer(env.getChannel(), serverName, env.getData(), env.getSourceServer());
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Forwards a message to a backend over the plugin channel, using one of the
+     * backend's players as the carrier. Used as the external forward fallback by
+     * the companion TCP bridge when the target backend has no TCP connection.
+     *
+     * @param serverName   the target backend server name
+     * @param channel      the message channel
+     * @param data         the serialized payload
+     * @param sourceServer the originating server name to report to the target
+     * @return true if a carrier was found and the message was sent
+     */
+    public boolean forwardViaPluginChannel(String serverName, String channel, String data, String sourceServer) {
+        if (serverName == null || serverName.isBlank()) return false;
         Optional<Player> carrier = proxy.getAllPlayers().stream()
             .filter(p -> p.getCurrentServer().map(sc -> sc.getServerInfo().getName().equalsIgnoreCase(serverName)).orElse(false))
             .findFirst();
@@ -169,6 +249,9 @@ public final class VelocityPluginMessenger implements Messenger, AutoCloseable {
         Optional<ServerConnection> connection = carrier.get().getCurrentServer();
         if (connection.isEmpty()) return false;
 
+        NetworkEnvelope env = new NetworkEnvelope(channel, data, NetworkEnvelope.Target.SERVER, serverName,
+            sourceServer != null && !sourceServer.isBlank() ? sourceServer : getServerName(),
+            System.currentTimeMillis());
         byte[] bytes = gson.toJson(env).getBytes(StandardCharsets.UTF_8);
         connection.get().sendPluginMessage(CHANNEL_ID, bytes);
         return true;
