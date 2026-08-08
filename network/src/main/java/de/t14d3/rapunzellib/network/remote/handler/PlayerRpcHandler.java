@@ -145,6 +145,19 @@ public final class PlayerRpcHandler {
             })
         );
 
+        // Server-authoritative presence: who is online on THIS server right now.
+        // Lets cross-server tests prove a player really joined/left a backend.
+        gateway.register(PlayerServiceMethods.QUERY_SERVER_PLAYERS, (req, source) -> {
+            List<String> names = new ArrayList<>();
+            for (RPlayer player : Rapunzel.players().online()) {
+                if (player.asServerPlayer().isPresent()) {
+                    names.add(player.name());
+                }
+            }
+            names.sort(String::compareToIgnoreCase);
+            return CompletableFuture.completedFuture(new Requests.ServerPlayersResult(names));
+        });
+
         logger.info("[Remote] Registered player RPC handlers");
     }
 

@@ -9,6 +9,7 @@ import de.t14d3.rapunzellib.common.context.ConsumerView;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.network.bootstrap.BackendTransportBootstrap;
+import de.t14d3.rapunzellib.network.bootstrap.ConsumerServerNameBinder;
 import de.t14d3.rapunzellib.network.bootstrap.SharedBackendBootstrap;
 import de.t14d3.rapunzellib.network.queue.NetworkQueueTransportDecorator;
 import de.t14d3.rapunzellib.platform.paper.objects.PaperBlocks;
@@ -82,6 +83,19 @@ public final class PaperRapunzelBootstrap {
             consumerPlugin.getDataFolder().toPath(),
             path -> Optional.ofNullable(openResource(consumerPlugin, path)),
             new LifecycleOwner(consumerPlugin)
+        );
+        // Root fix for the consumer-side server-name re-binding: the platform
+        // bootstrap resolves names from the platform's own (typically empty)
+        // config, so bind the name from the CONSUMER's config when it is still
+        // blank/unknown. The async NetworkInfo RPC path remains as fallback for
+        // consumers without a configured serverName.
+        ConsumerServerNameBinder.bindIfUnknown(
+            platform,
+            view.configs(),
+            consumerPlugin.getDataFolder().toPath(),
+            PaperPluginMessenger.class,
+            PaperPluginMessenger::setNetworkServerName,
+            "paper"
         );
         return Rapunzel.acquire(consumerPlugin, view);
     }

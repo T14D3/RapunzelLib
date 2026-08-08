@@ -303,6 +303,10 @@ public final class FileSyncEndpoint implements AutoCloseable {
                     }
                 }
 
+                if (logger.isDebugEnabled()) {
+                    logger.debug("[FileSync] authority " + groupId + ": request from " + sourceServer
+                        + " local=" + local + " remote=" + remote + " changedOrNew=" + changedOrNew);
+                }
                 List<String> deletePaths = new ArrayList<>();
                 if (spec.deleteExtraneous() && !remote.isEmpty()) {
                     for (String remotePath : remote.keySet()) {

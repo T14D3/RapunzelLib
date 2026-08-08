@@ -22,9 +22,15 @@ import java.util.Set;
 public final class LegacyAllowlistNetworkOutboxPolicy implements NetworkOutboxPolicy {
     /**
      * Default set of channels eligible for store-and-forward queuing.
+     * <p>
+     * Cache invalidation flows on RLib's own channel
+     * ({@link DistributedCacheManager#CACHE_INVALIDATION_CHANNEL}); the legacy
+     * consumer-side {@code db_cache_event} channel is gone and deliberately
+     * NOT allowlisted.
+     * </p>
      */
     public static final Set<String> DEFAULT_CHANNEL_ALLOWLIST =
-        Set.of("rapunzellib:filesync:invalidate", DistributedCacheManager.CACHE_INVALIDATION_CHANNEL, "db.cache_event");
+        Set.of("rapunzellib:filesync:invalidate", DistributedCacheManager.CACHE_INVALIDATION_CHANNEL);
 
     private final Set<String> channelAllowlist;
 

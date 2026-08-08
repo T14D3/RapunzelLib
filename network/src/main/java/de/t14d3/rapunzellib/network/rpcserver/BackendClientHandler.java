@@ -264,18 +264,20 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
  private void routeMessage(@NotNull String channel, @NotNull String data,
  @Nullable String targetServer, @NotNull String sourceServer,
  @Nullable String target) {
- // Deliver to local listeners
- deliverToLocalListeners(channel, data, sourceServer);
-
  // Proxy-addressed envelopes (e.g. RPC requests) must never be forwarded
  // to backend servers.
  if (target != null && "PROXY".equalsIgnoreCase(target)) {
+ deliverToLocalListeners(channel, data, sourceServer);
  return;
  }
 
- // Targeted envelopes: route to the target backend only.
+ // Targeted envelopes: route to the target backend only - they are never
+ // meant for the proxy's own listeners (a backend-to-backend RPC must
+ // not be answered by the proxy's handlers).
  if (target != null && "SERVER".equalsIgnoreCase(target)) {
- if (targetServer != null && !targetServer.equalsIgnoreCase(localServerName)) {
+ if (targetServer != null && targetServer.equalsIgnoreCase(localServerName)) {
+ deliverToLocalListeners(channel, data, sourceServer);
+ } else if (targetServer != null) {
  routeToBackend(channel, data, sourceServer, targetServer);
  }
  return;
@@ -283,13 +285,17 @@ public class BackendClientHandler implements Runnable, AutoCloseable {
 
  // Legacy targeted envelopes (no explicit target hint).
  if (target == null && targetServer != null && !targetServer.isBlank()) {
- if (!targetServer.equalsIgnoreCase(localServerName)) {
+ if (targetServer.equalsIgnoreCase(localServerName)) {
+ deliverToLocalListeners(channel, data, sourceServer);
+ } else {
  routeToBackend(channel, data, sourceServer, targetServer);
  }
  return;
  }
 
- // Broadcast to all other backends (except source)
+ // Broadcast: deliver to the proxy's local listeners and to all other
+ // backends (except source).
+ deliverToLocalListeners(channel, data, sourceServer);
  broadcastToBackends(channel, data, sourceServer);
  }
 

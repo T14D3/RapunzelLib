@@ -37,4 +37,7 @@ public final class PlayerServiceMethods {
 
     public static final RpcMethod<Requests.SetInventoryRequest, Requests.BooleanResult> SET_INVENTORY =
         RpcMethod.of("player", "setInventory", Requests.SetInventoryRequest.class, Requests.BooleanResult.class);
+
+    public static final RpcMethod<Requests.ServerPlayersRequest, Requests.ServerPlayersResult> QUERY_SERVER_PLAYERS =
+        RpcMethod.of("player", "queryServerPlayers", Requests.ServerPlayersRequest.class, Requests.ServerPlayersResult.class);
 }

@@ -26,6 +26,12 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
     private final Logger logger;
     private final RpcClient rpcClient;
     private final Set<ManagedSubscription> subscriptions = ConcurrentHashMap.newKeySet();
+    // Request ids currently being handled. The transport can deliver an
+    // envelope more than once (e.g. over both the TCP bridge and the plugin
+    // channel); without this a duplicated RPC request would run the handler
+    // multiple times and answer the caller with the first (possibly racy)
+    // response.
+    private final Set<String> inFlightRequestIds = ConcurrentHashMap.newKeySet();
     private volatile boolean closed;
 
     /**
@@ -190,6 +196,11 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
             if (sourceServer == null || sourceServer.isBlank()) {
                 return;
             }
+            // The transport may deliver the same request envelope more than
+            // once; handle each request id exactly once.
+            if (!inFlightRequestIds.add(request.requestId())) {
+                return;
+            }
 
             Req decoded;
             try {
@@ -197,6 +208,7 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
                 Req parsed = (Req) gson.fromJson(request.payload(), method.requestType());
                 decoded = parsed;
             } catch (Exception e) {
+                inFlightRequestIds.remove(request.requestId());
                 sendRpcError(request.requestId(), sourceServer, e.getMessage());
                 return;
             }
@@ -205,11 +217,13 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
             try {
                 responseFuture = Objects.requireNonNull(handler.handle(decoded, sourceServer), "handler returned null future");
             } catch (Exception e) {
+                inFlightRequestIds.remove(request.requestId());
                 sendRpcError(request.requestId(), sourceServer, e.getMessage());
                 return;
             }
 
             responseFuture.whenComplete((result, error) -> {
+                inFlightRequestIds.remove(request.requestId());
                 if (error != null) {
                     sendRpcError(request.requestId(), sourceServer, error.getMessage());
                     return;

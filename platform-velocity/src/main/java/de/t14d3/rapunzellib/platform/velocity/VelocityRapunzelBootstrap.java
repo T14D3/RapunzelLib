@@ -14,6 +14,7 @@ import de.t14d3.rapunzellib.context.ResourceProvider;
 import de.t14d3.rapunzellib.network.InMemoryMessenger;
 import de.t14d3.rapunzellib.network.Messenger;
 import de.t14d3.rapunzellib.network.bootstrap.BackendTransportBootstrap;
+import de.t14d3.rapunzellib.network.bootstrap.ConsumerServerNameBinder;
 import de.t14d3.rapunzellib.network.bootstrap.MessengerTransportBootstrap;
 import de.t14d3.rapunzellib.network.bootstrap.TransportBootstrapResultApplier;
 import de.t14d3.rapunzellib.network.info.NetworkInfoService;
@@ -65,6 +66,20 @@ public final class VelocityRapunzelBootstrap {
             dataDirectory,
             path -> Optional.ofNullable(openResource(plugin, path)),
             new LifecycleOwner(plugin)
+        );
+        // Same acquire-time name binding as the paper side (1a). On the proxy
+        // the messenger name is the static proxy name ("velocity"), never
+        // blank/unknown, so this is a no-op by construction - it is wired here
+        // so both platforms share the same mechanism.
+        ConsumerServerNameBinder.bindIfUnknown(
+            platform,
+            view.configs(),
+            dataDirectory,
+            VelocityPluginMessenger.class,
+            (messenger, name) -> {
+                // The proxy messenger's server name is static; nothing to bind.
+            },
+            "velocity"
         );
         return Rapunzel.acquire(plugin, view);
     }

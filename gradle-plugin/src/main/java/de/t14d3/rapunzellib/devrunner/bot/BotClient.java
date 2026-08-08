@@ -99,9 +99,24 @@ public class BotClient {
     private final List<String> chatMessages = new CopyOnWriteArrayList<>();
     private final List<CompletableFuture<String>> chatFutures = new CopyOnWriteArrayList<>();
     private final List<Consumer<String>> chatCallbacks = new CopyOnWriteArrayList<>();
+    // Session-drop listeners fired whenever the bot's connection ends for ANY
+    // reason (server kick, ban, proxy disconnect). Unlike chat callbacks these
+    // are wired per-BotClient and consumed by the BotManager so the harness can
+    // observe genuine server-side disconnects (e.g. /kick, /ban) - previously
+    // only client-initiated disconnects produced a "disconnected" event.
+    private final List<Consumer<String>> disconnectCallbacks = new CopyOnWriteArrayList<>();
 
     private ClientNetworkSession session;
     private String currentServer;
+    // Whether the bot has completed at least one join (login) on this session.
+    // A second ClientboundLoginPacket on the SAME session is a proxy-driven
+    // server switch/transfer (velocity re-runs the login sequence from the new
+    // backend), which must be surfaced to the harness as a fresh arrival.
+    private volatile boolean joined = false;
+
+    // Join/transfer listeners fired on EVERY genuine login packet (first join
+    // and subsequent proxy-driven server switches).
+    private final java.util.List<Runnable> joinListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     private double x, y, z;
     private float yaw, pitch;
@@ -205,8 +220,19 @@ public class BotClient {
             @Override
             public void packetReceived(Session s, Packet packet) {
                 if (packet instanceof ClientboundLoginPacket loginPacket) {
+                    boolean firstJoin = !joined;
+                    joined = true;
                     connected.set(true);
-                    loginFuture.complete(null);
+                    if (firstJoin) {
+                        loginFuture.complete(null);
+                    } else {
+                        // Proxy-driven backend switch (velocity transfer): the
+                        // session stays up but the client is now on a different
+                        // backend. Surface it to the harness as a fresh arrival.
+                        System.out.println("[devrunner] Bot '" + name + "' server switch detected"
+                                + " (second join on existing session)");
+                        resetForNewServer();
+                    }
                     lastJoinNanos = System.nanoTime();
                     botEntityId = loginPacket.getEntityId();
                     if (loginPacket.getCommonPlayerSpawnInfo() != null
@@ -214,12 +240,14 @@ public class BotClient {
                         gameMode = loginPacket.getCommonPlayerSpawnInfo().getGameMode().name().toLowerCase();
                     }
                     botEntityId = loginPacket.getEntityId();
+                    fireJoinListeners();
                 }
             }
 
             @Override
             public void disconnected(DisconnectedEvent event) {
                 connected.set(false);
+                joined = false;
                 if (!loginFuture.isDone()) {
                     String reason = event.getReason() != null
                             ? event.getReason().toString()
@@ -413,6 +441,63 @@ public class BotClient {
 
     public void addChatCallback(Consumer<String> callback) {
         chatCallbacks.add(callback);
+    }
+
+    /**
+     * Registers a listener fired when this bot's session drops for any reason
+     * (server kick/ban, connection loss, explicit disconnect). The listener
+     * receives the disconnect reason (may be null).
+     */
+    public void addDisconnectCallback(Consumer<String> callback) {
+        disconnectCallbacks.add(callback);
+    }
+
+    private void fireDisconnectCallbacks(String reason) {
+        for (Consumer<String> callback : disconnectCallbacks) {
+            try {
+                callback.accept(reason);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /**
+     * Registers a listener fired whenever the bot completes a genuine login
+     * (the first join, and again on every proxy-driven server switch).
+     */
+    public void addJoinListener(Runnable listener) {
+        joinListeners.add(listener);
+    }
+
+    private void fireJoinListeners() {
+        for (Runnable l : joinListeners) {
+            try {
+                l.run();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /**
+     * Clears per-server state when the bot is moved to a different backend by
+     * the proxy. The new server re-sends its own position/entity/block/inventory
+     * packets, so stale snapshots from the previous backend must not leak into
+     * the new one (and the previous position must not be confirmed against the
+     * new server's anti-cheat).
+     */
+    private void resetForNewServer() {
+        hasPosition = false;
+        entitySnapshots.clear();
+        blockSnapshots.clear();
+        openContainerId = -1;
+        abilities = null;
+        dead = false;
+        // The new backend re-sends its own inventory; without clearing the
+        // per-container state here the client would keep serving the PREVIOUS
+        // server's snapshots (e.g. the source server's inventory right after a
+        // proxy transfer), which the harness would then treat as current.
+        containers.clear();
+        cursorItemContainerId = 0;
     }
 
     public String waitForChat(String text, long timeoutMs) throws Exception {
@@ -1322,6 +1407,7 @@ public class BotClient {
                 future.completeExceptionally(new RuntimeException("Bot '" + name + "' disconnected: " + reason));
             }
             chatFutures.clear();
+            fireDisconnectCallbacks(reason);
         }
 
         private String extractChatMessage(Packet packet) {

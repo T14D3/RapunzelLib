@@ -241,12 +241,63 @@ public class Bot implements AutoCloseable {
         return service.awaitAnyChat(name, Duration.ofMillis(timeoutMs), texts);
     }
 
+    /**
+     * Waits until this bot's connection drops for any reason (server kick,
+     * ban, explicit disconnect). Completes with the disconnect reason.
+     */
+    public @NotNull CompletableFuture<String> awaitDisconnect(long timeoutMs) {
+        return service.awaitDisconnect(name, Duration.ofMillis(timeoutMs));
+    }
+
     public @NotNull CompletableFuture<Position> awaitPosition(int x, int y, int z, int radius, long timeoutMs) {
         return service.awaitPosition(name, x, y, z, radius, Duration.ofMillis(timeoutMs));
     }
 
     public @NotNull CompletableFuture<Void> awaitServer(@NotNull String serverName, long timeoutMs) {
         return service.awaitServer(name, serverName, Duration.ofMillis(timeoutMs));
+    }
+
+    /**
+     * Waits for a FRESH arrival on the given server (requires a genuine new
+     * join on the target backend, not a stale pre-transfer arrival). Capture
+     * the baseline with {@link #arrivalToken(String)} BEFORE issuing the
+     * transfer.
+     *
+     * @param serverName the target server name
+     * @param sinceToken arrival-token baseline captured before the transfer
+     * @param timeoutMs  the maximum time to wait
+     * @return a future that completes when the bot freshly arrives on the server
+     */
+    public @NotNull CompletableFuture<Void> awaitServer(@NotNull String serverName, long sinceToken, long timeoutMs) {
+        return service.awaitServer(name, serverName, sinceToken, Duration.ofMillis(timeoutMs));
+    }
+
+    /**
+     * Returns the current monotonic arrival token for this bot on the given
+     * server (0 if it has never landed there). Capture a baseline before
+     * issuing a cross-server transfer and pass it to
+     * {@link #awaitServer(String, long, long)}.
+     */
+    public long arrivalToken(@NotNull String serverName) {
+        return service.arrivalToken(name, serverName);
+    }
+
+    /**
+     * Harness-truth presence: whether the harness has observed a genuine
+     * arrival of this bot on the given server.
+     */
+    public boolean isPresentOn(@NotNull String serverName) {
+        return service.isPresentOn(name, serverName);
+    }
+
+    /**
+     * Announces that the proxy is about to move this bot to the given server
+     * (call right before issuing a cross-server transfer). The harness tags
+     * the bot's next genuine arrival (real second-login packet) with the
+     * announced landing server.
+     */
+    public void announceTransfer(@NotNull String targetServer) {
+        service.announceTransfer(name, targetServer);
     }
 
     // ── Inventory async ────────────────────────────────────────────────────

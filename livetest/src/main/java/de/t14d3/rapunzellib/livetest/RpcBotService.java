@@ -75,10 +75,15 @@ public class RpcBotService implements BotService, AutoCloseable {
     // Local cache of the latest explosion snapshot per bot.
     private final Map<String, ExplosionSnapshot> explosionCache = new ConcurrentHashMap<>();
 
-    // Server-arrival cache: botName -> serverName. Populated on "server" events
-    // so that awaitServer() can match pre-existing arrivals even when the await
-    // slot is registered after the event has already been dispatched.
-    private final Map<String, String> serverCache = new ConcurrentHashMap<>();
+    // Server-arrival cache: botName -> serverName -> monotonic arrival token.
+    // Populated ONLY on genuine "server" arrivals (the bot client actually
+    // landed on a backend) so that awaitServer() can match pre-existing
+    // arrivals (short-circuit) AND enforce freshness (token > sinceToken)
+    // without false-positives on stale state. Tokens are scoped per
+    // (bot, server) so a bot transferred between backends keeps separate
+    // sequences for each server it has landed on.
+    private final Map<String, Map<String, Long>> arrivalTokens = new ConcurrentHashMap<>();
+    private final AtomicLong arrivalSequence = new AtomicLong(0);
 
     // Bots owned by this client: botName -> set of logical servers the bot has
     // been connected to. Used to scope outgoing requests and to filter incoming
@@ -171,7 +176,7 @@ public class RpcBotService implements BotService, AutoCloseable {
                 // fall through to the loud failure below
             }
             pending.remove(id);
-            serverCache.clear();
+            arrivalTokens.clear();
             future.completeExceptionally(new RuntimeException(
                     "BotRPC connection lost; request '" + request.get("type").getAsString()
                             + "' for bot '" + request.get("bot").getAsString() + "' was not delivered"));
@@ -228,7 +233,7 @@ public class RpcBotService implements BotService, AutoCloseable {
         this.socket = fresh;
         this.writer = freshWriter;
         this.reader = freshReader;
-        serverCache.clear();
+        arrivalTokens.clear();
         System.err.println("[rpc-bot] transport reconnected to " + host + ":" + port);
         startReaderThread(freshReader);
     }
@@ -351,11 +356,27 @@ public class RpcBotService implements BotService, AutoCloseable {
                 explosionCache.put(botName, snap);
             }
             if ("SERVER".equalsIgnoreCase(type)) {
-                // Cache the server arrival so awaitServer() can match
-                // pre-existing arrivals even when the await slot is registered
-                // after the event has been dispatched.
-                if (message != null && !message.isEmpty()) {
-                    serverCache.put(botName, message);
+                // Cache the arrival token per (bot, server) so awaitServer()
+                // can match pre-existing arrivals even when the await slot is
+                // registered after the event has been dispatched, and so
+                // callers can enforce freshness via a sinceToken baseline.
+                if (evtServer != null && !evtServer.isEmpty()) {
+                    Map<String, Long> byServer = arrivalTokens.computeIfAbsent(
+                            botName, n -> new ConcurrentHashMap<>());
+                    // A bot lives on exactly one backend at a time: a new
+                    // arrival means it left every other server.
+                    byServer.keySet().removeIf(s -> !s.equalsIgnoreCase(evtServer));
+                    byServer.put(evtServer, arrivalSequence.incrementAndGet());
+                    // A fresh arrival (initial join or proxy transfer) lands on
+                    // a NEW backend: drop the per-server state cached from the
+                    // previous one, otherwise stale snapshots (e.g. the source
+                    // server's inventory right after a transfer) satisfy
+                    // awaitInventory before the new backend's state arrives.
+                    inventoryCache.remove(botName);
+                    entityCache.remove(botName);
+                    blockCache.remove(botName);
+                    explosionCache.remove(botName);
+                    abilitiesCache.remove(botName);
                 }
             }
             if ("ABILITIES".equalsIgnoreCase(type)) {
@@ -367,8 +388,13 @@ public class RpcBotService implements BotService, AutoCloseable {
                 }
             }
             if ("DISCONNECTED".equalsIgnoreCase(type)) {
-                // Clean up caches when a bot disconnects.
-                serverCache.remove(botName);
+                // Clean up caches when a bot disconnects. A disconnect ends the
+                // bot's session entirely, so EVERY arrival token for the bot is
+                // invalidated - including tokens for servers the bot reached via
+                // a proxy transfer (the disconnect request is routed via the
+                // bot's primary server, which would otherwise leave the
+                // transferred arrival behind and false-positive presence).
+                arrivalTokens.remove(botName);
                 abilitiesCache.remove(botName);
             }
             // Cache population must happen *before* dispatch so that await
@@ -611,11 +637,15 @@ public class RpcBotService implements BotService, AutoCloseable {
 
         // 2) Otherwise register an await predicate that fires on subsequent
         //    INVENTORY pushes for this (bot,containerId) pair, AND also polls
-        //    the cache (in case a push landed before we registered).
+        //    the cache (in case a push landed before we registered). The
+        //    inventory cache is keyed by (bot, containerId) only - NOT scoped
+        //    to the bot's primary server - because a proxy transfer moves the
+        //    bot to another backend and its events then arrive tagged with the
+        //    NEW server. Scoping the slot to the primary server would reject
+        //    exactly the events that carry the transferred inventory.
         EventDispatcher.AwaitSlot slot = new EventDispatcher.AwaitSlot(event -> {
             if (!"INVENTORY".equals(event.type())) return false;
             if (!name.equals(event.botName())) return false;
-            if (!serverMatchesScope(event, botPrimaryServer.get(name))) return false;
             BotInventory snap = getCachedInventory(name, containerId);
             return snap != null && matcher.test(snap);
         });
@@ -1057,6 +1087,16 @@ public class RpcBotService implements BotService, AutoCloseable {
     }
 
     @Override
+    public @NotNull CompletableFuture<String> awaitDisconnect(@NotNull String name, @NotNull Duration timeout) {
+        // Uses awaitEvent so the replay buffer covers the race where the
+        // server-side kick already dropped the session before the test
+        // registers the await (the event is dispatched as a DISCONNECTED
+        // broadcast by the devrunner when a genuine session drop is observed).
+        return awaitEvent(name, event -> "DISCONNECTED".equals(event.type()), timeout)
+                .thenApply(BotEventListener.BotEvent::message);
+    }
+
+    @Override
     public @NotNull CompletableFuture<Bot.Position> awaitPosition(@NotNull String name, int x, int y, int z, double radius, @NotNull Duration timeout) {
         // Use a periodic poll of query_position against the cache. We accept a
         // small boundary error here: this is a test helper, not a hot path.
@@ -1089,26 +1129,64 @@ public class RpcBotService implements BotService, AutoCloseable {
 
     @Override
     public @NotNull CompletableFuture<Void> awaitServer(@NotNull String name, @NotNull String serverName, @NotNull Duration timeout) {
-        // Wait for either a "server" event whose message matches the requested
-        // server name, or a "disconnected"->"ready" cycle for that target server.
-        // The DevRunner's BotTcpServer pushes a "server" event right after the
-        // underlying client confirms a transfer (or a fresh connect).
-        String target = Objects.requireNonNull(serverName);
+        return awaitServer(name, serverName, 0L, timeout);
+    }
 
-        // 1) Check the server-arrival cache first - let pre-existing arrivals
-        //    short-circuit even if the await slot is registered after the event
-        //    was already dispatched (race condition avoidance).
-        String arrived = serverCache.get(name);
-        if (arrived != null && (arrived.equals(target) || arrived.equals(target.toLowerCase()))) {
+    @Override
+    public @NotNull CompletableFuture<Void> awaitServer(@NotNull String name, @NotNull String targetServer, long sinceToken, @NotNull Duration timeout) {
+        // Wait for a genuine arrival on the target server. Unlike the legacy
+        // name-only matching, this requires BOTH a "server" event tagged with
+        // the target AND a fresh arrival token (token > sinceToken), so a stale
+        // arrival from a previous connect/transfer cannot satisfy the await.
+        String target = Objects.requireNonNull(targetServer);
+
+        // 1) Short-circuit on a fresh arrival already in the cache - but only
+        //    if it is genuinely fresh (token > sinceToken).
+        if (arrivalToken(name, target) > sinceToken) {
             return CompletableFuture.completedFuture(null);
         }
 
-        // 2) Otherwise subscribe to subsequent SERVER events.
+        // 2) Otherwise subscribe to subsequent SERVER events tagged with the
+        //    target. The cache is populated before dispatch, so by the time the
+        //    predicate runs the token for this arrival is already visible.
         return awaitEventUnscoped(name, event -> {
             if (!"SERVER".equals(event.type())) return false;
-            String m = event.message();
-            return m != null && (m.equals(target) || m.equals(target.toLowerCase()));
+            String evtServer = event.server();
+            if (evtServer == null || !evtServer.equalsIgnoreCase(target)) return false;
+            return arrivalToken(name, target) > sinceToken;
         }, timeout).thenApply(event -> null);
+    }
+
+    @Override
+    public long arrivalToken(@NotNull String name, @NotNull String serverName) {
+        Map<String, Long> byServer = arrivalTokens.get(name);
+        if (byServer == null) return 0L;
+        Long token = byServer.get(serverName);
+        return token != null ? token : 0L;
+    }
+
+    @Override
+    public boolean isPresentOn(@NotNull String name, @NotNull String serverName) {
+        // Harness-truth presence: the bot is "present on" a server iff the
+        // harness has observed a genuine arrival for (name, serverName).
+        return arrivalToken(name, serverName) > 0L;
+    }
+
+    @Override
+    public void announceTransfer(@NotNull String name, @NotNull String targetServer) {
+        // Accept arrival events tagged with the announced target so the
+        // transfer's CONFIRMED login (the real second-login packet) can be
+        // observed by this client. The token is still only minted on a genuine
+        // arrival - a failed transfer produces no token.
+        if (targetServer != null && !targetServer.isBlank()) {
+            botServers.computeIfAbsent(name, n -> java.util.concurrent.ConcurrentHashMap.newKeySet())
+                    .add(targetServer);
+        }
+        JsonObject req = new JsonObject();
+        req.addProperty("type", "announce_transfer");
+        req.addProperty("bot", name);
+        req.addProperty("target", targetServer);
+        sendAndForget(req);
     }
 
     @Override

@@ -16,7 +16,8 @@ public record DevRunnerConfig(
     List<RegexReplace> regexReplaces,
     Map<String, Map<String, String>> fileOverrides,
     boolean jfrEnabled,
-    String jfrSettings
+    String jfrSettings,
+    boolean allowDirectConnections
 ) {
     public DevRunnerConfig {
         servers = servers != null ? Map.copyOf(servers) : Map.of();

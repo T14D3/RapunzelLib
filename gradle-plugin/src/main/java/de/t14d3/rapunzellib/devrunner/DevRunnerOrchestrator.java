@@ -9,6 +9,7 @@ import de.t14d3.rapunzellib.devrunner.service.ServiceRegistry;
 import de.t14d3.rapunzellib.serverrunner.FillV3Client;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -43,12 +44,25 @@ public final class DevRunnerOrchestrator {
         workspace.createDirectories();
         registerShutdownHook();
 
+        // Project policy: players (bots) must ALWAYS connect through the proxy.
+        // Fail at config time when no velocity server is configured and the
+        // config did not explicitly opt out (allowDirectConnections).
+        if (!verifyProxyRequirement()) {
+            return 2;
+        }
+
         startServices();
         waitForServicesReady();
 
         // Start the bot TCP server before server processes so the RpcBotService
         // can connect as soon as the plugin initializes.
         int botTcpPort = startBotTcpServer();
+
+        // Fail loudly BEFORE any server starts when the velocity forced-host
+        // DNS entries the bot harness relies on are missing (see /etc/hosts).
+        if (!verifyForcedHosts()) {
+            return 2;
+        }
 
         String mysqlJdbc = cfg.mysqlJdbc(null);
         Map<String, Path> resolvedJars = resolveJars();
@@ -367,50 +381,11 @@ public final class DevRunnerOrchestrator {
 
         System.out.println("[devrunner] Running live tests...");
 
-        // Wait for servers to finish loading before sending commands
-        for (var entry : cfg.servers().entrySet()) {
-            String name = entry.getKey();
-            DevRunnerConfig.ServerSpec spec = entry.getValue();
-
-            // Give the server time to fully initialize before sending commands
-            try {
-                // Look for "Done" in the server output to know it's ready
-                // Simple heuristic: poll for process to print "Done"
-                long deadline = System.currentTimeMillis() + cfg.liveTests().timeoutMs();
-                while (System.currentTimeMillis() < deadline) {
-                    // Check if the server process is still alive
-                    boolean alive = false;
-                    for (Process p : serverProcesses) {
-                        if (p.isAlive()) { alive = true; break; }
-                    }
-                    if (!alive) break;
-                    // Just wait - the console will have captured output by then
-                    Thread.sleep(500);
-                    // Simple heuristic: if we've waited 15 seconds, assume server is ready
-                    if (System.currentTimeMillis() > deadline - cfg.liveTests().timeoutMs() + 15_000L) break;
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-
-            // Determine the livetest command based on platform
-            String testCommand = switch (spec.platform()) {
-                case "paper", "fabric", "neoforge", "sponge" -> "/livetest runall";
-                case "velocity" -> "/livetest runall";
-                default -> null;
-            };
-
-            if (testCommand != null) {
-                console.routeInput("-" + name + " " + testCommand);
-            }
-        }
-
         // Track servers that have completed testing via line listener.
         // NOTE: this listener MUST be registered before the runall commands are
-        // dispatched above, otherwise a fast-completing test suite (e.g. only
-        // single-server stub tests) can finish before the listener attaches and
-        // the orchestrator would wait for the full run timeout.
+        // dispatched below, otherwise a fast-completing test suite can finish
+        // before the listener attaches and the orchestrator would wait for the
+        // full run timeout.
         java.util.Set<String> serversCompleted = java.util.concurrent.ConcurrentHashMap.newKeySet();
         DevRunnerConsole.LineListener completionListener = (sourceName, line, isError) -> {
             if (!isError && line != null && line.contains("All tests completed")) {
@@ -421,22 +396,58 @@ public final class DevRunnerOrchestrator {
         };
         console.addLineListener(completionListener);
 
-        try {
-            // Wait for all non-velocity servers to complete (allow generous time for
-            // server startup + bot tests). If the deadline expires, proceed anyway.
-            long testDeadline = System.currentTimeMillis() + cfg.liveTests().runTimeoutMs();
-            int targetServers = 0;
-            for (var entry : cfg.servers().entrySet()) {
-                if (!"velocity".equals(entry.getValue().platform())) {
-                    targetServers++;
-                }
+        int targetServers = 0;
+        for (var entry : cfg.servers().entrySet()) {
+            if (!"velocity".equals(entry.getValue().platform())) {
+                targetServers++;
             }
+        }
 
-            while (System.currentTimeMillis() < testDeadline && serversCompleted.size() < targetServers) {
-                // Check if any process has died (server may have crashed)
-                boolean anyAlive = serverProcesses.stream().anyMatch(Process::isAlive);
-                if (!anyAlive) break;
-                Thread.sleep(200);
+        try {
+            // Run each server's test suite SEQUENTIALLY. Every live-test bot
+            // connects through the shared velocity proxy, and velocity enforces
+            // unique player identities - two instances running the same bot
+            // names (BotAlice/BotBob) concurrently would kick each other with
+            // "You are already connected to this proxy!". Serializing the
+            // suites keeps the same-named bots from ever being connected at
+            // the same time. Servers stay up between suites, so the lobby's
+            // cross-server scenarios can still connect bots to survival.
+            long suiteBudgetMs = Math.max(1, cfg.liveTests().runTimeoutMs() / Math.max(1, targetServers));
+            for (var entry : cfg.servers().entrySet()) {
+                String name = entry.getKey();
+                DevRunnerConfig.ServerSpec spec = entry.getValue();
+                if ("velocity".equals(spec.platform())) continue;
+
+                // Give the server time to fully initialize before sending commands.
+                long readyDeadline = System.currentTimeMillis() + cfg.liveTests().timeoutMs();
+                while (System.currentTimeMillis() < readyDeadline) {
+                    boolean alive = serverProcesses.stream().anyMatch(Process::isAlive);
+                    if (!alive) break;
+                    Thread.sleep(500);
+                    // Simple heuristic: if we've waited 15 seconds, assume server is ready.
+                    if (System.currentTimeMillis() > readyDeadline - cfg.liveTests().timeoutMs() + 15_000L) break;
+                }
+
+                String testCommand = switch (spec.platform()) {
+                    case "paper", "fabric", "neoforge", "sponge" -> "/livetest runall";
+                    default -> null;
+                };
+                if (testCommand == null) continue;
+
+                console.routeInput("-" + name + " " + testCommand);
+
+                // Wait for THIS server's suite to complete before starting the
+                // next one (see the serialization rationale above).
+                long suiteDeadline = System.currentTimeMillis() + suiteBudgetMs;
+                while (System.currentTimeMillis() < suiteDeadline && !serversCompleted.contains(name)) {
+                    boolean anyAlive = serverProcesses.stream().anyMatch(Process::isAlive);
+                    if (!anyAlive) break;
+                    Thread.sleep(200);
+                }
+                if (!serversCompleted.contains(name)) {
+                    System.out.println("[devrunner] Server '" + name + "' did not report test completion within "
+                            + suiteBudgetMs + "ms; proceeding to the next server.");
+                }
             }
 
             // Send shutdown to all servers
@@ -457,15 +468,98 @@ public final class DevRunnerOrchestrator {
         }
     }
 
+    /**
+     * Verifies that the velocity forced-host DNS names used to route bots to
+     * backends ({@code <server>.example.com}) resolve before any server starts.
+     *
+     * <p>The bot harness connects every bot through the velocity proxy using
+     * these hostnames (see {@link #startBotTcpServer()}); when the corresponding
+     * /etc/hosts entries (or DNS records) are missing, every backend bot fails
+     * with "Unknown host" and the whole devrun dies slowly and confusingly.
+     * This check fails fast with an actionable message instead.</p>
+     *
+     * @return true when the forced hosts resolve (or no velocity proxy is used)
+     */
+    private boolean verifyForcedHosts() {
+        boolean hasVelocity = cfg.servers().values().stream()
+                .anyMatch(spec -> "velocity".equals(spec.platform()));
+        if (!hasVelocity) {
+            return true;
+        }
+
+        List<String> missing = new ArrayList<>();
+        for (var entry : cfg.servers().entrySet()) {
+            String name = entry.getKey();
+            if ("velocity".equals(entry.getValue().platform())) continue;
+            String host = forcedHostFor(name);
+            try {
+                InetAddress.getAllByName(host);
+            } catch (Exception e) {
+                missing.add(host);
+            }
+        }
+
+        if (missing.isEmpty()) {
+            return true;
+        }
+
+        System.err.println("[devrunner] FATAL: velocity topology requires forced-host DNS entries that do NOT resolve:");
+        for (String host : missing) {
+            System.err.println("  - " + host);
+        }
+        System.err.println("Add the following lines to /etc/hosts (or configure DNS), then re-run:");
+        for (String host : missing) {
+            System.err.println("  127.0.0.1 " + host);
+        }
+        return false;
+    }
+
+    /**
+     * Verifies the velocity-proxy requirement.
+     *
+     * <p>Per project policy every player (dev bot) must connect through the
+     * velocity proxy, never directly to a backend. A topology without a
+     * velocity server is only accepted when the config explicitly opts out
+     * ({@code allowDirectConnections=true}, e.g. single-server devruns).</p>
+     *
+     * @return true when the requirement is satisfied
+     */
+    private boolean verifyProxyRequirement() {
+        boolean hasVelocity = cfg.servers().values().stream()
+                .anyMatch(spec -> "velocity".equals(spec.platform()));
+        if (hasVelocity || cfg.allowDirectConnections()) {
+            return true;
+        }
+
+        System.err.println("[devrunner] FATAL: no velocity server configured.");
+        System.err.println("[devrunner] Every player/bot must connect through the velocity proxy;");
+        System.err.println("[devrunner] direct backend connections are not allowed by default.");
+        System.err.println("[devrunner] Fix one of:");
+        System.err.println("[devrunner]   - add a server with platform \"velocity\" to the devRunner servers DSL, or");
+        System.err.println("[devrunner]   - explicitly opt out: devRunner { allowDirectConnections.set(true) }");
+        return false;
+    }
+
+    /** Returns the velocity forced-host name used for the given backend server. */
+    private static String forcedHostFor(String serverName) {
+        return serverName + ".example.com";
+    }
+
     // ── Bot management ─────────────────────────────────────────────────────
 
     private int startBotTcpServer() {
         try {
-            botTcpServer = new BotTcpServer(botManager, 0, serverName -> {
-                DevRunnerConfig.ServerSpec spec = cfg.servers().get(serverName);
-                if (spec == null) return null;
-                return "127.0.0.1:" + spec.port();
-            });
+            // Resolve the velocity proxy spec once: bots connect through the proxy
+            // (never directly to a backend). Each backend is addressed by its
+            // velocity forced-host hostname so the proxy routes the bot to the
+            // intended server; /etc/hosts maps those hostnames to 127.0.0.1.
+            Map<String, DevRunnerConfig.ServerSpec> servers = cfg.servers();
+            DevRunnerConfig.ServerSpec velocitySpec = servers.values().stream()
+                    .filter(s -> "velocity".equals(s.platform()))
+                    .findFirst()
+                    .orElse(null);
+            botTcpServer = new BotTcpServer(botManager, 0, serverName ->
+                    resolveBotAddress(servers, serverName, velocitySpec, cfg.allowDirectConnections()));
             int port = botTcpServer.start();
             System.out.println("[devrunner] Bot TCP server started on port " + port);
             return port;
@@ -473,6 +567,49 @@ public final class DevRunnerOrchestrator {
             System.err.println("[devrunner] Failed to start bot TCP server: " + e.getMessage());
             return 0;
         }
+    }
+
+    /**
+     * Resolves the connection address the bot harness should use for the given
+     * backend server.
+     *
+     * <p>Bots always connect through the velocity proxy (policy): the backend
+     * is addressed by its velocity forced-host hostname on the proxy's port.
+     * When no proxy is configured the topology must have opted out via
+     * {@code allowDirectConnections}; the backend is then addressed directly
+     * on its own port. Returns {@code null} for unknown servers and for the
+     * proxy itself.</p>
+     *
+     * @param servers              the configured server specs
+     * @param serverName           the backend to connect to
+     * @param velocitySpec         the velocity spec, or null when none is configured
+     * @param allowDirectConnections opt-out for proxy-less topologies
+     * @return the bot connection address, or null when the server is not connectable
+     * @throws IllegalStateException when no proxy is configured and direct connections are not allowed
+     */
+    static String resolveBotAddress(
+            Map<String, DevRunnerConfig.ServerSpec> servers,
+            String serverName,
+            DevRunnerConfig.ServerSpec velocitySpec,
+            boolean allowDirectConnections
+    ) {
+        DevRunnerConfig.ServerSpec spec = servers.get(serverName);
+        if (spec == null) {
+            return null;
+        }
+        // Bots never target the proxy itself as a backend.
+        if ("velocity".equals(spec.platform())) {
+            return null;
+        }
+        if (velocitySpec == null) {
+            if (!allowDirectConnections) {
+                throw new IllegalStateException(
+                        "no velocity server configured; bots cannot connect directly to backend '"
+                                + serverName + "' (set allowDirectConnections=true to opt out)");
+            }
+            return "127.0.0.1:" + spec.port();
+        }
+        return forcedHostFor(serverName) + ":" + velocitySpec.port();
     }
 
     private ServiceAdapter.ServiceSpec toServiceSpec(DevRunnerConfig.ServiceSpec spec, String name) {

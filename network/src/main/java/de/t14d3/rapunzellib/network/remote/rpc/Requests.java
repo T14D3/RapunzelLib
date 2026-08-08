@@ -70,4 +70,28 @@ public final class Requests {
     public record SetInventoryRequest(@NotNull UUID uuid,
                                        @NotNull String inventoryType,
                                        @NotNull List<SlotEntry> slots) {}
+
+    /**
+     * Presence query: asks the target backend which players are online there.
+     * The {@code serverName} mirrors the routing target (used for logging /
+     * debugging); the handler replies with the online player names on THIS
+     * server.
+     */
+    public record ServerPlayersRequest(@Nullable String serverName) {}
+
+    public record ServerPlayersResult(@NotNull List<String> playerNames) {}
+
+    /**
+     * Presence query: asks the target backend whether a specific entity (by
+     * UUID) exists on THAT server. Mirrors {@link ServerPlayersRequest} so
+     * cross-server tests can prove an entity really arrived on a backend.
+     */
+    public record EntityPresenceRequest(@NotNull UUID uuid) {}
+
+    /**
+     * Reply to {@link EntityPresenceRequest}: {@code present} is true only when
+     * the entity was found locally on the queried server; {@code entityType}
+     * and {@code world} are populated for identification/logging.
+     */
+    public record EntityPresenceResult(boolean present, @Nullable String entityType, @Nullable String world) {}
 }

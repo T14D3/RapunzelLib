@@ -48,6 +48,7 @@ public final class DevRunnerConfigParser {
         if (config.baseDir() != null) global.addProperty("baseDir", config.baseDir().toString());
         if (config.jfrEnabled()) global.addProperty("jfrEnabled", true);
         if (!"profile".equals(config.jfrSettings())) global.addProperty("jfrSettings", config.jfrSettings());
+        if (config.allowDirectConnections()) global.addProperty("allowDirectConnections", true);
         root.add("global", global);
 
         // Servers
@@ -162,6 +163,7 @@ public final class DevRunnerConfigParser {
         Path baseDir = null;
         boolean jfrEnabled = false;
         String jfrSettings = "profile";
+        boolean allowDirectConnections = false;
 
         if (root.has("global")) {
             JsonObject g = root.getAsJsonObject("global");
@@ -172,6 +174,7 @@ public final class DevRunnerConfigParser {
             if (g.has("baseDir")) baseDir = Path.of(g.get("baseDir").getAsString());
             if (g.has("jfrEnabled")) jfrEnabled = g.get("jfrEnabled").getAsBoolean();
             if (g.has("jfrSettings")) jfrSettings = g.get("jfrSettings").getAsString();
+            if (g.has("allowDirectConnections")) allowDirectConnections = g.get("allowDirectConnections").getAsBoolean();
         }
 
         // Servers
@@ -258,7 +261,8 @@ public final class DevRunnerConfigParser {
 
         return new DevRunnerConfig(
             javaBin, jvmArgs, resolvedBase, resolvedCache, resolvedInstances,
-            servers, services, liveTests, List.of(), fileOverrides, jfrEnabled, jfrSettings
+            servers, services, liveTests, List.of(), fileOverrides, jfrEnabled, jfrSettings,
+            allowDirectConnections
         );
     }
 
@@ -314,7 +318,7 @@ public final class DevRunnerConfigParser {
             if (!arg.startsWith("--")) throw new DevRunnerUsageException(2, "Unknown argument: " + arg);
 
             String key = arg.substring(2);
-            if (key.equals("mysql") || key.equals("jfr")) {
+            if (key.equals("mysql") || key.equals("jfr") || key.equals("allow-direct-connections")) {
                 flags.put(key, "true");
                 continue;
             }
@@ -379,6 +383,9 @@ public final class DevRunnerConfigParser {
         boolean jfrEnabled = Boolean.parseBoolean(flags.getOrDefault("jfr", "false"));
         String jfrSettings = flags.getOrDefault("jfr-settings", "profile");
 
+        // Direct bot connections (opt-out of the velocity requirement).
+        boolean allowDirectConnections = Boolean.parseBoolean(flags.getOrDefault("allow-direct-connections", "false"));
+
         // Directories
         Path baseDir = flags.containsKey("base-dir") ? Path.of(flags.get("base-dir")) : null;
         Path resolvedBase = baseDir != null ? baseDir.toAbsolutePath().normalize() : Path.of("run", "devrunner").toAbsolutePath().normalize();
@@ -391,7 +398,7 @@ public final class DevRunnerConfigParser {
             javaBin, jvmArgs, resolvedBase, resolvedCache, resolvedInstances,
             servers, services,
             new DevRunnerConfig.LiveTestConfig(false, false, null, List.of(), 30_000L, 300_000L),
-            regexReplaces, Map.of(), jfrEnabled, jfrSettings
+            regexReplaces, Map.of(), jfrEnabled, jfrSettings, allowDirectConnections
         );
     }
 
@@ -439,6 +446,8 @@ public final class DevRunnerConfigParser {
               --base-dir <dir>                   default run/devrunner
               --jfr                              Enable JFR profiling
               --jfr-settings <name>              default profile
+              --allow-direct-connections         Opt out of the velocity-proxy requirement (bots
+                                                 connect directly to backends; default: off)
               --replace <path> <regex> <repl>    Regex file replacement (repeatable)
               --mysql                            Start MySQL Docker container
               --mysql-port <port>                default 3307

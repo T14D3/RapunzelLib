@@ -221,6 +221,12 @@ public final class PluginTransportTcpBridge implements Messenger, AutoCloseable 
     public void registerListener(@NotNull String channel, @NotNull MessageListener listener) {
         listeners.computeIfAbsent(channel, k -> new CopyOnWriteArrayList<>()).add(listener);
         delegate.registerListener(channel, listener);
+        // A server that subscribes to network channels is a network participant:
+        // establish the TCP link eagerly (it is lazily created on the first SEND
+        // otherwise). Without this, a mostly-idle backend has no bridge
+        // connection and other servers' targeted envelopes to it are dropped -
+        // e.g. a config-sync follower could never reach a quiet authority.
+        ensureTcpStarted();
         RpcClientMessenger tcp = tcpRef.get();
         if (tcp != null) {
             tcp.registerListener(channel, listener);

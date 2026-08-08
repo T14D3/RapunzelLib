@@ -82,6 +82,25 @@ public final class EntityRpcHandler {
                 new Requests.RemoveResult(entity.remove()))
         );
 
+        // Server-authoritative entity presence: does the given entity exist on
+        // THIS server right now? Lets cross-server tests prove an entity really
+        // arrived on (or left) a backend after a transfer.
+        gateway.register(EntityServiceMethods.QUERY_ENTITY_PRESENCE, (req, source) -> {
+            if (req == null || req.uuid() == null) {
+                return CompletableFuture.completedFuture(new Requests.EntityPresenceResult(false, null, null));
+            }
+            Optional<REntity> entity = Rapunzel.entities().get(req.uuid());
+            if (entity.isEmpty()) {
+                return CompletableFuture.completedFuture(new Requests.EntityPresenceResult(false, null, null));
+            }
+            REntity found = entity.get();
+            String type = found.typeKey().asString();
+            String world = found.worldRef().map(RWorldRef::identifier).orElse(null);
+            logger.info("[Remote] Entity presence {} found={} type={} world={}",
+                req.uuid(), true, type, world);
+            return CompletableFuture.completedFuture(new Requests.EntityPresenceResult(true, type, world));
+        });
+
         logger.info("[Remote] Registered entity RPC handlers");
     }
 

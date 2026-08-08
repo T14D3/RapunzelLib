@@ -71,6 +71,7 @@ public abstract class DevRunnerTask extends DefaultTask {
         List<String> jvmArgs = extension.getJvmArgs().getOrElse(List.of());
         boolean jfrEnabled = Boolean.TRUE.equals(extension.getJfrEnabled().getOrElse(false));
         String jfrSettings = extension.getJfrSettings().getOrElse("profile");
+        boolean allowDirectConnections = Boolean.TRUE.equals(extension.getAllowDirectConnections().getOrElse(false));
 
         Path baseDirPath = extension.getBaseDir().get().getAsFile().toPath().toAbsolutePath().normalize();
 
@@ -127,7 +128,8 @@ public abstract class DevRunnerTask extends DefaultTask {
 
         return new DevRunnerConfig(
             javaBin, jvmArgs, baseDirPath, baseDirPath.resolve("cache"), baseDirPath.resolve("instances"),
-            servers, services, liveTests, List.of(), fileOverrides, jfrEnabled, jfrSettings
+            servers, services, liveTests, List.of(), fileOverrides, jfrEnabled, jfrSettings,
+            allowDirectConnections
         );
     }
 

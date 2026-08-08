@@ -28,4 +28,7 @@ public final class EntityServiceMethods {
 
     public static final RpcMethod<Requests.EntityRef, Requests.WorldRefResult> GET_WORLD =
         RpcMethod.of("entity", "getWorld", Requests.EntityRef.class, Requests.WorldRefResult.class);
+
+    public static final RpcMethod<Requests.EntityPresenceRequest, Requests.EntityPresenceResult> QUERY_ENTITY_PRESENCE =
+        RpcMethod.of("entity", "queryEntityPresence", Requests.EntityPresenceRequest.class, Requests.EntityPresenceResult.class);
 }

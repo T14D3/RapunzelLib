@@ -162,16 +162,24 @@ public class BotTcpServer implements AutoCloseable {
                     String[] parts = address.split(":");
                     String host = parts[0];
                     int p = Integer.parseInt(parts[1]);
-                    botManager.connectBot(botName, server, host, p);
-                    // Broadcast a "server" event with the logical server name so
-                    // that RpcBotService.awaitServer() can match it by name
-                    // (the BotManager's internal serverJoinListener broadcasts the
-                    // raw IP address, which is not what awaitServer expects).
-                    broadcast(event("server", botName, server, "message", server));
+                    boolean newSession = botManager.connectBot(botName, server, host, p);
+                    // Broadcast a "server" event with the actual landing server
+                    // ONLY when a new session was established. A no-op connect
+                    // (bot already connected) must not re-fire an arrival, and
+                    // the BotClient's own join listener already broadcasts the
+                    // genuine login events (initial join + proxy switches).
+                    if (newSession) {
+                        broadcast(event("server", botName, server, "message", server));
+                    }
                     return ok(id);
                 }
                 case "disconnect" -> {
                     botManager.disconnectBot(botName, server);
+                    return ok(id);
+                }
+                case "announce_transfer" -> {
+                    String target = request.has("target") ? request.get("target").getAsString() : "";
+                    botManager.announceTransfer(botName, target);
                     return ok(id);
                 }
                 case "dig" -> {

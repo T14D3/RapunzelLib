@@ -27,6 +27,26 @@ public class BotManager {
     /** Key = {@code name + "\u0000" + server}. */
     private final Map<String, BotClient> bots = new ConcurrentHashMap<>();
 
+    /**
+     * Announced proxy transfers, keyed by bot name -> expected landing server.
+     * A velocity transfer looks to the client like a second login packet on
+     * the existing session - the client cannot observe the new backend's name,
+     * so the harness uses the announcement to tag the CONFIRMED arrival with
+     * the correct landing server. The entry is consumed by the next genuine
+     * login and cleared on disconnect.
+     */
+    private final Map<String, String> pendingTransfers = new ConcurrentHashMap<>();
+
+    /**
+     * Last disconnect wall-clock time per bot name. Velocity removes a player
+     * asynchronously after the client closes its connection; a test that
+     * disconnects and IMMEDIATELY reconnects the same name can otherwise get
+     * kicked with "You are already connected to this proxy!". connectBot()
+     * waits out a short grace after a recent same-name disconnect.
+     */
+    private final Map<String, Long> lastDisconnectAt = new ConcurrentHashMap<>();
+    private static final long RECONNECT_GRACE_MS = 800L;
+
     /** Tri-consumer carrying (botName, serverName, payload). */
     @FunctionalInterface
     public interface BotEventConsumer<T> {
@@ -75,27 +95,74 @@ public class BotManager {
         return null;
     }
 
-    public void connectBot(String name, String server, String host, int port) throws Exception {
+    /**
+     * Connects a bot to the given server.
+     *
+     * @return {@code true} if a NEW bot session was established; {@code false}
+     *         if the (name, server) pair already has a connected bot (no-op).
+     */
+    public boolean connectBot(String name, String server, String host, int port) throws Exception {
         BotClient existing = bots.get(key(name, server));
         if (existing != null && existing.isConnected()) {
             System.out.println("[devrunner] Bot '" + name + "' already connected to " + host + ":" + port);
-            return;
+            return false;
         }
         if (existing != null) {
             existing.disconnect();
             bots.remove(key(name, server));
+            recordDisconnect(name);
         }
+        // Velocity removes a player asynchronously after its connection closes.
+        // A test that disconnects and immediately reconnects the same name can
+        // otherwise be kicked with "You are already connected to this proxy!".
+        waitOutReconnectGrace(name);
         BotClient client = new BotClient(name, host, port);
         wireEventListeners(name, server, client, host);
         client.connect();
         bots.put(key(name, server), client);
         System.out.println("[devrunner] Bot '" + name + "' connected to " + host + ":" + port);
+        return true;
+    }
+
+    private void waitOutReconnectGrace(String name) {
+        Long lastDisc = lastDisconnectAt.get(name);
+        if (lastDisc == null) return;
+        long elapsed = System.currentTimeMillis() - lastDisc;
+        long remaining = RECONNECT_GRACE_MS - elapsed;
+        if (remaining <= 0) return;
+        System.out.println("[devrunner] Bot '" + name + "' reconnecting quickly; waiting "
+                + remaining + "ms for the proxy to release the old session");
+        try {
+            Thread.sleep(remaining);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void recordDisconnect(String name) {
+        if (name != null) {
+            lastDisconnectAt.put(name, System.currentTimeMillis());
+        }
     }
 
     private void wireEventListeners(String name, String server, BotClient client, String host) {
         client.addChatCallback(message -> {
             BotEventConsumer<String> l = chatEventListener;
             if (l != null) l.accept(name, server, message);
+        });
+        client.addDisconnectCallback(reason -> {
+            // Server-side session drop (kick, ban, connection loss): remove the
+            // stale entry and surface a genuine "disconnected" event to the
+            // harness so awaitDisconnect() can observe it. The map guard makes
+            // this a no-op for entries already removed by disconnectBot() or
+            // for connect attempts that never completed (banned login).
+            if (bots.remove(key(name, server), client)) {
+                recordDisconnect(name);
+                BotEventConsumer<String> l = disconnectListener;
+                if (l != null) l.accept(name, server, reason);
+                System.out.println("[devrunner] Bot '" + name + "' session dropped on " + server
+                        + (reason != null ? ": " + reason : ""));
+            }
         });
         client.addInventoryListener((containerId, stateId) -> {
             BotEventConsumer<Integer> l = inventoryListener;
@@ -119,16 +186,33 @@ public class BotManager {
         });
         BotEventConsumer<String> joins = serverJoinListener;
         if (joins != null) {
-            // Fire once after a successful connect - the BotClient.connect()
-            // has already returned, so we notify on a worker thread.
-            new Thread(() -> {
-                try { Thread.sleep(50); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); return; }
-                joins.accept(name, server, host);
-            }, "bot-join-notify-" + name).start();
+            // Fire on EVERY genuine login - the initial connect and each
+            // proxy-driven server switch (velocity transfer). The listener is
+            // invoked from the BotClient's network thread right after the login
+            // packet is processed. A confirmed arrival consumes any announced
+            // transfer and is tagged with the announced landing server; without
+            // an announcement the arrival is tagged with the bot's current
+            // logical server.
+            client.addJoinListener(() -> {
+                String landing = pendingTransfers.remove(name);
+                String evtServer = landing != null && !landing.isBlank() ? landing : server;
+                joins.accept(name, evtServer, host);
+            });
         }
     }
 
+    /**
+     * Records an expected proxy transfer for the given bot. The next genuine
+     * login on the bot's session is tagged with the announced landing server.
+     */
+    public void announceTransfer(String name, String targetServer) {
+        if (name == null || targetServer == null || targetServer.isBlank()) return;
+        pendingTransfers.put(name, targetServer);
+        System.out.println("[devrunner] Announced transfer: bot '" + name + "' -> " + targetServer);
+    }
+
     public void disconnectBot(String name, String server) {
+        pendingTransfers.remove(name);
         String k = key(name, server);
         BotClient client = bots.remove(k);
         if (client == null && (server == null || server.isEmpty())) {
@@ -144,6 +228,7 @@ public class BotManager {
         }
         if (client != null) {
             client.disconnect();
+            recordDisconnect(name);
             BotEventConsumer<String> l = disconnectListener;
             if (l != null) l.accept(name, server != null ? server : "", null);
             System.out.println("[devrunner] Bot '" + name + "' disconnected");
@@ -178,6 +263,7 @@ public class BotManager {
             entry.getValue().disconnect();
         }
         bots.clear();
+        pendingTransfers.clear();
     }
 
     public double[] queryPosition(String name, String server) {

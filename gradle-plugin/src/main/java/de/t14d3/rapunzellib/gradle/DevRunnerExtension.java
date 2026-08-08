@@ -41,6 +41,17 @@ public abstract class DevRunnerExtension {
 
     public abstract Property<String> getJfrSettings();
 
+    /**
+     * Whether bots may connect DIRECTLY to backend servers when no velocity
+     * proxy is configured.
+     *
+     * <p>Default {@code false}: the devrunner REQUIRES a velocity server and
+     * fails at config time when none is configured. Set to {@code true} to
+     * explicitly opt out (single-server topologies, e.g. Zones' paper-only
+     * devrun).</p>
+     */
+    public abstract Property<Boolean> getAllowDirectConnections();
+
     // Containers
     public NamedDomainObjectContainer<ServerSpecConfig> getServers() {
         return servers;
@@ -83,6 +94,7 @@ public abstract class DevRunnerExtension {
         getBaseDir().convention(project.getRootProject().getLayout().getProjectDirectory().dir("run/devrunner"));
         getJfrEnabled().convention(false);
         getJfrSettings().convention("profile");
+        getAllowDirectConnections().convention(false);
 
         liveTests.applyConventions();
     }

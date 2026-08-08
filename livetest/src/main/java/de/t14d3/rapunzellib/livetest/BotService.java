@@ -79,6 +79,17 @@ public interface BotService {
     @NotNull CompletableFuture<String> awaitAnyChat(@NotNull String name, @NotNull Duration timeout, @NotNull String... texts);
 
     /**
+     * Waits until the bot's connection drops for ANY reason (server kick,
+     * ban, explicit disconnect, connection loss). Completes with the
+     * disconnect reason (possibly empty).
+     *
+     * @param name    the bot's player name
+     * @param timeout the maximum time to wait
+     * @return a future that completes with the disconnect reason
+     */
+    @NotNull CompletableFuture<String> awaitDisconnect(@NotNull String name, @NotNull Duration timeout);
+
+    /**
      * Queries the bot's current position.
      *
      * @param name    the bot's player name
@@ -221,6 +232,58 @@ public interface BotService {
      * @return a future that completes when the bot is on the server
      */
     @NotNull CompletableFuture<Void> awaitServer(@NotNull String name, @NotNull String serverName, @NotNull Duration timeout);
+
+    /**
+     * Waits for a FRESH arrival of the bot on the target server. Unlike
+     * {@link #awaitServer(String, String, Duration)}, an arrival that predates
+     * {@code sinceToken} (captured via {@link #arrivalToken} before issuing a
+     * transfer) does NOT satisfy the await - the caller must observe a genuine
+     * new join on the target backend.
+     *
+     * @param name        the bot's player name
+     * @param targetServer the target server name
+     * @param sinceToken  the arrival-token baseline captured before the transfer
+     * @param timeout     the maximum time to wait
+     * @return a future that completes when the bot freshly arrives on the server
+     */
+    @NotNull CompletableFuture<Void> awaitServer(@NotNull String name, @NotNull String targetServer, long sinceToken, @NotNull Duration timeout);
+
+    /**
+     * Returns the current monotonic arrival token for the (bot, server) pair,
+     * or {@code 0} if the bot has never landed on that server. Callers capture
+     * a baseline BEFORE issuing a transfer and pass it as {@code sinceToken} to
+     * {@link #awaitServer(String, String, long, Duration)}.
+     *
+     * @param name       the bot's player name
+     * @param serverName the server name
+     * @return the current arrival token (monotonic per bot+server), 0 if never arrived
+     */
+    long arrivalToken(@NotNull String name, @NotNull String serverName);
+
+    /**
+     * Harness-truth presence: whether the harness has observed a genuine
+     * arrival of the bot on the given server. Useful for negative assertions
+     * (e.g. "Alice is NOT on survival after a denied TPA").
+     *
+     * @param name       the bot's player name
+     * @param serverName the server name
+     * @return {@code true} if a genuine arrival for (name, serverName) has been observed
+     */
+    boolean isPresentOn(@NotNull String name, @NotNull String serverName);
+
+    /**
+     * Announces that the proxy is about to move the given bot to the target
+     * server. A proxy-driven transfer looks to the client like a second login
+     * packet on the existing session - the client itself cannot observe the
+     * new backend's name. The harness uses the announcement to tag the bot's
+     * NEXT genuine arrival with the correct landing server; the arrival is
+     * still confirmed by the real login, so a failed transfer never produces
+     * a false positive. Default: no-op.
+     *
+     * @param name         the bot's player name
+     * @param targetServer the server the bot is expected to land on
+     */
+    default void announceTransfer(@NotNull String name, @NotNull String targetServer) {}
 
     // ── Inventory read ──────────────────────────────────────────────────────
 
