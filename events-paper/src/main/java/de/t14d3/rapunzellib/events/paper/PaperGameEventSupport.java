@@ -4,18 +4,22 @@ import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.events.GameEventSupportManifest;
 import de.t14d3.rapunzellib.events.block.*;
 import de.t14d3.rapunzellib.events.entity.*;
-import de.t14d3.rapunzellib.events.interact.UseBlockPost;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
 import de.t14d3.rapunzellib.events.item.BucketFillPre;
+import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
+import de.t14d3.rapunzellib.events.player.PlayerJoinPost;
+import de.t14d3.rapunzellib.events.player.PlayerLoginPre;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePost;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
 import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.player.PlayerStatePost;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
@@ -39,6 +43,8 @@ final class PaperGameEventSupport {
             BlockPhysicsPost.class,
             BlockFormPre.class,
             BlockSpreadPre.class,
+            BlockTransformPre.class,
+            PistonMovePre.class,
             AttackEntityPre.class,
             AttackEntityPost.class,
             InteractEntityPre.class,
@@ -49,23 +55,30 @@ final class PaperGameEventSupport {
             EntityHurtPre.class,
             EntityHurtPost.class,
             EntityHurtSnapshot.class,
+            EntityDeathPre.class,
+            EntityDeathPost.class,
+            EntityTamePost.class,
             EntityMovePost.class,
             EntityTeleportPost.class,
-            UseBlockPre.class,
-            UseBlockPost.class,
             UseBlockSnapshot.class,
             BucketEmptyPre.class,
             BucketFillPre.class,
             BucketEntityPre.class,
             InteractBlockPre.class,
+            InteractBlockPost.class,
             PlayerQuitPost.class,
+            PlayerJoinPost.class,
+            PlayerLoginPre.class,
+            PlayerMessagePre.class,
+            PlayerMessagePost.class,
+            PlayerStatePost.class,
             PlayerMovePre.class,
             PlayerMovePost.class,
             InventoryOpenPre.class,
             InventoryOpenPost.class,
             InventoryClosePost.class,
-            InventoryClickPre.class,
-            InventoryClickPost.class,
+            InventoryActionPre.class,
+            InventoryActionPost.class,
             ChunkUnloadPost.class,
             WorldLoadPost.class,
             ExplosionPre.class,

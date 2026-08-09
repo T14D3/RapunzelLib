@@ -13,6 +13,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,13 +29,15 @@ final class InventoryEventPayloadsTest {
         RItem stone = RItem.of("minecraft:stone", 2);
         inventory.setItem(1, stone);
 
-        InventoryClickPre event = InventoryEventPayloads.clickPre(new TestPlayer(), inventory, 1, InventoryClickType.RIGHT);
+        InventoryActionPre event = InventoryEventPayloads.actionPre(
+            new TestPlayer(), inventory, 1, InventoryActionType.LEFT
+        );
         inventory.setItem(1, RItem.of("minecraft:diamond", 1));
 
         assertSame(inventory, event.inventory());
         assertSame(inventory.handle(), event.inventory().handle());
-        assertEquals(1, event.slot());
-        assertEquals(InventoryClickType.RIGHT, event.clickType());
+        assertEquals(List.of(1), event.slots());
+        assertEquals(InventoryActionType.LEFT, event.actionType());
         assertEquals(stone, event.currentItem().orElseThrow());
         assertFalse(event.isCancelled());
     }
@@ -44,21 +47,54 @@ final class InventoryEventPayloadsTest {
         TestInventory inventory = new TestInventory(new Object(), 2);
         inventory.setItem(0, RItem.of("minecraft:paper", 1));
 
-        InventoryClickPre pre = InventoryEventPayloads.clickPre(new TestPlayer(), inventory, 0, InventoryClickType.LEFT);
+        InventoryActionPre pre = InventoryEventPayloads.actionPre(
+            new TestPlayer(), inventory, 0, InventoryActionType.SHIFT_LEFT
+        );
         pre.deny();
         inventory.setItem(0, RItem.of("minecraft:book", 1));
 
-        InventoryClickPost post = InventoryEventPayloads.clickPost(
+        InventoryActionPost post = InventoryEventPayloads.actionPost(
             pre.player(),
             inventory,
-            pre.slot(),
-            pre.clickType(),
+            pre.slots(),
+            pre.actionType(),
+            null,
+            inventory.item(0).orElse(null),
             pre.isCancelled() || pre.isDenied()
         );
 
         assertTrue(post.cancelled());
-        assertEquals(RItem.of("minecraft:book", 1), post.currentItem().orElseThrow());
+        assertEquals(RItem.of("minecraft:book", 1), post.currentItemIfPresent().orElseThrow());
         assertSame(inventory, post.inventory());
+    }
+
+    @Test
+    void dragActionCarriesFullSlotListAndIsDragFlag() {
+        TestInventory inventory = new TestInventory(new Object(), 9);
+        RItem paper = RItem.of("minecraft:paper", 1);
+        inventory.setItem(2, paper);
+
+        InventoryActionPre pre = InventoryEventPayloads.actionPre(
+            new TestPlayer(),
+            inventory,
+            List.of(0, 1, 2),
+            InventoryActionType.DRAG,
+            RItem.of("minecraft:stick", 1),
+            paper
+        );
+
+        assertEquals(List.of(0, 1, 2), pre.slots());
+        assertEquals(InventoryActionType.DRAG, pre.actionType());
+        assertTrue(pre.isDrag());
+        assertEquals(RItem.of("minecraft:stick", 1), pre.cursorItem().orElseThrow());
+        assertEquals(paper, pre.currentItem().orElseThrow());
+
+        InventoryActionPost post = InventoryEventPayloads.actionPost(
+            pre.player(), inventory, pre.slots(), pre.actionType(),
+            pre.cursorItem().orElse(null), pre.currentItem().orElse(null), false
+        );
+        assertTrue(post.isDrag());
+        assertEquals(List.of(0, 1, 2), post.slots());
     }
 
     @Test

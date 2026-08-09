@@ -5,8 +5,6 @@ import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.block.*;
 import de.t14d3.rapunzellib.events.entity.*;
-import de.t14d3.rapunzellib.events.interact.UseBlockPost;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
@@ -18,6 +16,7 @@ import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.ExplosionSourceKind;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.RGameMode;
 import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RPlayer;
@@ -28,15 +27,19 @@ import de.t14d3.rapunzellib.registry.RBlockType;
 import com.destroystokyo.paper.event.block.BlockDestroyEvent;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.RItemType;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickType;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionType;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.inventory.InventoryFeatures;
 import de.t14d3.rapunzellib.inventory.RInventory;
+import de.t14d3.rapunzellib.nbt.NbtFeatures;
+import de.t14d3.rapunzellib.nbt.item.RItem;
+import io.papermc.paper.event.player.AsyncChatEvent;
 import io.papermc.paper.event.entity.EntityMoveEvent;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.event.EventHandler;
@@ -46,6 +49,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.*;
 import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
@@ -180,15 +184,20 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onUseBlockPre(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (event.getClickedBlock() == null) return;
-        if (!bus.hasPreListeners(UseBlockPre.class)) return;
+    public void onInteractBlockPre(PlayerInteractEvent event) {
+        InteractBlockPre.Action action = switch (event.getAction()) {
+            case LEFT_CLICK_BLOCK, LEFT_CLICK_AIR -> InteractBlockPre.Action.LEFT;
+            case RIGHT_CLICK_BLOCK, RIGHT_CLICK_AIR -> InteractBlockPre.Action.RIGHT;
+            default -> null;
+        };
+        if (action == null) return;
+        if (!bus.hasPreListeners(InteractBlockPre.class)) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
-        RBlock block = Rapunzel.blocks().require(event.getClickedBlock());
+        RBlock block = event.getClickedBlock() != null ? Rapunzel.blocks().require(event.getClickedBlock()) : null;
+        String face = event.getClickedBlock() != null ? event.getBlockFace().name() : null;
 
-        UseBlockPre pre = new UseBlockPre(player, block, event.isCancelled());
+        InteractBlockPre pre = new InteractBlockPre(player, action, block, face, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -196,50 +205,32 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
-    public void onUseBlockPost(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (event.getClickedBlock() == null) return;
-        boolean needsPost = bus.hasPostListeners(UseBlockPost.class);
+    public void onInteractBlockPost(PlayerInteractEvent event) {
+        InteractBlockPre.Action action = switch (event.getAction()) {
+            case LEFT_CLICK_BLOCK, LEFT_CLICK_AIR -> InteractBlockPre.Action.LEFT;
+            case RIGHT_CLICK_BLOCK, RIGHT_CLICK_AIR -> InteractBlockPre.Action.RIGHT;
+            default -> null;
+        };
+        if (action == null) return;
+        boolean needsPost = bus.hasPostListeners(InteractBlockPost.class);
         boolean needsAsync = bus.hasAsyncListeners(UseBlockSnapshot.class);
+        if (!needsPost && !needsAsync) return;
+        // The legacy async block-use snapshot only applies to right-clicks on a block.
+        if (event.getClickedBlock() == null || action != InteractBlockPre.Action.RIGHT) {
+            needsAsync = false;
+        }
         if (!needsPost && !needsAsync) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
-        RBlock block = Rapunzel.blocks().require(event.getClickedBlock());
+        RBlock block = event.getClickedBlock() != null ? Rapunzel.blocks().require(event.getClickedBlock()) : null;
+        String face = event.getClickedBlock() != null ? event.getBlockFace().name() : null;
         boolean cancelled = event.isCancelled();
 
         if (needsPost) {
-            bus.dispatchPost(new UseBlockPost(player, block, cancelled));
+            bus.dispatchPost(new InteractBlockPost(player, action, block, face, cancelled));
         }
-        if (needsAsync) {
+        if (needsAsync && block != null) {
             bus.dispatchAsync(UseBlockSnapshot.capture(player.uuid(), block, cancelled));
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onInteractBlockPre(PlayerInteractEvent event) {
-        if (event.getClickedBlock() == null) return;
-        Action action = event.getAction();
-        InteractBlockPre.Action normalized = switch (action) {
-            case LEFT_CLICK_BLOCK -> InteractBlockPre.Action.LEFT_CLICK_BLOCK;
-            case RIGHT_CLICK_BLOCK -> InteractBlockPre.Action.RIGHT_CLICK_BLOCK;
-            default -> null;
-        };
-        if (normalized == null) return;
-        if (!bus.hasPreListeners(InteractBlockPre.class)) return;
-
-        InteractBlockPre.Hand hand = switch (event.getHand()) {
-            case HAND -> InteractBlockPre.Hand.MAIN_HAND;
-            case OFF_HAND -> InteractBlockPre.Hand.OFF_HAND;
-            case null, default -> InteractBlockPre.Hand.UNKNOWN;
-        };
-
-        RPlayer player = Rapunzel.players().require(event.getPlayer());
-        RBlock block = Rapunzel.blocks().require(event.getClickedBlock());
-
-        InteractBlockPre pre = new InteractBlockPre(player, block, normalized, hand, event.isCancelled());
-        bus.dispatchPre(pre);
-        if (pre.isDenied()) {
-            event.setCancelled(true);
         }
     }
 
@@ -353,6 +344,78 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onPlayerJoinPost(PlayerJoinEvent event) {
+        if (bus.hasPostListeners(PlayerJoinPost.class)) {
+            bus.dispatchPost(new PlayerJoinPost(event.getPlayer().getUniqueId(), event.getPlayer().getName()));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPlayerMessagePre(AsyncChatEvent event) {
+        if (!bus.hasPreListeners(PlayerMessagePre.class)) return;
+
+        String content = PlainTextComponentSerializer.plainText().serialize(event.message());
+        PlayerMessagePre pre = new PlayerMessagePre(
+            Rapunzel.players().require(event.getPlayer()),
+            content,
+            false,
+            event.isCancelled()
+        );
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onPlayerMessagePost(AsyncChatEvent event) {
+        if (!bus.hasPostListeners(PlayerMessagePost.class)) return;
+
+        String content = PlainTextComponentSerializer.plainText().serialize(event.message());
+        bus.dispatchPost(new PlayerMessagePost(
+            Rapunzel.players().require(event.getPlayer()),
+            content,
+            false,
+            event.isCancelled()
+        ));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPlayerCommandPre(PlayerCommandPreprocessEvent event) {
+        if (!bus.hasPreListeners(PlayerMessagePre.class)) return;
+
+        RPlayer player = Rapunzel.players().require(event.getPlayer());
+        String content = event.getMessage();
+        PlayerMessagePre pre = new PlayerMessagePre(player, content, true, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onPlayerCommandPost(PlayerCommandPreprocessEvent event) {
+        if (!bus.hasPostListeners(PlayerMessagePost.class)) return;
+
+        RPlayer player = Rapunzel.players().require(event.getPlayer());
+        bus.dispatchPost(new PlayerMessagePost(player, event.getMessage(), true, event.isCancelled()));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPlayerLoginPre(AsyncPlayerPreLoginEvent event) {
+        if (!bus.hasPreListeners(PlayerLoginPre.class)) return;
+
+        PlayerLoginPre pre = new PlayerLoginPre(event.getName(), event.getUniqueId());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setLoginResult(AsyncPlayerPreLoginEvent.Result.KICK_OTHER);
+            pre.denyReason().ifPresent(reason ->
+                event.setKickMessage(PlainTextComponentSerializer.plainText().serialize(reason))
+            );
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onEntityMove(EntityMoveEvent event) {
         if (!bus.hasPostListeners(EntityMovePost.class)) return;
 
@@ -370,6 +433,23 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPostListeners(EntityTeleportPost.class)) return;
 
         var entity = Rapunzel.entities().require(event.getEntity());
+
+        bus.dispatchPost(new EntityTeleportPost(
+                entity,
+                fromBukkit(event.getFrom()),
+                fromBukkit(event.getTo())
+        ));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onPlayerTeleport(PlayerTeleportEvent event) {
+        // Player teleports fire PlayerTeleportEvent on Paper, never
+        // EntityTeleportEvent (PlayerTeleportEvent does not even extend it in
+        // recent versions), so player teleports must be dispatched here as
+        // well - otherwise EntityTeleportPost subscribers would never see them.
+        if (!bus.hasPostListeners(EntityTeleportPost.class)) return;
+
+        var entity = Rapunzel.entities().require(event.getPlayer());
 
         bus.dispatchPost(new EntityTeleportPost(
                 entity,
@@ -749,6 +829,83 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onEntityDeathPre(PlayerDeathEvent event) {
+        if (!bus.hasPreListeners(EntityDeathPre.class)) return;
+
+        var player = Rapunzel.entities().require(event.getEntity());
+        var killer = event.getDamageSource().getCausingEntity() != null
+            ? Rapunzel.entities().require(event.getDamageSource().getCausingEntity())
+            : null;
+        String cause = event.getDamageSource().getDamageType().getKey().toString();
+        RLocation position = fromBukkit(event.getEntity().getLocation());
+
+        EntityDeathPre pre = new EntityDeathPre(player, killer, cause, position, event.deathMessage(), event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onEntityDeathPreGeneric(EntityDeathEvent event) {
+        // Player deaths are handled by onEntityDeathPre (cancellable via PlayerDeathEvent).
+        if (event instanceof PlayerDeathEvent) return;
+        if (!bus.hasPreListeners(EntityDeathPre.class)) return;
+
+        var entity = Rapunzel.entities().require(event.getEntity());
+        var killer = event.getDamageSource().getCausingEntity() != null
+            ? Rapunzel.entities().require(event.getDamageSource().getCausingEntity())
+            : null;
+        String cause = event.getDamageSource().getDamageType().getKey().toString();
+        RLocation position = fromBukkit(event.getEntity().getLocation());
+
+        // Denial cannot be honored here: EntityDeathEvent is not cancellable.
+        // See EntityDeathPre javadoc for the platform caveat.
+        bus.dispatchPre(new EntityDeathPre(entity, killer, cause, position, null, event.isCancelled()));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onEntityDeathPost(PlayerDeathEvent event) {
+        if (!bus.hasPostListeners(EntityDeathPost.class)) return;
+
+        var player = Rapunzel.entities().require(event.getEntity());
+        var killer = event.getDamageSource().getCausingEntity() != null
+            ? Rapunzel.entities().require(event.getDamageSource().getCausingEntity())
+            : null;
+        String cause = event.getDamageSource().getDamageType().getKey().toString();
+        RLocation position = fromBukkit(event.getEntity().getLocation());
+
+        bus.dispatchPost(new EntityDeathPost(player, killer, cause, position, event.deathMessage(), event.isCancelled()));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onEntityDeathPostGeneric(EntityDeathEvent event) {
+        if (event instanceof PlayerDeathEvent) return;
+        if (!bus.hasPostListeners(EntityDeathPost.class)) return;
+
+        var entity = Rapunzel.entities().require(event.getEntity());
+        var killer = event.getDamageSource().getCausingEntity() != null
+            ? Rapunzel.entities().require(event.getDamageSource().getCausingEntity())
+            : null;
+        String cause = event.getDamageSource().getDamageType().getKey().toString();
+        RLocation position = fromBukkit(event.getEntity().getLocation());
+
+        bus.dispatchPost(new EntityDeathPost(entity, killer, cause, position, null, event.isCancelled()));
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onEntityTamePost(EntityTameEvent event) {
+        if (!bus.hasPostListeners(EntityTamePost.class)) return;
+
+        var tamed = Rapunzel.entities().require(event.getEntity());
+        // The tamer is a player during the tame interaction; other AnimalTamer
+        // implementations (e.g. offline players) cannot be resolved to an RPlayer.
+        if (event.getOwner() instanceof org.bukkit.entity.Player owner) {
+            bus.dispatchPost(new EntityTamePost(Rapunzel.players().require(owner), tamed));
+        }
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onArmorStandManipulatePost(PlayerArmorStandManipulateEvent event) {
         if (!bus.hasPostListeners(InteractEntityPost.class)) return;
@@ -834,16 +991,29 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onInventoryClickPre(InventoryClickEvent event) {
+    public void onInventoryActionPre(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
-        if (!bus.hasPreListeners(InventoryClickPre.class)) return;
+        if (!bus.hasPreListeners(InventoryActionPre.class)) return;
 
         RPlayer rPlayer = Rapunzel.players().require(player);
         int slot = event.getRawSlot();
         RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
-        InventoryClickType clickType = mapBukkitClick(event.getClick());
+        InventoryActionType actionType = mapBukkitAction(event.getClick());
 
-        InventoryClickPre pre = new InventoryClickPre(rPlayer, rInventory, slot, clickType, event.isCancelled());
+        // currentItem mirrors Bukkit's InventoryClickEvent#getCurrentItem
+        // (view.getItem(rawSlot) = the clicked menu slot). The top-inventory
+        // wrap cannot resolve the player's own CRAFTING view on 26.2 (the
+        // top is a CraftingInventory with 5 slots), where main/hotbar raw
+        // slots 9+ fall outside the wrap.
+        InventoryActionPre pre = new InventoryActionPre(
+            rPlayer,
+            rInventory,
+            List.of(slot),
+            actionType,
+            wrapItemStack(event.getCursor()),
+            wrapItemStack(event.getCurrentItem()),
+            event.isCancelled()
+        );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -851,32 +1021,218 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
-    public void onInventoryClickPost(InventoryClickEvent event) {
+    public void onInventoryActionPost(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
-        if (!bus.hasPostListeners(InventoryClickPost.class)) return;
+        if (!bus.hasPostListeners(InventoryActionPost.class)) return;
 
         RPlayer rPlayer = Rapunzel.players().require(player);
         int slot = event.getRawSlot();
         RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
-        InventoryClickType clickType = mapBukkitClick(event.getClick());
+        InventoryActionType actionType = mapBukkitAction(event.getClick());
 
-        bus.dispatchPost(new InventoryClickPost(rPlayer, rInventory, slot, clickType, event.isCancelled()));
+        // Same currentItem source as the pre-dispatch: Bukkit's
+        // getCurrentItem(), which resolves the player's own CRAFTING view
+        // main/hotbar slots that the top-inventory wrap cannot cover.
+        bus.dispatchPost(new InventoryActionPost(
+            rPlayer,
+            rInventory,
+            List.of(slot),
+            actionType,
+            wrapItemStack(event.getCursor()),
+            wrapItemStack(event.getCurrentItem()),
+            event.isCancelled()
+        ));
     }
 
-    private static InventoryClickType mapBukkitClick(org.bukkit.event.inventory.ClickType bukkitClick) {
-        if (bukkitClick == null) return InventoryClickType.UNKNOWN;
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onInventoryDragPre(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+        if (!bus.hasPreListeners(InventoryActionPre.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+        List<Integer> slots = event.getRawSlots().stream().sorted().toList();
+
+        InventoryActionPre pre = new InventoryActionPre(
+            rPlayer,
+            rInventory,
+            slots,
+            InventoryActionType.DRAG,
+            wrapItemStack(event.getOldCursor()),
+            firstSlotItem(rInventory, slots),
+            event.isCancelled()
+        );
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void onInventoryDragPost(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof org.bukkit.entity.Player player)) return;
+        if (!bus.hasPostListeners(InventoryActionPost.class)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+        List<Integer> slots = event.getRawSlots().stream().sorted().toList();
+
+        bus.dispatchPost(new InventoryActionPost(
+            rPlayer,
+            rInventory,
+            slots,
+            InventoryActionType.DRAG,
+            wrapItemStack(event.getOldCursor()),
+            firstSlotItem(rInventory, slots),
+            event.isCancelled()
+        ));
+    }
+
+    /** Returns the item in the first in-bounds raw slot, or null. */
+    private static RItem firstSlotItem(RInventory inventory, List<Integer> slots) {
+        for (int slot : slots) {
+            if (slot >= 0 && slot < inventory.size()) {
+                return inventory.item(slot).orElse(null);
+            }
+        }
+        return null;
+    }
+
+    /** Wraps a Bukkit item stack as an {@link RItem}, or null when unavailable. */
+    private static RItem wrapItemStack(org.bukkit.inventory.ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) return null;
+        try {
+            return NbtFeatures.itemStackAdapter(org.bukkit.inventory.ItemStack.class).snapshot(stack);
+        } catch (RuntimeException ignored) {
+            // Item-stack adapters may not be installed; cursor/current refs are nullable.
+            return null;
+        }
+    }
+
+    private static InventoryActionType mapBukkitAction(org.bukkit.event.inventory.ClickType bukkitClick) {
+        if (bukkitClick == null) return InventoryActionType.UNKNOWN;
         return switch (bukkitClick) {
-            case LEFT -> InventoryClickType.LEFT;
-            case RIGHT -> InventoryClickType.RIGHT;
-            case SHIFT_LEFT -> InventoryClickType.SHIFT_LEFT;
-            case SHIFT_RIGHT -> InventoryClickType.SHIFT_RIGHT;
-            case MIDDLE -> InventoryClickType.MIDDLE;
-            case DOUBLE_CLICK -> InventoryClickType.DOUBLE_CLICK;
-            case DROP -> InventoryClickType.DROP;
-            case CONTROL_DROP -> InventoryClickType.CONTROL_DROP;
-            case NUMBER_KEY -> InventoryClickType.NUMBER_KEY_1;
-            case SWAP_OFFHAND -> InventoryClickType.SWAP_OFFHAND;
-            default -> InventoryClickType.UNKNOWN;
+            case LEFT -> InventoryActionType.LEFT;
+            case RIGHT -> InventoryActionType.RIGHT;
+            case SHIFT_LEFT -> InventoryActionType.SHIFT_LEFT;
+            case SHIFT_RIGHT -> InventoryActionType.SHIFT_RIGHT;
+            case MIDDLE -> InventoryActionType.MIDDLE;
+            case DOUBLE_CLICK -> InventoryActionType.DOUBLE_CLICK;
+            case DROP -> InventoryActionType.DROP;
+            case CONTROL_DROP -> InventoryActionType.CONTROL_DROP;
+            case NUMBER_KEY -> InventoryActionType.NUMBER_KEY;
+            case CREATIVE -> InventoryActionType.CREATIVE;
+            case SWAP_OFFHAND -> InventoryActionType.SWAP_OFFHAND;
+            default -> InventoryActionType.UNKNOWN;
         };
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPlayerGameModeChange(PlayerGameModeChangeEvent event) {
+        if (!bus.hasPostListeners(PlayerStatePost.class)) return;
+        RPlayer player = Rapunzel.players().require(event.getPlayer());
+        bus.dispatchPost(new PlayerStatePost(
+            player,
+            snapshot(event.getPlayer(), RGameMode.valueOf(event.getNewGameMode().name()), null, null, null, null),
+            Set.of(PlayerStatePost.StateField.GAMEMODE)
+        ));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPlayerToggleSneak(PlayerToggleSneakEvent event) {
+        if (!bus.hasPostListeners(PlayerStatePost.class)) return;
+        RPlayer player = Rapunzel.players().require(event.getPlayer());
+        bus.dispatchPost(new PlayerStatePost(
+            player,
+            snapshot(event.getPlayer(), null, event.isSneaking(), null, null, null),
+            Set.of(PlayerStatePost.StateField.SNEAKING)
+        ));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPlayerToggleFlight(PlayerToggleFlightEvent event) {
+        if (!bus.hasPostListeners(PlayerStatePost.class)) return;
+        RPlayer player = Rapunzel.players().require(event.getPlayer());
+        bus.dispatchPost(new PlayerStatePost(
+            player,
+            snapshot(event.getPlayer(), null, null, event.isFlying(), null, null),
+            Set.of(PlayerStatePost.StateField.FLYING)
+        ));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPlayerToggleSprint(PlayerToggleSprintEvent event) {
+        if (!bus.hasPostListeners(PlayerStatePost.class)) return;
+        RPlayer player = Rapunzel.players().require(event.getPlayer());
+        bus.dispatchPost(new PlayerStatePost(
+            player,
+            snapshot(event.getPlayer(), null, null, null, event.isSprinting(), null),
+            Set.of(PlayerStatePost.StateField.SPRINTING)
+        ));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onVehicleExit(org.bukkit.event.vehicle.VehicleExitEvent event) {
+        if (!bus.hasPostListeners(PlayerStatePost.class)) return;
+        if (!(event.getExited() instanceof org.bukkit.entity.Player bukkitPlayer)) return;
+        RPlayer player = Rapunzel.players().require(bukkitPlayer);
+        // Paper clears the passenger's vehicle reference before firing
+        // VehicleExitEvent, so the live read at dispatch already reports
+        // getVehicle() == null.
+        bus.dispatchPost(new PlayerStatePost(
+            player,
+            snapshot(bukkitPlayer, null, null, null, null, bukkitPlayer.getVehicle() != null),
+            Set.of(PlayerStatePost.StateField.RIDING)
+        ));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onVehicleEnter(org.bukkit.event.vehicle.VehicleEnterEvent event) {
+        if (!bus.hasPostListeners(PlayerStatePost.class)) return;
+        if (!(event.getEntered() instanceof org.bukkit.entity.Player bukkitPlayer)) return;
+        RPlayer player = Rapunzel.players().require(bukkitPlayer);
+        bus.dispatchPost(new PlayerStatePost(
+            player,
+            snapshot(bukkitPlayer, null, null, null, null, true),
+            Set.of(PlayerStatePost.StateField.RIDING)
+        ));
+    }
+
+    /**
+     * Builds a full player-state snapshot; null overrides keep the player's
+     * live value, non-null overrides carry the changed-field value from the
+     * source event.
+     */
+    private static PlayerStatePost.PlayerStateSnapshot snapshot(
+        org.bukkit.entity.Player player,
+        RGameMode gamemode,
+        Boolean sneaking,
+        Boolean flying,
+        Boolean sprinting,
+        Boolean riding
+    ) {
+        return new PlayerStatePost.PlayerStateSnapshot(
+            gamemode != null ? gamemode : RGameMode.valueOf(player.getGameMode().name()),
+            sneaking != null ? sneaking : player.isSneaking(),
+            flying != null ? flying : player.isFlying(),
+            sprinting != null ? sprinting : player.isSprinting(),
+            riding != null ? riding : player.getVehicle() != null
+        );
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBlockTransformPre(BlockFadeEvent event) {
+        // BlockFadeEvent is the Bukkit surface for block transformations
+        // (e.g. copper oxidation); it carries the target state.
+        if (!bus.hasPreListeners(BlockTransformPre.class)) return;
+
+        RBlock block = Rapunzel.blocks().require(event.getBlock());
+        RKey newTypeKey = RKey.of(event.getNewState().getType().getKey().toString());
+
+        BlockTransformPre pre = new BlockTransformPre(block, newTypeKey, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
     }
 }

@@ -105,7 +105,7 @@ implementation("de.t14d3.rapunzellib:livetest-paper")
 | Feature | Description | Installer |
 |---|---|---|
 | **Commands** | Cross-platform Brigadier dispatcher | `CommandFeatures.commands().registerRoot("cmd", commandNode)` |
-| **Events** | Unified game event bus | `GameEvents.bus().onPre(BlockBreakEvent.class, handler)` |
+| **Events** | Unified game event bus | `GameEvents.bus().onPre(BlockBreakPre.class, handler)` |
 | **GUI** | Inventory-based UI framework (buttons, sliders, dialogs, pagination) | `GuiFeatures.renderer()` |
 | **Inventory** | Cross-platform inventory wrapping | `InventoryFeatures.inventories().wrap(nativeInventory)` |
 | **NBT** | NBT codec, serialization, item-stack adapters | `NbtFeatures.itemStacks().find(stackHandle)` |
@@ -113,6 +113,8 @@ implementation("de.t14d3.rapunzellib:livetest-paper")
 | **LiveTest** | Bot-based integration testing via MCProtocolLib | `LiveTestFeatures.install().host().runTest(new MyTest())` |
 
 GUI depends on events, inventory, and NBT - installing it auto-installs those three. Visuals is independent.
+
+**Event consumption convention:** one event family per semantic action (`Pre` = deny-able, `Post` = informational; snapshots are async-fire-and-forget). Payloads are the discriminated union of consumer needs - shared RLib types only, never platform handles. The catalog in the events module is the single source of truth; extend the catalog instead of mirroring Bukkit/Fabric/Forge events one-to-one. Each platform manifest declares its parity for every catalog entry.
 
 **Network and database-spool** work differently. The platform bootstrap registers an in-memory `Messenger` into the service registry. For Redis-backed multi-node messaging, add:
 

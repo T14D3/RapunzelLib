@@ -3,7 +3,6 @@ package de.t14d3.rapunzellib.gui.shared.map;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPre;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
@@ -32,7 +31,6 @@ public final class SharedMapInput {
      */
     public static void wire(@org.jetbrains.annotations.NotNull GameEventBus bus) {
         bus.onPre(InteractBlockPre.class, SharedMapInput::onInteractBlock);
-        bus.onPre(UseBlockPre.class, SharedMapInput::onUseBlock);
         bus.onPre(InteractEntityPre.class, SharedMapInput::onInteractEntity);
         bus.onPre(AttackEntityPre.class, SharedMapInput::onAttackEntity);
         bus.onPre(InventoryOpenPre.class, SharedMapInput::onInventoryOpen);
@@ -45,24 +43,13 @@ public final class SharedMapInput {
         if (session == null) {
             return;
         }
+        // The merged interact event covers both the former InteractBlockPre and
+        // UseBlockPre, so a single deny here cancels the block use as well.
         event.deny();
-        if (event.hand() == InteractBlockPre.Hand.MAIN_HAND) {
-            GuiMapClick.Action action = event.action() == InteractBlockPre.Action.LEFT_CLICK_BLOCK
-                ? GuiMapClick.Action.LEFT
-                : GuiMapClick.Action.RIGHT;
-            session.activate(action);
-        }
-    }
-
-    /**
-     * A right-click on a block dispatches both {@link InteractBlockPre} and
-     * {@link UseBlockPre}; the activation happens on the interact event only,
-     * this just makes sure the underlying block use is cancelled too.
-     */
-    private static void onUseBlock(UseBlockPre event) {
-        if (SharedMapSessions.get(event.player().uuid()) != null) {
-            event.deny();
-        }
+        GuiMapClick.Action action = event.action() == InteractBlockPre.Action.LEFT
+            ? GuiMapClick.Action.LEFT
+            : GuiMapClick.Action.RIGHT;
+        session.activate(action);
     }
 
     /** Interacting with an entity (right-click) is a press on the map. */

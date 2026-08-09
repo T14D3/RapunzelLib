@@ -5,17 +5,16 @@ import de.t14d3.rapunzellib.events.GameEventSupportManifest;
 import de.t14d3.rapunzellib.events.shared.SharedGameEventSupportManifests;
 import de.t14d3.rapunzellib.events.block.*;
 import de.t14d3.rapunzellib.events.entity.*;
-import de.t14d3.rapunzellib.events.interact.UseBlockPost;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
 import de.t14d3.rapunzellib.events.item.BucketFillPre;
+import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
@@ -34,14 +33,13 @@ final class FabricGameEventSupport {
                     BlockBreakPre.class,
                     BlockBreakPost.class,
                     BlockBreakSnapshot.class,
-                    UseBlockPre.class,
                     InteractBlockPre.class,
                     InteractEntityPre.class,
                     AttackEntityPre.class
                 )
                 .partialSupport(
                     "Derived from Fabric callbacks; post/snapshots reflect attempted interaction rather than authoritative committed state",
-                    UseBlockPost.class,
+                    InteractBlockPost.class,
                     UseBlockSnapshot.class,
                     BlockPlacePre.class,
                     BlockPlacePost.class,
@@ -66,8 +64,8 @@ final class FabricGameEventSupport {
                     BucketEntityPre.class,
                     ExplosionPre.class,
                     TntPrimePre.class,
-                    InventoryClickPre.class,
-                    InventoryClickPost.class,
+                    InventoryActionPre.class,
+                    InventoryActionPost.class,
                     InventoryOpenPre.class,
                     InventoryOpenPost.class,
                     InventoryClosePost.class

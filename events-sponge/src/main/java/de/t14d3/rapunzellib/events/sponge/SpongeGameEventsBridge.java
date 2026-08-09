@@ -32,12 +32,11 @@ import de.t14d3.rapunzellib.events.entity.EntityMovePost;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
-import de.t14d3.rapunzellib.events.interact.UseBlockPost;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
 import de.t14d3.rapunzellib.events.item.BucketFillPre;
+import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
@@ -47,9 +46,9 @@ import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.ExplosionSourceKind;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 import de.t14d3.rapunzellib.events.world.WorldLoadPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickType;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionType;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
@@ -385,9 +384,8 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
         InteractBlockPre pre = new InteractBlockPre(
             rPlayer,
-            block,
-            InteractBlockPre.Action.LEFT_CLICK_BLOCK,
-            InteractBlockPre.Hand.MAIN_HAND
+            InteractBlockPre.Action.LEFT,
+            block
         );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
@@ -397,13 +395,19 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
     @Listener(order = Order.FIRST)
     @IsCancelled(value = Tristate.UNDEFINED)
-    public void onUseBlockPre(InteractBlockEvent.Secondary event, @First ServerPlayer player) {
-        if (!bus.hasPreListeners(UseBlockPre.class)) return;
+    public void onInteractBlockSecondaryPre(InteractBlockEvent.Secondary event, @First ServerPlayer player) {
+        if (!bus.hasPreListeners(InteractBlockPre.class)) return;
 
         RPlayer rPlayer = Rapunzel.players().require(player);
         RBlock block = blockFromSnapshot(player.world(), event.block());
 
-        UseBlockPre pre = new UseBlockPre(rPlayer, block, event.isCancelled());
+        InteractBlockPre pre = new InteractBlockPre(
+            rPlayer,
+            InteractBlockPre.Action.RIGHT,
+            block,
+            null,
+            event.isCancelled()
+        );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -412,8 +416,8 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
     @Listener(order = Order.LAST)
     @IsCancelled(value = Tristate.UNDEFINED)
-    public void onUseBlockPost(InteractBlockEvent.Secondary event, @First ServerPlayer player) {
-        boolean needsPost = bus.hasPostListeners(UseBlockPost.class);
+    public void onInteractBlockSecondaryPost(InteractBlockEvent.Secondary event, @First ServerPlayer player) {
+        boolean needsPost = bus.hasPostListeners(InteractBlockPost.class);
         boolean needsAsync = bus.hasAsyncListeners(UseBlockSnapshot.class);
         if (!needsPost && !needsAsync) return;
 
@@ -421,7 +425,9 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         RBlock block = blockFromSnapshot(player.world(), event.block());
         boolean cancelled = event.isCancelled();
 
-        if (needsPost) bus.dispatchPost(new UseBlockPost(rPlayer, block, cancelled));
+        if (needsPost) {
+            bus.dispatchPost(new InteractBlockPost(rPlayer, InteractBlockPre.Action.RIGHT, block, null, cancelled));
+        }
         if (needsAsync) {
             bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), block, cancelled));
         }
@@ -795,9 +801,9 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
     @Listener(order = Order.FIRST)
     @IsCancelled(value = Tristate.UNDEFINED)
-    public void onInventoryClickPre(ClickContainerEvent event) {
+    public void onInventoryActionPre(ClickContainerEvent event) {
         if (!(event.cause().first(ServerPlayer.class).orElse(null) instanceof ServerPlayer player)) return;
-        if (!bus.hasPreListeners(InventoryClickPre.class)) return;
+        if (!bus.hasPreListeners(InventoryActionPre.class)) return;
 
         Optional<Slot> slotOpt = event.slot();
         if (slotOpt.isEmpty()) return;
@@ -807,9 +813,17 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         if (rInventory == null) return;
 
         int slot = slotIndex(event.container(), slotOpt.get());
-        InventoryClickType clickType = mapClickType(event);
+        InventoryActionType actionType = mapActionType(event);
 
-        InventoryClickPre pre = new InventoryClickPre(rPlayer, rInventory, slot, clickType, event.isCancelled());
+        InventoryActionPre pre = new InventoryActionPre(
+            rPlayer,
+            rInventory,
+            List.of(slot),
+            actionType,
+            null,
+            slot >= 0 && slot < rInventory.size() ? rInventory.item(slot).orElse(null) : null,
+            event.isCancelled()
+        );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -817,9 +831,9 @@ final class SpongeGameEventsBridge implements GameEventBridge {
     }
 
     @Listener(order = Order.LAST)
-    public void onInventoryClickPost(ClickContainerEvent event) {
+    public void onInventoryActionPost(ClickContainerEvent event) {
         if (!(event.cause().first(ServerPlayer.class).orElse(null) instanceof ServerPlayer player)) return;
-        if (!bus.hasPostListeners(InventoryClickPost.class)) return;
+        if (!bus.hasPostListeners(InventoryActionPost.class)) return;
 
         Optional<Slot> slotOpt = event.slot();
         if (slotOpt.isEmpty()) return;
@@ -829,9 +843,17 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         if (rInventory == null) return;
 
         int slot = slotIndex(event.container(), slotOpt.get());
-        InventoryClickType clickType = mapClickType(event);
+        InventoryActionType actionType = mapActionType(event);
 
-        bus.dispatchPost(new InventoryClickPost(rPlayer, rInventory, slot, clickType, event.isCancelled()));
+        bus.dispatchPost(new InventoryActionPost(
+            rPlayer,
+            rInventory,
+            List.of(slot),
+            actionType,
+            null,
+            slot >= 0 && slot < rInventory.size() ? rInventory.item(slot).orElse(null) : null,
+            event.isCancelled()
+        ));
     }
 
     @Listener(order = Order.FIRST)
@@ -938,17 +960,24 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         return -1;
     }
 
-    private static InventoryClickType mapClickType(ClickContainerEvent event) {
-        // Sponge models click kinds as event subtypes; map to the shared enum.
-        if (event instanceof ClickContainerEvent.Shift) return InventoryClickType.SHIFT_LEFT;
-        if (event instanceof ClickContainerEvent.Middle) return InventoryClickType.MIDDLE;
-        if (event instanceof ClickContainerEvent.Double) return InventoryClickType.DOUBLE_CLICK;
-        if (event instanceof ClickContainerEvent.NumberPress) return InventoryClickType.NUMBER_KEY_1;
-        if (event instanceof ClickContainerEvent.Drop) return InventoryClickType.DROP;
-        if (event instanceof ClickContainerEvent.Primary) return InventoryClickType.LEFT;
-        if (event instanceof ClickContainerEvent.Secondary) return InventoryClickType.RIGHT;
-        if (event instanceof ClickContainerEvent.Drag) return InventoryClickType.LEFT;
-        return InventoryClickType.UNKNOWN;
+    private static InventoryActionType mapActionType(ClickContainerEvent event) {
+        // Sponge models click kinds as event subtypes; map to the shared enum,
+        // checking the most specific subtypes first (e.g. Shift.Primary is
+        // also a Primary, Drop.Outside.Primary is also a Primary).
+        if (event instanceof ClickContainerEvent.Shift.Primary) return InventoryActionType.SHIFT_LEFT;
+        if (event instanceof ClickContainerEvent.Shift.Secondary) return InventoryActionType.SHIFT_RIGHT;
+        if (event instanceof ClickContainerEvent.Middle) return InventoryActionType.MIDDLE;
+        if (event instanceof ClickContainerEvent.Double) return InventoryActionType.DOUBLE_CLICK;
+        if (event instanceof ClickContainerEvent.NumberPress) return InventoryActionType.NUMBER_KEY;
+        if (event instanceof ClickContainerEvent.Drop.Outside.Primary) return InventoryActionType.DROP;
+        if (event instanceof ClickContainerEvent.Drop.Outside.Secondary) return InventoryActionType.CONTROL_DROP;
+        if (event instanceof ClickContainerEvent.Drop.Single) return InventoryActionType.DROP;
+        if (event instanceof ClickContainerEvent.Drop.Full) return InventoryActionType.CONTROL_DROP;
+        if (event instanceof ClickContainerEvent.Primary) return InventoryActionType.LEFT;
+        if (event instanceof ClickContainerEvent.Secondary) return InventoryActionType.RIGHT;
+        if (event instanceof ClickContainerEvent.Creative) return InventoryActionType.CREATIVE;
+        if (event instanceof ClickContainerEvent.Drag) return InventoryActionType.DRAG;
+        return InventoryActionType.UNKNOWN;
     }
 
     private static ItemType usedItemType(org.spongepowered.api.event.Event event) {

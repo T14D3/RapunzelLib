@@ -15,6 +15,8 @@ import de.t14d3.rapunzellib.events.block.BlockTransformPre;
 import de.t14d3.rapunzellib.events.block.PistonMovePre;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPost;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPre;
+import de.t14d3.rapunzellib.events.entity.EntityDeathPost;
+import de.t14d3.rapunzellib.events.entity.EntityDeathPre;
 import de.t14d3.rapunzellib.events.entity.EntityHurtPost;
 import de.t14d3.rapunzellib.events.entity.EntityHurtPre;
 import de.t14d3.rapunzellib.events.entity.EntityHurtSnapshot;
@@ -22,24 +24,29 @@ import de.t14d3.rapunzellib.events.entity.EntityMovePost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
+import de.t14d3.rapunzellib.events.entity.EntityTamePost;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
-import de.t14d3.rapunzellib.events.interact.UseBlockPost;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
 import de.t14d3.rapunzellib.events.item.BucketFillPre;
+import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
+import de.t14d3.rapunzellib.events.player.PlayerJoinPost;
+import de.t14d3.rapunzellib.events.player.PlayerLoginPre;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePost;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
 import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
+import de.t14d3.rapunzellib.events.player.PlayerStatePost;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
@@ -81,19 +88,26 @@ final class GameEventCatalog {
         EntityHurtPre.class,
         EntityHurtPost.class,
         EntityHurtSnapshot.class,
-        InventoryClickPre.class,
-        InventoryClickPost.class,
+        EntityDeathPre.class,
+        EntityDeathPost.class,
+        EntityTamePost.class,
+        InventoryActionPre.class,
+        InventoryActionPost.class,
         InventoryOpenPre.class,
         InventoryOpenPost.class,
         InventoryClosePost.class,
-        UseBlockPre.class,
-        UseBlockPost.class,
         UseBlockSnapshot.class,
         BucketEmptyPre.class,
         BucketFillPre.class,
         BucketEntityPre.class,
         InteractBlockPre.class,
+        InteractBlockPost.class,
         PlayerQuitPost.class,
+        PlayerJoinPost.class,
+        PlayerLoginPre.class,
+        PlayerMessagePre.class,
+        PlayerMessagePost.class,
+        PlayerStatePost.class,
         PlayerMovePre.class,
         PlayerMovePost.class,
         ChunkUnloadPost.class,

@@ -4,7 +4,7 @@ import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.events.block.BlockBreakPost;
 import de.t14d3.rapunzellib.events.block.BlockBreakPre;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
+import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class TestGameEventBridgeInstaller implements GameEventBridgeInstaller {
     static final GameEventSupportManifest MANIFEST = GameEventSupportManifest.builder(PlatformId.PAPER)
         .nativeSupport("test-native", BlockBreakPre.class, BlockBreakPost.class)
-        .emulatedSupport("test-emulated", UseBlockPre.class)
+        .emulatedSupport("test-emulated", InteractBlockPre.class)
         .build();
 
     private static final AtomicInteger INSTALL_CALLS = new AtomicInteger();

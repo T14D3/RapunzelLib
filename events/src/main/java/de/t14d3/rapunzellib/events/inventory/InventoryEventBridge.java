@@ -4,9 +4,11 @@ import de.t14d3.rapunzellib.Rapunzel;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.GameEvents;
 import de.t14d3.rapunzellib.inventory.RInventory;
+import de.t14d3.rapunzellib.nbt.item.RItem;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -23,9 +25,13 @@ public final class InventoryEventBridge {
      * Dispatches an inventory click event, returning a {@link ClickDispatch} handle
      * for post-dispatch.
      *
+     * <p>The fine-grained {@link InventoryClickType} is mapped faithfully to
+     * the {@link InventoryActionType} carried by the dispatched
+     * {@link InventoryActionPre}/{@link InventoryActionPost} payloads.</p>
+     *
      * @param player    the clicking player
      * @param inventory the inventory being clicked
-     * @param slot      the slot index
+     * @param slot      the raw slot index
      * @param clickType the type of click
      * @return a ClickDispatch for post-processing
      */
@@ -40,7 +46,12 @@ public final class InventoryEventBridge {
         Objects.requireNonNull(clickType, "clickType");
 
         InventorySupport support = support();
-        InventoryClickPre pre = InventoryEventPayloads.clickPre(player, inventory, slot, clickType);
+        InventoryActionPre pre = InventoryEventPayloads.actionPre(
+            player,
+            inventory,
+            slot,
+            mapActionType(clickType)
+        );
         support.bus().dispatchPre(pre);
         return new ClickDispatch(support.bus(), player, inventory, slot, clickType, pre.isCancelled() || pre.isDenied());
     }
@@ -94,13 +105,29 @@ public final class InventoryEventBridge {
         return new InventorySupport(bus);
     }
 
+    private static @NotNull InventoryActionType mapActionType(@NotNull InventoryClickType clickType) {
+        return switch (clickType) {
+            case LEFT -> InventoryActionType.LEFT;
+            case RIGHT -> InventoryActionType.RIGHT;
+            case SHIFT_LEFT -> InventoryActionType.SHIFT_LEFT;
+            case SHIFT_RIGHT -> InventoryActionType.SHIFT_RIGHT;
+            case DOUBLE_CLICK -> InventoryActionType.DOUBLE_CLICK;
+            case NUMBER_KEY_1 -> InventoryActionType.NUMBER_KEY;
+            case DROP -> InventoryActionType.DROP;
+            case CONTROL_DROP -> InventoryActionType.CONTROL_DROP;
+            case MIDDLE -> InventoryActionType.MIDDLE;
+            case SWAP_OFFHAND -> InventoryActionType.SWAP_OFFHAND;
+            case UNKNOWN -> InventoryActionType.UNKNOWN;
+        };
+    }
+
     /**
      * Handle for post-dispatch of an inventory click event.
      *
      * @param bus       the event bus
      * @param player    the clicking player
      * @param inventory the inventory that was clicked
-     * @param slot      the slot index
+     * @param slot      the raw slot index
      * @param clickType the type of click
      * @param cancelled whether the click was cancelled
      */
@@ -117,16 +144,22 @@ public final class InventoryEventBridge {
             Objects.requireNonNull(player, "player");
             Objects.requireNonNull(inventory, "inventory");
             Objects.requireNonNull(clickType, "clickType");
-            if (slot < 0 || slot >= inventory.size()) {
-                throw new IndexOutOfBoundsException("Slot " + slot + " out of bounds for inventory size " + inventory.size());
-            }
         }
 
         /**
          * Dispatches the post-click event.
          */
         public void post() {
-            bus.dispatchPost(InventoryEventPayloads.clickPost(player, inventory, slot, clickType, cancelled));
+            RItem current = slot >= 0 && slot < inventory.size() ? inventory.item(slot).orElse(null) : null;
+            bus.dispatchPost(InventoryEventPayloads.actionPost(
+                player,
+                inventory,
+                List.of(slot),
+                mapActionType(clickType),
+                null,
+                current,
+                cancelled
+            ));
         }
     }
 

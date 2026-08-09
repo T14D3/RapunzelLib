@@ -12,13 +12,12 @@ import de.t14d3.rapunzellib.events.block.BlockPlacePre;
 import de.t14d3.rapunzellib.events.block.BlockPlaceSnapshot;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPre;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
-import de.t14d3.rapunzellib.events.interact.UseBlockPost;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.shared.SharedEntityInteractionHooks;
 import de.t14d3.rapunzellib.events.shared.SharedLifecycleEventHooks;
 import de.t14d3.rapunzellib.events.shared.mixin.SharedMixinEventsBridge;
 import de.t14d3.rapunzellib.events.shared.mixin.SharedBlockMixinHooks;
+import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RPlayer;
@@ -163,14 +162,13 @@ final class FabricGameEventsBridge implements GameEventBridge {
         if (!(world instanceof ServerLevel serverLevel)) return InteractionResult.PASS;
 
         boolean needsInteractPre = bus.hasPreListeners(InteractBlockPre.class);
-        boolean needsUsePre = bus.hasPreListeners(UseBlockPre.class);
-        boolean needsUsePost = bus.hasPostListeners(UseBlockPost.class);
+        boolean needsInteractPost = bus.hasPostListeners(InteractBlockPost.class);
         boolean needsUseAsync = bus.hasAsyncListeners(UseBlockSnapshot.class);
         boolean needsPlacePre = bus.hasPreListeners(BlockPlacePre.class);
         boolean needsPlacePost = bus.hasPostListeners(BlockPlacePost.class);
         boolean needsPlaceAsync = bus.hasAsyncListeners(BlockPlaceSnapshot.class);
 
-        if (!needsInteractPre && !needsUsePre && !needsUsePost && !needsUseAsync && !needsPlacePre && !needsPlacePost && !needsPlaceAsync) {
+        if (!needsInteractPre && !needsInteractPost && !needsUseAsync && !needsPlacePre && !needsPlacePost && !needsPlaceAsync) {
             return InteractionResult.PASS;
         }
 
@@ -180,19 +178,16 @@ final class FabricGameEventsBridge implements GameEventBridge {
         BlockPos clickedPos = hit.getBlockPos();
         RBlockPos rClickedPos = new RBlockPos(clickedPos.getX(), clickedPos.getY(), clickedPos.getZ());
         RBlock clickedBlock = Rapunzel.blocks().at(rWorld, rClickedPos);
+        String face = hit.getDirection().getName();
 
         boolean cancelled = false;
 
         if (needsInteractPre) {
-            InteractBlockPre.Hand mappedHand = switch (hand) {
-                case MAIN_HAND -> InteractBlockPre.Hand.MAIN_HAND;
-                case OFF_HAND -> InteractBlockPre.Hand.OFF_HAND;
-            };
             InteractBlockPre pre = new InteractBlockPre(
                     rPlayer,
+                    InteractBlockPre.Action.RIGHT,
                     clickedBlock,
-                    InteractBlockPre.Action.RIGHT_CLICK_BLOCK,
-                    mappedHand
+                    face
             );
             bus.dispatchPre(pre);
             cancelled = pre.isDenied();
@@ -205,8 +200,8 @@ final class FabricGameEventsBridge implements GameEventBridge {
         if (needsPlacePre || needsPlacePost || needsPlaceAsync) {
         ItemStack stack = player.getItemInHand(hand);
             if (stack.getItem() instanceof BlockItem blockItem) {
-                Direction face = hit.getDirection();
-                BlockPos placePos = clickedPos.relative(face);
+                Direction placeFace = hit.getDirection();
+                BlockPos placePos = clickedPos.relative(placeFace);
 
                 RKey placeKey = RKey.of(BuiltInRegistries.BLOCK.getKey(blockItem.getBlock()).toString());
                 RWorldRef worldRef = clickedBlock.world().ref();
@@ -230,20 +225,12 @@ final class FabricGameEventsBridge implements GameEventBridge {
             }
         }
 
-        if (needsUsePre) {
-            UseBlockPre pre = new UseBlockPre(rPlayer, clickedBlock);
-            bus.dispatchPre(pre);
-            cancelled = pre.isDenied();
+        if (needsUseAsync) {
+            bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), clickedBlock, cancelled));
         }
-
-        if (cancelled) {
-            if (needsUsePost) bus.dispatchPost(new UseBlockPost(rPlayer, clickedBlock, true));
-            if (needsUseAsync) bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), clickedBlock, true));
-            return InteractionResult.FAIL;
+        if (needsInteractPost) {
+            bus.dispatchPost(new InteractBlockPost(rPlayer, InteractBlockPre.Action.RIGHT, clickedBlock, face, cancelled));
         }
-
-        if (needsUsePost) bus.dispatchPost(new UseBlockPost(rPlayer, clickedBlock, false));
-        if (needsUseAsync) bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), clickedBlock, false));
 
         return InteractionResult.PASS;
     }
@@ -259,12 +246,12 @@ final class FabricGameEventsBridge implements GameEventBridge {
         RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
         RBlock block = Rapunzel.blocks().at(rWorld, rPos);
 
-        InteractBlockPre.Hand mappedHand = switch (hand) {
-            case MAIN_HAND -> InteractBlockPre.Hand.MAIN_HAND;
-            case OFF_HAND -> InteractBlockPre.Hand.OFF_HAND;
-        };
-
-        InteractBlockPre pre = new InteractBlockPre(rPlayer, block, InteractBlockPre.Action.LEFT_CLICK_BLOCK, mappedHand);
+        InteractBlockPre pre = new InteractBlockPre(
+            rPlayer,
+            InteractBlockPre.Action.LEFT,
+            block,
+            direction.getName()
+        );
         bus.dispatchPre(pre);
         return pre.isDenied() ? InteractionResult.FAIL : InteractionResult.PASS;
     }

@@ -16,17 +16,16 @@ import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.entity.EntityMovePost;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
-import de.t14d3.rapunzellib.events.interact.UseBlockPost;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
 import de.t14d3.rapunzellib.events.item.BucketFillPre;
+import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
@@ -46,6 +45,7 @@ final class NeoForgeGameEventSupport {
                     BlockPlacePost.class,
                     BlockPlaceSnapshot.class,
                     InteractBlockPre.class,
+                    InteractBlockPost.class,
                     InteractEntityPre.class,
                     InteractEntityPost.class,
                     AttackEntityPre.class,
@@ -53,8 +53,6 @@ final class NeoForgeGameEventSupport {
                     EntityHurtPre.class,
                     EntityHurtPost.class,
                     EntityHurtSnapshot.class,
-                    UseBlockPre.class,
-                    UseBlockPost.class,
                     UseBlockSnapshot.class,
                     EntityTeleportPost.class,
                     InventoryOpenPre.class,
@@ -83,8 +81,8 @@ final class NeoForgeGameEventSupport {
                 )
                 .emulatedSupport(
                     "NeoForge AbstractContainerMenu.doClick mixin",
-                    InventoryClickPre.class,
-                    InventoryClickPost.class
+                    InventoryActionPre.class,
+                    InventoryActionPost.class
                 )
                 .emulatedSupport(
                     "NeoForge Entity.move() mixin",

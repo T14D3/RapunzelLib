@@ -17,8 +17,6 @@ import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
-import de.t14d3.rapunzellib.events.interact.UseBlockPre;
-import de.t14d3.rapunzellib.events.interact.UseBlockPost;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
@@ -32,6 +30,7 @@ import de.t14d3.rapunzellib.events.shared.SharedEntityDamageHooks;
 import de.t14d3.rapunzellib.events.shared.SharedEntityInteractionHooks;
 import de.t14d3.rapunzellib.events.shared.SharedEntitySpawnHooks;
 import de.t14d3.rapunzellib.events.shared.SharedLifecycleEventHooks;
+import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RLocation;
@@ -218,13 +217,14 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         BlockPos pos = event.getPos();
         RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
         RBlock block = Rapunzel.blocks().at(rWorld, rPos);
+        // LeftClickBlock exposes the face directly (no hit-vector accessor).
+        String face = event.getFace() != null ? event.getFace().getName() : null;
 
-        InteractBlockPre.Hand mappedHand = mapHand(event.getHand());
         InteractBlockPre pre = new InteractBlockPre(
             rPlayer,
+            InteractBlockPre.Action.LEFT,
             block,
-            InteractBlockPre.Action.LEFT_CLICK_BLOCK,
-            mappedHand,
+            face,
             event.isCanceled()
         );
         bus.dispatchPre(pre);
@@ -243,35 +243,27 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         BlockPos pos = event.getPos();
         RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
         RBlock block = Rapunzel.blocks().at(rWorld, rPos);
+        String face = event.getHitVec() != null ? event.getHitVec().getDirection().getName() : null;
         boolean cancelled = event.isCanceled();
 
         // Dispatch InteractBlockPre
         if (bus.hasPreListeners(InteractBlockPre.class)) {
-            InteractBlockPre.Hand mappedHand = mapHand(event.getHand());
             InteractBlockPre pre = new InteractBlockPre(
                 rPlayer,
+                InteractBlockPre.Action.RIGHT,
                 block,
-                InteractBlockPre.Action.RIGHT_CLICK_BLOCK,
-                mappedHand,
+                face,
                 cancelled
             );
             bus.dispatchPre(pre);
             cancelled = pre.isDenied();
             if (cancelled) event.setCanceled(true);
         }
-
-        // Dispatch UseBlockPre
-        if (bus.hasPreListeners(UseBlockPre.class)) {
-            UseBlockPre usePre = new UseBlockPre(rPlayer, block, cancelled);
-            bus.dispatchPre(usePre);
-            cancelled = usePre.isDenied();
-            if (cancelled) event.setCanceled(true);
-        }
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public void onRightClickBlockPost(PlayerInteractEvent.RightClickBlock event) {
-        boolean needsPost = bus.hasPostListeners(UseBlockPost.class);
+        boolean needsPost = bus.hasPostListeners(InteractBlockPost.class);
         boolean needsAsync = bus.hasAsyncListeners(UseBlockSnapshot.class);
         if (!needsPost && !needsAsync) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -282,10 +274,11 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         BlockPos pos = event.getPos();
         RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
         RBlock block = Rapunzel.blocks().at(rWorld, rPos);
+        String face = event.getHitVec() != null ? event.getHitVec().getDirection().getName() : null;
         boolean cancelled = event.isCanceled();
 
         if (needsPost) {
-            bus.dispatchPost(new UseBlockPost(rPlayer, block, cancelled));
+            bus.dispatchPost(new InteractBlockPost(rPlayer, InteractBlockPre.Action.RIGHT, block, face, cancelled));
         }
         if (needsAsync) {
             bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), block, cancelled));
@@ -474,14 +467,6 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         if (rInventory == null) return;
 
         bus.dispatchPost(new InventoryClosePost(rPlayer, rInventory));
-    }
-
-    private static InteractBlockPre.Hand mapHand(InteractionHand hand) {
-        if (hand == null) return InteractBlockPre.Hand.UNKNOWN;
-        return switch (hand) {
-            case MAIN_HAND -> InteractBlockPre.Hand.MAIN_HAND;
-            case OFF_HAND -> InteractBlockPre.Hand.OFF_HAND;
-        };
     }
 
     private static RKey typeKey(net.minecraft.world.level.block.state.BlockState state) {

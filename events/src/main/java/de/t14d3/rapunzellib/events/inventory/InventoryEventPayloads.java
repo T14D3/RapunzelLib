@@ -1,8 +1,12 @@
 package de.t14d3.rapunzellib.events.inventory;
 
 import de.t14d3.rapunzellib.inventory.RInventory;
+import de.t14d3.rapunzellib.nbt.item.RItem;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Factory methods for creating inventory event payloads.
@@ -27,23 +31,47 @@ public final class InventoryEventPayloads {
         return new InventoryOpenPost(player, inventory);
     }
 
-    public static @NotNull InventoryClickPre clickPre(
+    /**
+     * Creates an {@link InventoryActionPre} for a single-slot click, capturing
+     * the current item from the inventory slot.
+     */
+    public static @NotNull InventoryActionPre actionPre(
         @NotNull RPlayer player,
         @NotNull RInventory inventory,
         int slot,
-        @NotNull InventoryClickType clickType
+        @NotNull InventoryActionType actionType
     ) {
-        return new InventoryClickPre(player, inventory, slot, clickType);
+        RItem current = slot >= 0 && slot < inventory.size() ? inventory.item(slot).orElse(null) : null;
+        return new InventoryActionPre(player, inventory, List.of(slot), actionType, null, current, false);
     }
 
-    public static @NotNull InventoryClickPost clickPost(
+    /**
+     * Creates an {@link InventoryActionPre} for a multi-slot action (e.g. a drag).
+     */
+    public static @NotNull InventoryActionPre actionPre(
         @NotNull RPlayer player,
         @NotNull RInventory inventory,
-        int slot,
-        @NotNull InventoryClickType clickType,
+        @NotNull List<Integer> slots,
+        @NotNull InventoryActionType actionType,
+        @Nullable RItem cursorItem,
+        @Nullable RItem currentItem
+    ) {
+        return new InventoryActionPre(player, inventory, slots, actionType, cursorItem, currentItem, false);
+    }
+
+    /**
+     * Creates an {@link InventoryActionPost}.
+     */
+    public static @NotNull InventoryActionPost actionPost(
+        @NotNull RPlayer player,
+        @NotNull RInventory inventory,
+        @NotNull List<Integer> slots,
+        @NotNull InventoryActionType actionType,
+        @Nullable RItem cursorItem,
+        @Nullable RItem currentItem,
         boolean cancelled
     ) {
-        return new InventoryClickPost(player, inventory, slot, clickType, cancelled);
+        return new InventoryActionPost(player, inventory, slots, actionType, cursorItem, currentItem, cancelled);
     }
 
     public static @NotNull InventoryClosePost closePost(

@@ -1,8 +1,8 @@
 package de.t14d3.rapunzellib.events;
 
 import de.t14d3.rapunzellib.PlatformId;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPost;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
@@ -37,8 +37,8 @@ public final class GameEventSupportManifests {
         Objects.requireNonNull(builder, "builder");
         return builder.emulatedSupport(
             GUI_INVENTORY_BRIDGE_DETAILS,
-            InventoryClickPre.class,
-            InventoryClickPost.class,
+            InventoryActionPre.class,
+            InventoryActionPost.class,
             InventoryOpenPre.class,
             InventoryOpenPost.class,
             InventoryClosePost.class
@@ -68,8 +68,8 @@ public final class GameEventSupportManifests {
         Objects.requireNonNull(builder, "builder");
         return builder.partialSupport(
             GUI_INVENTORY_BRIDGE_PARTIAL_DETAILS,
-            InventoryClickPre.class,
-            InventoryClickPost.class,
+            InventoryActionPre.class,
+            InventoryActionPost.class,
             InventoryOpenPre.class,
             InventoryOpenPost.class,
             InventoryClosePost.class

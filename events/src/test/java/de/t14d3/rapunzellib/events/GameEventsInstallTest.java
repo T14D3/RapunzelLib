@@ -12,7 +12,7 @@ import de.t14d3.rapunzellib.runtime.RuntimeCapability;
 import de.t14d3.rapunzellib.runtime.RuntimeRole;
 import de.t14d3.rapunzellib.scheduler.ScheduledTask;
 import de.t14d3.rapunzellib.scheduler.Scheduler;
-import de.t14d3.rapunzellib.events.inventory.InventoryClickPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -71,8 +71,8 @@ final class GameEventsInstallTest {
         assertTrue(platformManifest.supports(de.t14d3.rapunzellib.events.block.BlockBreakPre.class));
         assertEquals(GameEventSupportParity.NATIVE, platformManifest.support(de.t14d3.rapunzellib.events.block.BlockBreakPre.class).parity());
         assertEquals(GameEventSupportParity.UNSUPPORTED, platformManifest.support(de.t14d3.rapunzellib.events.block.BlockBreakSnapshot.class).parity());
-        assertEquals(GameEventSupportParity.EMULATED, platformManifest.support(InventoryClickPre.class).parity());
-        assertEquals(GameEventSupportManifests.GUI_INVENTORY_BRIDGE_DETAILS, platformManifest.support(InventoryClickPre.class).details());
+        assertEquals(GameEventSupportParity.EMULATED, platformManifest.support(InventoryActionPre.class).parity());
+        assertEquals(GameEventSupportManifests.GUI_INVENTORY_BRIDGE_DETAILS, platformManifest.support(InventoryActionPre.class).details());
     }
 
     @Test
