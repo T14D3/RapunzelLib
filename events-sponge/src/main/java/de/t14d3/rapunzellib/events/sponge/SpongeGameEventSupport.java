@@ -23,6 +23,7 @@ import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
 import de.t14d3.rapunzellib.events.entity.EntityMovePost;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
+import de.t14d3.rapunzellib.events.entity.EntityTeleportPre;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
@@ -77,6 +78,7 @@ final class SpongeGameEventSupport {
             ExplosionPre.class,
             TntPrimePre.class,
             EntityTeleportPost.class,
+            EntityTeleportPre.class,
             EntityMovePost.class,
             InventoryOpenPre.class,
             InventoryOpenPost.class,

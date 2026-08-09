@@ -58,6 +58,7 @@ final class FabricGameEventSupport {
                     EntitySpawnPost.class,
                     EntitySpawnSnapshot.class,
                     EntityTeleportPost.class,
+                    EntityTeleportPre.class,
                     EntityMovePost.class,
                     BucketEmptyPre.class,
                     BucketFillPre.class,

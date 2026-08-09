@@ -30,6 +30,8 @@ import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
 import de.t14d3.rapunzellib.events.entity.EntityMovePost;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
+import de.t14d3.rapunzellib.events.entity.EntityTeleportPre;
+import de.t14d3.rapunzellib.events.entity.EntityTeleportCause;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
@@ -55,6 +57,7 @@ import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.inventory.InventoryFeatures;
 import de.t14d3.rapunzellib.inventory.RInventory;
 import de.t14d3.rapunzellib.objects.block.RBlock;
+import de.t14d3.rapunzellib.objects.REntity;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.RItemType;
 import de.t14d3.rapunzellib.registry.RBlockType;
@@ -76,6 +79,7 @@ import org.spongepowered.api.event.block.InteractBlockEvent;
 import org.spongepowered.api.event.block.NotifyNeighborBlockEvent;
 import org.spongepowered.api.event.entity.AttackEntityEvent;
 import org.spongepowered.api.event.entity.DamageEntityEvent;
+import org.spongepowered.api.event.cause.entity.damage.source.DamageSource;
 import org.spongepowered.api.event.entity.InteractEntityEvent;
 import org.spongepowered.api.event.entity.ChangeEntityWorldEvent;
 import org.spongepowered.api.event.entity.MoveEntityEvent;
@@ -495,7 +499,20 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         Entity entity = event.entity();
         String damageTypeKey = damageTypeKey(event);
 
-        EntityHurtPre pre = new EntityHurtPre(Rapunzel.entities().require(entity), damageTypeKey, event.isCancelled());
+        // Direct attacker from the damage source, when entity-sourced
+        // (fire, lava, fall etc. have no source entity).
+        REntity damager = event.context()
+            .get(EventContextKeys.LAST_DAMAGE_SOURCE)
+            .flatMap(DamageSource::source)
+            .map(Rapunzel.entities()::require)
+            .orElse(null);
+
+        EntityHurtPre pre = new EntityHurtPre(
+            Rapunzel.entities().require(entity),
+            damageTypeKey,
+            damager,
+            event.isCancelled()
+        );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -655,6 +672,35 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
         RPlayer rPlayer = event.cause().first(ServerPlayer.class).map(p -> Rapunzel.players().require(p)).orElse(null);
         TntPrimePre pre = new TntPrimePre(block, cause, rPlayer, event.isCancelled());
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onEntityTeleportPre(ChangeEntityWorldEvent.Reposition event) {
+        if (!bus.hasPreListeners(EntityTeleportPre.class)) return;
+
+        Entity entity = event.entity();
+        var rEntity = Rapunzel.entities().require(entity);
+
+        // Reposition inherits MoveEntityEvent, so positions are Vector3d
+        Vector3d fromPos = event.originalPosition();
+        Vector3d toPos = event.destinationPosition();
+
+        RWorldRef worldRef = Rapunzel.worlds().require(event.destinationWorld()).ref();
+        RLocation from = new RLocation(worldRef, fromPos.x(), fromPos.y(), fromPos.z());
+        RLocation to = new RLocation(worldRef, toPos.x(), toPos.y(), toPos.z());
+
+        EntityTeleportPre pre = new EntityTeleportPre(
+            rEntity,
+            from,
+            to,
+            EntityTeleportCause.UNKNOWN,
+            event.isCancelled()
+        );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -852,6 +898,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
             actionType,
             null,
             slot >= 0 && slot < rInventory.size() ? rInventory.item(slot).orElse(null) : null,
+            null,
             event.isCancelled()
         ));
     }

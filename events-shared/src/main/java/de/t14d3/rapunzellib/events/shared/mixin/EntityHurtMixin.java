@@ -34,7 +34,18 @@ public abstract class EntityHurtMixin {
         // #else
         damageKey = "minecraft:" + source.type().msgId();
         // #endif
-        EntityHurtPre pre = new EntityHurtPre(Rapunzel.entities().require(self), RKey.of(damageKey));
+        // The direct attacker (arrow, mob, TNT, ...) when entity-sourced;
+        // empty for block/environmental damage.
+        net.minecraft.world.entity.Entity directDamager = source.getDirectEntity();
+        de.t14d3.rapunzellib.objects.REntity damager = directDamager != null && directDamager != self
+                ? Rapunzel.entities().require(directDamager)
+                : null;
+        EntityHurtPre pre = new EntityHurtPre(
+            Rapunzel.entities().require(self),
+            RKey.of(damageKey),
+            damager,
+            false
+        );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             cir.setReturnValue(false);

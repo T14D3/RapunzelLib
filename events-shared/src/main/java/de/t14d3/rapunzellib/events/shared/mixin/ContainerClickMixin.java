@@ -102,6 +102,11 @@ public abstract class ContainerClickMixin {
         };
 
         boolean cancelled = !Boolean.TRUE.equals(cir.getReturnValue());
+        // SWAP carries the hotbar slot in the button (0-8); the offhand swap
+        // is button 40 and maps to SWAP_OFFHAND above.
+        Integer hotbarButton = actionTypeMapped == InventoryActionType.NUMBER_KEY && button >= 0 && button < 9
+                ? button
+                : null;
         bus.dispatchPost(new InventoryActionPost(
             rPlayer,
             rInventory,
@@ -109,6 +114,7 @@ public abstract class ContainerClickMixin {
             actionTypeMapped,
             wrapItem(container.getCarried()),
             wrapSlotItem(container, slotId),
+            hotbarButton,
             cancelled
         ));
     }

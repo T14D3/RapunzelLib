@@ -16,6 +16,7 @@ import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.ExplosionSourceKind;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.REntity;
 import de.t14d3.rapunzellib.objects.RGameMode;
 import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RLocation;
@@ -39,6 +40,7 @@ import de.t14d3.rapunzellib.nbt.NbtFeatures;
 import de.t14d3.rapunzellib.nbt.item.RItem;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import io.papermc.paper.event.entity.EntityMoveEvent;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -313,7 +315,14 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         String damageType = event.getDamageSource().getDamageType().getKey().toString();
         var entity = Rapunzel.entities().require(event.getEntity());
 
-        EntityHurtPre pre = new EntityHurtPre(entity, damageType, event.isCancelled());
+        // Non-player entity-sourced damage carries the damager (arrow, mob,
+        // TNT, ...); block/environmental damage has none. Player damagers are
+        // skipped above (AttackEntityPre covers those).
+        REntity damager = event instanceof EntityDamageByEntityEvent byEntity
+                ? Rapunzel.entities().require(byEntity.getDamager())
+                : null;
+
+        EntityHurtPre pre = new EntityHurtPre(entity, damageType, damager, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -402,15 +411,24 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onPlayerLoginPre(AsyncPlayerPreLoginEvent event) {
+    public void onPlayerLoginPre(PlayerLoginEvent event) {
         if (!bus.hasPreListeners(PlayerLoginPre.class)) return;
 
-        PlayerLoginPre pre = new PlayerLoginPre(event.getName(), event.getUniqueId());
+        // Dispatched from PlayerLoginEvent (main thread, live player) rather
+        // than AsyncPlayerPreLoginEvent so the payload can carry the player:
+        // permission-gated login policies (maintenance mode etc.) need it.
+        org.bukkit.entity.Player bukkitPlayer = event.getPlayer();
+        PlayerLoginPre pre = new PlayerLoginPre(
+            bukkitPlayer.getName(),
+            bukkitPlayer.getUniqueId(),
+            Rapunzel.players().require(bukkitPlayer),
+            event.getResult() == PlayerLoginEvent.Result.KICK_OTHER
+        );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
-            event.setLoginResult(AsyncPlayerPreLoginEvent.Result.KICK_OTHER);
-            pre.denyReason().ifPresent(reason ->
-                event.setKickMessage(PlainTextComponentSerializer.plainText().serialize(reason))
+            event.disallow(
+                PlayerLoginEvent.Result.KICK_OTHER,
+                pre.denyReason().orElse(Component.text("Disconnected"))
             );
         }
     }
@@ -426,6 +444,61 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
                 fromBukkit(event.getFrom()),
                 fromBukkit(event.getTo())
         ));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onEntityTeleportPre(EntityTeleportEvent event) {
+        if (!bus.hasPreListeners(EntityTeleportPre.class)) return;
+
+        var entity = Rapunzel.entities().require(event.getEntity());
+
+        EntityTeleportPre pre = new EntityTeleportPre(
+                entity,
+                fromBukkit(event.getFrom()),
+                fromBukkit(event.getTo()),
+                EntityTeleportCause.UNKNOWN,
+                event.isCancelled()
+        );
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onPlayerTeleportPre(PlayerTeleportEvent event) {
+        // Player teleports fire PlayerTeleportEvent on Paper, never
+        // EntityTeleportEvent (PlayerTeleportEvent does not even extend it in
+        // recent versions), so player teleports must be dispatched here as
+        // well - same asymmetry the EntityTeleportPost bridge documents.
+        if (!bus.hasPreListeners(EntityTeleportPre.class)) return;
+
+        var entity = Rapunzel.entities().require(event.getPlayer());
+
+        EntityTeleportPre pre = new EntityTeleportPre(
+                entity,
+                fromBukkit(event.getFrom()),
+                fromBukkit(event.getTo()),
+                mapTeleportCause(event.getCause()),
+                event.isCancelled()
+        );
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    private static EntityTeleportCause mapTeleportCause(PlayerTeleportEvent.TeleportCause cause) {
+        if (cause == null) return EntityTeleportCause.UNKNOWN;
+        // Name-based mapping: newer TeleportCause constants (CONSUMABLE_EFFECT,
+        // DISMOUNT, EXIT_BED) do not exist on every multiversion target, so a
+        // compile-time switch would break the 1.21.x builds.
+        for (EntityTeleportCause mapped : EntityTeleportCause.values()) {
+            if (mapped.name().equals(cause.name())) {
+                return mapped;
+            }
+        }
+        return EntityTeleportCause.UNKNOWN;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
@@ -1005,6 +1078,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         // wrap cannot resolve the player's own CRAFTING view on 26.2 (the
         // top is a CraftingInventory with 5 slots), where main/hotbar raw
         // slots 9+ fall outside the wrap.
+        Integer hotbarButton = event.getHotbarButton() >= 0 ? event.getHotbarButton() : null;
         InventoryActionPre pre = new InventoryActionPre(
             rPlayer,
             rInventory,
@@ -1012,6 +1086,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
             actionType,
             wrapItemStack(event.getCursor()),
             wrapItemStack(event.getCurrentItem()),
+            hotbarButton,
             event.isCancelled()
         );
         bus.dispatchPre(pre);
@@ -1033,6 +1108,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         // Same currentItem source as the pre-dispatch: Bukkit's
         // getCurrentItem(), which resolves the player's own CRAFTING view
         // main/hotbar slots that the top-inventory wrap cannot cover.
+        Integer hotbarButton = event.getHotbarButton() >= 0 ? event.getHotbarButton() : null;
         bus.dispatchPost(new InventoryActionPost(
             rPlayer,
             rInventory,
@@ -1040,6 +1116,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
             actionType,
             wrapItemStack(event.getCursor()),
             wrapItemStack(event.getCurrentItem()),
+            hotbarButton,
             event.isCancelled()
         ));
     }
@@ -1084,6 +1161,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
             InventoryActionType.DRAG,
             wrapItemStack(event.getOldCursor()),
             firstSlotItem(rInventory, slots),
+            null,
             event.isCancelled()
         ));
     }

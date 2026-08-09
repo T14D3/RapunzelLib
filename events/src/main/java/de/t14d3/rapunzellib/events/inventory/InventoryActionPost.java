@@ -23,9 +23,10 @@ import java.util.Optional;
  * @param inventory    the inventory the action targeted
  * @param slots        the raw slots involved (single-element for clicks, full list for drags)
  * @param actionType   the action type
- * @param cursorItem   the item on the cursor, or {@code null} when empty or unknown
- * @param currentItem  the item in the first affected slot, or {@code null} when empty or out of bounds
- * @param cancelled    whether the action was cancelled
+ *  @param cursorItem   the item on the cursor, or {@code null} when empty or unknown
+ *  @param currentItem  the item in the first affected slot, or {@code null} when empty or out of bounds
+ *  @param hotbarButton the hotbar slot (0-8) for NUMBER_KEY clicks, or {@code null} otherwise
+ *  @param cancelled    whether the action was cancelled
  */
 public record InventoryActionPost(
     @NotNull RPlayer player,
@@ -34,6 +35,7 @@ public record InventoryActionPost(
     @NotNull InventoryActionType actionType,
     @Nullable RItem cursorItem,
     @Nullable RItem currentItem,
+    @Nullable Integer hotbarButton,
     boolean cancelled
 ) implements GamePostEvent {
 
@@ -74,5 +76,19 @@ public record InventoryActionPost(
      */
     public @NotNull Optional<RItem> currentItemIfPresent() {
         return Optional.ofNullable(currentItem);
+    }
+
+    /**
+     * Returns the hotbar slot (0-8) involved in this action, when it is a
+     * {@link InventoryActionType#NUMBER_KEY} click.
+     *
+     * <p>Mirrors Bukkit's {@code InventoryClickEvent#getHotbarButton()}: the
+     * slot whose item is swapped with the clicked slot. Empty for every other
+     * action type and on platforms that do not expose the button.</p>
+     *
+     * @return the hotbar button slot, or empty when not a NUMBER_KEY action
+     */
+    public @NotNull Optional<Integer> hotbarButtonIfPresent() {
+        return Optional.ofNullable(hotbarButton);
     }
 }

@@ -60,6 +60,7 @@ final class PaperGameEventSupport {
             EntityTamePost.class,
             EntityMovePost.class,
             EntityTeleportPost.class,
+            EntityTeleportPre.class,
             UseBlockSnapshot.class,
             BucketEmptyPre.class,
             BucketFillPre.class,

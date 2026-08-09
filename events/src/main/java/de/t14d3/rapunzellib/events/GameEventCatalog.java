@@ -26,6 +26,7 @@ import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
 import de.t14d3.rapunzellib.events.entity.EntityTamePost;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
+import de.t14d3.rapunzellib.events.entity.EntityTeleportPre;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
@@ -85,6 +86,7 @@ final class GameEventCatalog {
         EntitySpawnSnapshot.class,
         EntityMovePost.class,
         EntityTeleportPost.class,
+        EntityTeleportPre.class,
         EntityHurtPre.class,
         EntityHurtPost.class,
         EntityHurtSnapshot.class,

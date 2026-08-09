@@ -71,7 +71,7 @@ public final class InventoryEventPayloads {
         @Nullable RItem currentItem,
         boolean cancelled
     ) {
-        return new InventoryActionPost(player, inventory, slots, actionType, cursorItem, currentItem, cancelled);
+        return new InventoryActionPost(player, inventory, slots, actionType, cursorItem, currentItem, null, cancelled);
     }
 
     public static @NotNull InventoryClosePost closePost(

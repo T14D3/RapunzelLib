@@ -111,6 +111,7 @@ include(
     "events-fabric",
     "events-neoforge",
     "events-sponge",
+    "events-velocity",
     "gui",
     "gui-shared",
     "gui-paper",

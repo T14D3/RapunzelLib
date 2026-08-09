@@ -16,6 +16,7 @@ import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.entity.EntityMovePost;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
+import de.t14d3.rapunzellib.events.entity.EntityTeleportPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
@@ -55,6 +56,7 @@ final class NeoForgeGameEventSupport {
                     EntityHurtSnapshot.class,
                     UseBlockSnapshot.class,
                     EntityTeleportPost.class,
+                    EntityTeleportPre.class,
                     InventoryOpenPre.class,
                     InventoryOpenPost.class,
                     InventoryClosePost.class

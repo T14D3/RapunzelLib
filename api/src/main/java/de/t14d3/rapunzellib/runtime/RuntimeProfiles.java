@@ -23,9 +23,16 @@ public final class RuntimeProfiles {
 
     /**
      * Standard runtime profile for proxy platforms with minimal capabilities.
+     *
+     * <p>{@link RuntimeCapability#EVENTS} is included since the velocity
+     * platform ships an events bridge (events-velocity): the proxy dispatches
+     * {@code PlayerJoinPost}/{@code PlayerQuitPost} from the connection
+     * lifecycle events. Without the capability, {@code GameEvents.install()}
+     * on the proxy throws and aborts consumer init.</p>
      */
     public static final RuntimeProfile PROXY_STANDARD = RuntimeProfile.of(
-        RuntimeCapability.ATTACHMENTS
+        RuntimeCapability.ATTACHMENTS,
+        RuntimeCapability.EVENTS
     );
 
     private RuntimeProfiles() {

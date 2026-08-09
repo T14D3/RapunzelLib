@@ -17,6 +17,8 @@ import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
+import de.t14d3.rapunzellib.events.entity.EntityTeleportPre;
+import de.t14d3.rapunzellib.events.entity.EntityTeleportCause;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
@@ -357,7 +359,18 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         if (!(event.getEntity().level() instanceof ServerLevel)) return;
 
         var rEntity = Rapunzel.entities().require(event.getEntity());
-        EntityHurtPre pre = new EntityHurtPre(rEntity, damageTypeKey(event.getSource()), event.isCanceled());
+        // Direct attacker (arrow, mob, TNT, ...) when entity-sourced; empty
+        // for block/environmental damage.
+        net.minecraft.world.entity.Entity directDamager = event.getSource().getDirectEntity();
+        de.t14d3.rapunzellib.objects.REntity damager = directDamager != null && directDamager != event.getEntity()
+                ? Rapunzel.entities().require(directDamager)
+                : null;
+        EntityHurtPre pre = new EntityHurtPre(
+            rEntity,
+            damageTypeKey(event.getSource()),
+            damager,
+            event.isCanceled()
+        );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCanceled(true);
@@ -381,6 +394,47 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
     // rapunzellib-events-neoforge-shared.mixins.json), which captures the
     // affected block list from ServerExplosion.explode() and supports
     // cancellation. No native handler here to avoid double dispatch.
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
+    public void onEntityTeleportPre(EntityTeleportEvent event) {
+        if (!bus.hasPreListeners(EntityTeleportPre.class)) return;
+        if (!(event.getEntity().level() instanceof ServerLevel)) return;
+
+        var entity = Rapunzel.entities().require(event.getEntity());
+        var target = event.getTarget();
+        var prev = new net.minecraft.world.phys.Vec3(event.getPrevX(), event.getPrevY(), event.getPrevZ());
+        // #if VERSION >= 26
+        var targetLevel = event.getTargetLevel();
+        // #else
+        ServerLevel targetLevel = (ServerLevel) event.getEntity().level();
+        // #endif
+
+        // #if VERSION >= 1.21.11
+        String targetWorldId = targetLevel.dimension().identifier().toString();
+        String fromWorldId = ((ServerLevel) event.getEntity().level()).dimension().identifier().toString();
+        // #else
+        String targetWorldId = targetLevel.dimension().location().toString();
+        String fromWorldId = ((ServerLevel) event.getEntity().level()).dimension().location().toString();
+        // #endif
+
+        RWorldRef targetWorldRef = new RWorldRef(targetWorldId, targetWorldId);
+        RWorldRef fromWorldRef = new RWorldRef(fromWorldId, fromWorldId);
+
+        RLocation from = new RLocation(fromWorldRef, prev.x, prev.y, prev.z);
+        RLocation to = new RLocation(targetWorldRef, target.x, target.y, target.z);
+
+        EntityTeleportPre pre = new EntityTeleportPre(
+            entity,
+            from,
+            to,
+            EntityTeleportCause.UNKNOWN,
+            event.isCanceled()
+        );
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCanceled(true);
+        }
+    }
 
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public void onEntityTeleport(EntityTeleportEvent event) {

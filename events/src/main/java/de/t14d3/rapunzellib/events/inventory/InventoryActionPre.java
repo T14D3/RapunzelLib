@@ -21,6 +21,10 @@ import java.util.Optional;
  * for clicks, the full list of affected raw slots for drags. Raw slots may
  * index beyond {@link RInventory#size()} (the player inventory section of a
  * container view), so the list is not bounds-checked.</p>
+ *
+ * <p>{@link #hotbarButton()} carries the hotbar slot (0-8) for
+ * {@link InventoryActionType#NUMBER_KEY} clicks - the slot whose item is
+ * swapped with the clicked slot - and is empty for all other actions.</p>
  */
 public final class InventoryActionPre extends BaseCancellablePreEvent {
     private final RPlayer player;
@@ -29,6 +33,7 @@ public final class InventoryActionPre extends BaseCancellablePreEvent {
     private final InventoryActionType actionType;
     private final RItem cursorItem;
     private final RItem currentItem;
+    private final Integer hotbarButton;
 
     public InventoryActionPre(
         @NotNull RPlayer player,
@@ -36,7 +41,7 @@ public final class InventoryActionPre extends BaseCancellablePreEvent {
         @NotNull List<Integer> slots,
         @NotNull InventoryActionType actionType
     ) {
-        this(player, inventory, slots, actionType, null, null, false);
+        this(player, inventory, slots, actionType, null, null, null, false);
     }
 
     public InventoryActionPre(
@@ -46,7 +51,7 @@ public final class InventoryActionPre extends BaseCancellablePreEvent {
         @NotNull InventoryActionType actionType,
         boolean cancelled
     ) {
-        this(player, inventory, slots, actionType, null, null, cancelled);
+        this(player, inventory, slots, actionType, null, null, null, cancelled);
     }
 
     public InventoryActionPre(
@@ -57,7 +62,7 @@ public final class InventoryActionPre extends BaseCancellablePreEvent {
         @Nullable RItem cursorItem,
         @Nullable RItem currentItem
     ) {
-        this(player, inventory, slots, actionType, cursorItem, currentItem, false);
+        this(player, inventory, slots, actionType, cursorItem, currentItem, null, false);
     }
 
     public InventoryActionPre(
@@ -69,6 +74,19 @@ public final class InventoryActionPre extends BaseCancellablePreEvent {
         @Nullable RItem currentItem,
         boolean cancelled
     ) {
+        this(player, inventory, slots, actionType, cursorItem, currentItem, null, cancelled);
+    }
+
+    public InventoryActionPre(
+        @NotNull RPlayer player,
+        @NotNull RInventory inventory,
+        @NotNull List<Integer> slots,
+        @NotNull InventoryActionType actionType,
+        @Nullable RItem cursorItem,
+        @Nullable RItem currentItem,
+        @Nullable Integer hotbarButton,
+        boolean cancelled
+    ) {
         this.player = Objects.requireNonNull(player, "player");
         this.inventory = Objects.requireNonNull(inventory, "inventory");
         this.slots = List.copyOf(Objects.requireNonNull(slots, "slots"));
@@ -78,6 +96,7 @@ public final class InventoryActionPre extends BaseCancellablePreEvent {
         this.actionType = Objects.requireNonNull(actionType, "actionType");
         this.cursorItem = cursorItem;
         this.currentItem = currentItem;
+        this.hotbarButton = hotbarButton;
         setCancelled(cancelled);
     }
 
@@ -129,5 +148,19 @@ public final class InventoryActionPre extends BaseCancellablePreEvent {
      */
     public @NotNull Optional<RItem> currentItem() {
         return Optional.ofNullable(currentItem);
+    }
+
+    /**
+     * Returns the hotbar slot (0-8) involved in this action, when it is a
+     * {@link InventoryActionType#NUMBER_KEY} click.
+     *
+     * <p>Mirrors Bukkit's {@code InventoryClickEvent#getHotbarButton()}: the
+     * slot whose item is swapped with the clicked slot. Empty for every other
+     * action type and on platforms that do not expose the button.</p>
+     *
+     * @return the hotbar button slot, or empty when not a NUMBER_KEY action
+     */
+    public @NotNull Optional<Integer> hotbarButton() {
+        return Optional.ofNullable(hotbarButton);
     }
 }

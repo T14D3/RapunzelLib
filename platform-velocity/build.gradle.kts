@@ -10,6 +10,7 @@ dependencies {
     // Feature modules - shared modules (no velocity-specific feature modules exist yet)
     implementation(project(":events"))
     implementation(project(":events-shared"))
+    implementation(project(":events-velocity"))
     implementation(project(":commands"))
     implementation(project(":commands-shared"))
     implementation(project(":gui"))
