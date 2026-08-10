@@ -150,6 +150,7 @@ public final class InventoryFeatureInstallerSupport {
         private final Predicate<? super N> emptyItemPredicate;
         private final Supplier<? extends N> emptyItemSupplier;
         private final ItemStackAdapter<N> itemAdapter;
+        private final @Nullable ToIntFunction<? super H> playerInventoryStartFunction;
 
         private SlotInventoryAdapter(
             @NotNull Class<H> handleType,
@@ -159,7 +160,8 @@ public final class InventoryFeatureInstallerSupport {
             @Nullable Consumer<? super H> clearAction,
             @NotNull Predicate<? super N> emptyItemPredicate,
             @NotNull Supplier<? extends N> emptyItemSupplier,
-            @NotNull ItemStackAdapter<N> itemAdapter
+            @NotNull ItemStackAdapter<N> itemAdapter,
+            @Nullable ToIntFunction<? super H> playerInventoryStartFunction
         ) {
             this.handleType = Objects.requireNonNull(handleType, "handleType");
             this.sizeFunction = Objects.requireNonNull(sizeFunction, "sizeFunction");
@@ -169,6 +171,7 @@ public final class InventoryFeatureInstallerSupport {
             this.emptyItemPredicate = Objects.requireNonNull(emptyItemPredicate, "emptyItemPredicate");
             this.emptyItemSupplier = Objects.requireNonNull(emptyItemSupplier, "emptyItemSupplier");
             this.itemAdapter = Objects.requireNonNull(itemAdapter, "itemAdapter");
+            this.playerInventoryStartFunction = playerInventoryStartFunction;
         }
 
         /**
@@ -250,6 +253,20 @@ public final class InventoryFeatureInstallerSupport {
         }
 
         /**
+         * Returns the raw slot index where the player's own inventory section
+         * starts in the combined menu wrapped by the given handle, or
+         * {@code -1} when the adapter carries no platform-specific
+         * computation (callers then fall back to {@link RInventory}'s default
+         * {@code size() - 36} invariant).
+         *
+         * @param handle the native inventory handle
+         * @return the player inventory start slot, or -1 when unknown
+         */
+        public int playerInventoryStart(@NotNull H handle) {
+            return playerInventoryStartFunction == null ? -1 : playerInventoryStartFunction.applyAsInt(handle);
+        }
+
+        /**
          * Returns a platform-sentinel native item representing an empty slot.
          *
          * @return the empty item sentinel, may be null
@@ -282,6 +299,7 @@ public final class InventoryFeatureInstallerSupport {
             private @Nullable Consumer<? super H> clearAction;
             private Predicate<? super N> emptyItemPredicate;
             private Supplier<? extends N> emptyItemSupplier;
+            private @Nullable ToIntFunction<? super H> playerInventoryStartFunction;
 
             private Builder(@NotNull Class<H> handleType, @NotNull ItemStackAdapter<N> itemAdapter) {
                 this.handleType = Objects.requireNonNull(handleType, "handleType");
@@ -338,6 +356,26 @@ public final class InventoryFeatureInstallerSupport {
             }
 
             /**
+             * Sets the function that computes the raw slot index where the
+             * player's own inventory section starts in a FULL combined menu
+             * wrap (the top container plus the player inventory section) -
+             * the value exposed via {@link RInventory#playerInventoryStart()}.
+             * <p>
+             * When omitted, the wrap falls back to {@code size() - 36} (the
+             * documented invariant for vanilla container menus). Platform
+             * installers that wrap menu views should provide an exact
+             * computation where the invariant does not hold (e.g. the
+             * player's own CRAFTING/CREATIVE views).
+             *
+             * @param playerInventoryStart the start-slot function
+             * @return this builder
+             */
+            public @NotNull Builder<H, N> playerInventoryStart(@NotNull ToIntFunction<? super H> playerInventoryStart) {
+                this.playerInventoryStartFunction = Objects.requireNonNull(playerInventoryStart, "playerInventoryStart");
+                return this;
+            }
+
+            /**
              * Sets the supplier that provides the sentinel empty native item.
              *
              * @param emptyItemSupplier the empty item supplier
@@ -358,18 +396,19 @@ public final class InventoryFeatureInstallerSupport {
              *
              * @return a new adapter instance
              */
-            public @NotNull SlotInventoryAdapter<H, N> build() {
-                return new SlotInventoryAdapter<>(
-                    handleType,
-                    Objects.requireNonNull(sizeFunction, "sizeFunction"),
-                    Objects.requireNonNull(itemGetter, "itemGetter"),
-                    Objects.requireNonNull(itemSetter, "itemSetter"),
-                    clearAction,
-                    Objects.requireNonNull(emptyItemPredicate, "emptyItemPredicate"),
-                    Objects.requireNonNull(emptyItemSupplier, "emptyItemSupplier"),
-                    itemAdapter
-                );
-            }
+        public @NotNull SlotInventoryAdapter<H, N> build() {
+            return new SlotInventoryAdapter<>(
+                handleType,
+                Objects.requireNonNull(sizeFunction, "sizeFunction"),
+                Objects.requireNonNull(itemGetter, "itemGetter"),
+                Objects.requireNonNull(itemSetter, "itemSetter"),
+                clearAction,
+                Objects.requireNonNull(emptyItemPredicate, "emptyItemPredicate"),
+                Objects.requireNonNull(emptyItemSupplier, "emptyItemSupplier"),
+                itemAdapter,
+                playerInventoryStartFunction
+            );
+        }
         }
     }
 
@@ -388,6 +427,18 @@ public final class InventoryFeatureInstallerSupport {
         @Override
         public int size() {
             return adapter.size(handle());
+        }
+
+        @Override
+        public int playerInventoryStart() {
+            int start = adapter.playerInventoryStart(handle());
+            if (start >= 0) {
+                return start;
+            }
+            // No platform-specific computation: fall back to the documented
+            // invariant for vanilla container menus (last 36 slots are the
+            // player section).
+            return RInventory.super.playerInventoryStart();
         }
 
         @Override

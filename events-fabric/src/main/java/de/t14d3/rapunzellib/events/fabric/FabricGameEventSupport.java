@@ -11,13 +11,19 @@ import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryTransferPre;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
 import de.t14d3.rapunzellib.events.item.BucketFillPre;
 import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
+import de.t14d3.rapunzellib.events.player.PlayerJoinPost;
+import de.t14d3.rapunzellib.events.player.PlayerLoginPre;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePost;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
+import de.t14d3.rapunzellib.events.player.PlayerStatePost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
 
@@ -69,7 +75,17 @@ final class FabricGameEventSupport {
                     InventoryActionPost.class,
                     InventoryOpenPre.class,
                     InventoryOpenPost.class,
-                    InventoryClosePost.class
+                    InventoryClosePost.class,
+                    InventoryTransferPre.class,
+                    PistonMovePre.class,
+                    EntityDeathPre.class,
+                    EntityDeathPost.class,
+                    EntityTamePost.class,
+                    PlayerLoginPre.class,
+                    PlayerJoinPost.class,
+                    PlayerMessagePre.class,
+                    PlayerMessagePost.class,
+                    PlayerStatePost.class
                 ),
             CALLBACK_BRIDGE_DETAILS
         ),

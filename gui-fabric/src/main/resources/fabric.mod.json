@@ -4,6 +4,7 @@
   "version": "${version}",
   "name": "RapunzelLib GUI (Fabric)",
   "description": "Fabric GUI implementation for RapunzelLib supporting inventory and dialog-based GUIs.",
+  "license": "LGPL-2.1",
   "authors": [
     "t14d3"
   ],

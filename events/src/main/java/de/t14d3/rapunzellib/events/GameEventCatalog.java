@@ -34,6 +34,7 @@ import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
+import de.t14d3.rapunzellib.events.inventory.InventoryTransferPre;
 import de.t14d3.rapunzellib.events.interact.UseBlockSnapshot;
 import de.t14d3.rapunzellib.events.item.BucketEmptyPre;
 import de.t14d3.rapunzellib.events.item.BucketEntityPre;
@@ -93,8 +94,18 @@ final class GameEventCatalog {
         EntityDeathPre.class,
         EntityDeathPost.class,
         EntityTamePost.class,
+        // InventoryActionPre/Post slot contract: raw slot ids index the FULL
+        // combined menu (0..inventory().size()-1, Bukkit getRawSlot()
+        // semantics); inventory() wraps the full menu (top container + player
+        // inventory section); currentItem = inventory().item(firstSlot)
+        // guarded by the wrap bounds; cursorItem = the menu's carried item.
         InventoryActionPre.class,
         InventoryActionPost.class,
+        // InventoryTransferPre contract: sourcePos = the inventory the item
+        // moves OUT of (the protected surface), targetPos = the destination;
+        // null when that side is not a block (e.g. hopper minecart) or
+        // unresolvable; at least one side is non-null. Deny = no transfer.
+        InventoryTransferPre.class,
         InventoryOpenPre.class,
         InventoryOpenPost.class,
         InventoryClosePost.class,

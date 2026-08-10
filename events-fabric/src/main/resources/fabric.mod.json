@@ -4,6 +4,7 @@
   "version": "${version}",
   "name": "RapunzelLib (Fabric Events)",
   "description": "Fabric event bridge implementation for RapunzelLib.",
+  "license": "LGPL-2.1",
   "authors": [
     "t14d3"
   ],

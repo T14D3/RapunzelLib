@@ -12,10 +12,17 @@
     "BucketEntityMixin",
     "BucketItemMixin",
     "ContainerClickMixin",
+    "EntityDeathMixin",
     "EntityMoveMixin",
     "ExplosionMixin",
+    "HopperTransferMixin",
+    "PistonBaseBlockMixin",
+    "PlayerDeathMixin",
+    "PlayerLoginMixin",
     "PlayerMoveMixin",
-    "TntPrimeMixin"
+    "PressurePlateStepMixin",
+    "TntPrimeMixin",
+    "TripWireStepMixin"
   ],
   "injectors": {
     "defaultRequire": 1

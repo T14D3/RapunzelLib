@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.LifecycleOwnerGameEventBridgeInstaller;
+import de.t14d3.rapunzellib.events.player.PlayerMoveThrottle;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,6 +21,7 @@ public final class PaperGameEventBridgeInstaller extends LifecycleOwnerGameEvent
         @NotNull Object owner
     ) {
         JavaPlugin plugin = (JavaPlugin) owner;
+        PlayerMoveThrottle.load(context);
         PaperGameEventsBridge bridge = new PaperGameEventsBridge(plugin, bus);
         bridge.register();
         return bridge;

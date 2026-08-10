@@ -48,7 +48,7 @@ public abstract class BucketEntityMixin {
         // #else
         String worldId = serverLevel.dimension().location().toString();
         // #endif
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
+        RWorldRef worldRef = new RWorldRef(null, worldId);
         RPlayer rPlayer = Rapunzel.players().require(serverPlayer);
 
         RLocation rLocation = new RLocation(worldRef, location.x(), location.y(), location.z());

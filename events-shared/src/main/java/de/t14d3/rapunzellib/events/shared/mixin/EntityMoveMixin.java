@@ -39,13 +39,19 @@ public abstract class EntityMoveMixin {
         Vec3 current = self.position();
         Vec3 previous = LAST_POSITIONS.get(uuid);
 
+        // First observed move: record the anchor and skip - there is no
+        // previous position yet, so dispatching would produce a phantom
+        // event with from == to.
+        if (previous == null) {
+            LAST_POSITIONS.put(uuid, current);
+            return;
+        }
+
         // Skip if movement is below threshold
-        if (previous != null) {
-            if (Math.abs(current.x - previous.x) < THRESHOLD
-                    && Math.abs(current.y - previous.y) < THRESHOLD
-                    && Math.abs(current.z - previous.z) < THRESHOLD) {
-                return;
-            }
+        if (Math.abs(current.x - previous.x) < THRESHOLD
+                && Math.abs(current.y - previous.y) < THRESHOLD
+                && Math.abs(current.z - previous.z) < THRESHOLD) {
+            return;
         }
 
         LAST_POSITIONS.put(uuid, current);
@@ -57,10 +63,9 @@ public abstract class EntityMoveMixin {
         RKey dimKey = RKey.of(serverLevel.dimension().location().toString());
         // #endif
         RWorldRef worldRef = new RWorldRef(null, dimKey);
-        Vec3 from = previous != null ? previous : current;
 
         bus.dispatchPost(new EntityMovePost(rEntity,
-                new RLocation(worldRef, from.x, from.y, from.z),
+                new RLocation(worldRef, previous.x, previous.y, previous.z),
                 new RLocation(worldRef, current.x, current.y, current.z)));
     }
 }

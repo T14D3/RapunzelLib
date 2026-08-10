@@ -28,6 +28,12 @@ public abstract class EntityHurtMixin {
         Entity self = (Entity) (Object) this;
         if (!(self.level() instanceof ServerLevel)) return;
 
+        // Player-caused damage is covered by AttackEntityPre everywhere
+        // (Paper skips EntityDamageByEntityEvent with a player damager);
+        // EntityHurtPre must NEVER fire for it on any platform.
+        net.minecraft.world.entity.Entity directDamager = source.getDirectEntity();
+        if (directDamager instanceof net.minecraft.world.entity.player.Player) return;
+
         String damageKey;
         // #if VERSION >= 26
         // # damageKey = source.typeHolder().unwrapKey().map(k -> k.identifier().toString()).orElse("unknown");
@@ -36,15 +42,18 @@ public abstract class EntityHurtMixin {
         // #endif
         // The direct attacker (arrow, mob, TNT, ...) when entity-sourced;
         // empty for block/environmental damage.
-        net.minecraft.world.entity.Entity directDamager = source.getDirectEntity();
         de.t14d3.rapunzellib.objects.REntity damager = directDamager != null && directDamager != self
                 ? Rapunzel.entities().require(directDamager)
                 : null;
+        // Initial cancelled state mirrors the real pre-existing cancellation
+        // (an earlier mixin handler may already have cancelled the call),
+        // matching Paper, which passes the Bukkit event's current isCancelled.
+        boolean preCancelled = cir.getReturnValue() != null && !cir.getReturnValue();
         EntityHurtPre pre = new EntityHurtPre(
             Rapunzel.entities().require(self),
             RKey.of(damageKey),
             damager,
-            false
+            preCancelled
         );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
@@ -59,6 +68,10 @@ public abstract class EntityHurtMixin {
 
         Entity self = (Entity) (Object) this;
         if (!(self.level() instanceof ServerLevel)) return;
+
+        // Mirror the pre-skip: player-caused damage never fires EntityHurt
+        // events (AttackEntityPre covers it).
+        if (source.getDirectEntity() instanceof net.minecraft.world.entity.player.Player) return;
 
         String damageKey;
         // #if VERSION >= 26

@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.platform.shared.entity;
 
+import de.t14d3.rapunzellib.common.objects.KeyedLruCache;
 import de.t14d3.rapunzellib.objects.Entities;
 import de.t14d3.rapunzellib.objects.REntity;
 import de.t14d3.rapunzellib.objects.RServerPlayer;
@@ -12,19 +13,22 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
  * Abstract base implementation of {@link Entities} that provides entity lookup and wrapping.
- * Maintains a {@link ConcurrentHashMap}-backed cache of wrapped entities keyed by UUID.
+ * Maintains a bounded LRU cache of wrapped entities keyed by UUID, so churned entity UUIDs
+ * cannot grow the cache without bound.
  *
  * @param <E> the concrete entity wrapper type
  */
 public abstract class SharedEntitiesCore<E extends REntity> implements Entities {
+    /** Maximum number of entity wrappers kept before the least recently used entry is evicted. */
+    private static final int CACHE_MAX_SIZE = 1024;
+
     protected final MinecraftServer server;
     protected final Function<ServerPlayer, RServerPlayer> playerWrapper;
-    private final ConcurrentHashMap<UUID, E> cache = new ConcurrentHashMap<>();
+    private final KeyedLruCache<UUID, E> cache = new KeyedLruCache<>(CACHE_MAX_SIZE);
 
     protected SharedEntitiesCore(@NotNull MinecraftServer server, @NotNull Function<ServerPlayer, RServerPlayer> playerWrapper) {
         this.server = Objects.requireNonNull(server, "server");

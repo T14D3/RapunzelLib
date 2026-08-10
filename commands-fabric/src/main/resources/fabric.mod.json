@@ -4,6 +4,7 @@
   "version": "${version}",
   "name": "RapunzelLib (Fabric Commands)",
   "description": "Fabric command integration for RapunzelLib using the native Brigadier dispatcher.",
+  "license": "LGPL-2.1",
   "authors": [
     "t14d3"
   ],

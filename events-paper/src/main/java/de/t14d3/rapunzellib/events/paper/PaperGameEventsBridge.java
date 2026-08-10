@@ -34,6 +34,8 @@ import de.t14d3.rapunzellib.events.inventory.InventoryActionType;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryTransferPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryTransferPre.TransferSource;
 import de.t14d3.rapunzellib.inventory.InventoryFeatures;
 import de.t14d3.rapunzellib.inventory.RInventory;
 import de.t14d3.rapunzellib.nbt.NbtFeatures;
@@ -52,6 +54,7 @@ import org.bukkit.event.block.*;
 import org.bukkit.event.entity.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
@@ -188,8 +191,12 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInteractBlockPre(PlayerInteractEvent event) {
         InteractBlockPre.Action action = switch (event.getAction()) {
-            case LEFT_CLICK_BLOCK, LEFT_CLICK_AIR -> InteractBlockPre.Action.LEFT;
-            case RIGHT_CLICK_BLOCK, RIGHT_CLICK_AIR -> InteractBlockPre.Action.RIGHT;
+            case LEFT_CLICK_BLOCK, LEFT_CLICK_AIR -> InteractBlockPre.Action.ATTACK;
+            case RIGHT_CLICK_BLOCK, RIGHT_CLICK_AIR -> InteractBlockPre.Action.USE;
+            // Physical contact (pressure plates, tripwires, ...): the clicked
+            // block is the plate/wire and cancellation is honored by Paper
+            // (the plate/wire does not activate).
+            case PHYSICAL -> InteractBlockPre.Action.STEP;
             default -> null;
         };
         if (action == null) return;
@@ -197,7 +204,10 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
         RBlock block = event.getClickedBlock() != null ? Rapunzel.blocks().require(event.getClickedBlock()) : null;
-        String face = event.getClickedBlock() != null ? event.getBlockFace().name() : null;
+        // PHYSICAL events carry no block face.
+        String face = action == InteractBlockPre.Action.STEP
+                || event.getClickedBlock() == null || event.getBlockFace() == null
+                ? null : event.getBlockFace().name();
 
         InteractBlockPre pre = new InteractBlockPre(player, action, block, face, event.isCancelled());
         bus.dispatchPre(pre);
@@ -209,8 +219,9 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void onInteractBlockPost(PlayerInteractEvent event) {
         InteractBlockPre.Action action = switch (event.getAction()) {
-            case LEFT_CLICK_BLOCK, LEFT_CLICK_AIR -> InteractBlockPre.Action.LEFT;
-            case RIGHT_CLICK_BLOCK, RIGHT_CLICK_AIR -> InteractBlockPre.Action.RIGHT;
+            case LEFT_CLICK_BLOCK, LEFT_CLICK_AIR -> InteractBlockPre.Action.ATTACK;
+            case RIGHT_CLICK_BLOCK, RIGHT_CLICK_AIR -> InteractBlockPre.Action.USE;
+            case PHYSICAL -> InteractBlockPre.Action.STEP;
             default -> null;
         };
         if (action == null) return;
@@ -218,14 +229,17 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         boolean needsAsync = bus.hasAsyncListeners(UseBlockSnapshot.class);
         if (!needsPost && !needsAsync) return;
         // The legacy async block-use snapshot only applies to right-clicks on a block.
-        if (event.getClickedBlock() == null || action != InteractBlockPre.Action.RIGHT) {
+        if (event.getClickedBlock() == null || action != InteractBlockPre.Action.USE) {
             needsAsync = false;
         }
         if (!needsPost && !needsAsync) return;
 
         RPlayer player = Rapunzel.players().require(event.getPlayer());
         RBlock block = event.getClickedBlock() != null ? Rapunzel.blocks().require(event.getClickedBlock()) : null;
-        String face = event.getClickedBlock() != null ? event.getBlockFace().name() : null;
+        // PHYSICAL events carry no block face.
+        String face = action == InteractBlockPre.Action.STEP
+                || event.getClickedBlock() == null || event.getBlockFace() == null
+                ? null : event.getBlockFace().name();
         boolean cancelled = event.isCancelled();
 
         if (needsPost) {
@@ -535,15 +549,14 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     public void onVehicleMove(VehicleMoveEvent event) {
         if (!bus.hasPostListeners(EntityMovePost.class)) return;
 
-        for (org.bukkit.entity.Entity passenger : event.getVehicle().getPassengers()) {
-            var entity = Rapunzel.entities().require(passenger);
+        // Dispatch for the moving vehicle itself, not its passengers.
+        var entity = Rapunzel.entities().require(event.getVehicle());
 
-            bus.dispatchPost(new EntityMovePost(
-                    entity,
-                    fromBukkit(event.getFrom()),
-                    fromBukkit(event.getTo())
-            ));
-        }
+        bus.dispatchPost(new EntityMovePost(
+                entity,
+                fromBukkit(event.getFrom()),
+                fromBukkit(event.getTo())
+        ));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -763,8 +776,13 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPreListeners(BlockPhysicsPre.class)) return;
 
         RBlock block = Rapunzel.blocks().require(event.getBlock());
-        // getChangedType() returns the Material (block type) that changed, triggering this physics update
-        RKey changedTypeKey = RKey.of(event.getChangedType().getKey().toString());
+        // The trigger block: Paper 26.x fires BlockPhysicsEvent from
+        // NeighborUpdater.executeUpdate with the changed/source block as
+        // getSourceBlock() (getChangedType() holds the state of the block
+        // being updated itself). Matches the shared mixin hook, which reports
+        // the changed block as changedType.
+        RBlock changed = Rapunzel.blocks().require(event.getSourceBlock());
+        RKey changedTypeKey = changed.typeKey();
         BlockPhysicsPre pre = new BlockPhysicsPre(block, changedTypeKey, event.isCancelled());
         bus.dispatchPre(pre);
 
@@ -778,7 +796,8 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPostListeners(BlockPhysicsPost.class)) return;
 
         RBlock block = Rapunzel.blocks().require(event.getBlock());
-        RBlockType changedType = RBlockType.require(RKey.of(event.getChangedType().getKey().toString()));
+        RBlock changed = Rapunzel.blocks().require(event.getSourceBlock());
+        RBlockType changedType = RBlockType.require(changed.typeKey());
         bus.dispatchPost(new BlockPhysicsPost(block, changedType, event.isCancelled()));
     }
 
@@ -993,16 +1012,16 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
     public void onPlayerMovePre(org.bukkit.event.player.PlayerMoveEvent event) {
         if (!bus.hasPreListeners(PlayerMovePre.class)) return;
 
-        // Ignore small movements (head rotation etc.) to reduce event spam
-        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
-                && event.getFrom().getBlockY() == event.getTo().getBlockY()
-                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
-            return;
-        }
-
         RPlayer player = Rapunzel.players().require(event.getPlayer());
+        RLocation from = fromBukkit(event.getFrom());
+        RLocation to = fromBukkit(event.getTo());
 
-        PlayerMovePre pre = new PlayerMovePre(player, fromBukkit(event.getFrom()), fromBukkit(event.getTo()), event.isCancelled());
+        // Library-scope throttle (events.player.move config): min-distance
+        // since the last dispatched move + per-player rate limit. Replaces the
+        // former block-difference filter.
+        if (!PlayerMoveThrottle.shouldDispatch(player.uuid(), from, to)) return;
+
+        PlayerMovePre pre = new PlayerMovePre(player, from, to, event.isCancelled());
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             event.setCancelled(true);
@@ -1014,16 +1033,15 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         boolean needsPost = bus.hasPostListeners(PlayerMovePost.class);
         if (!needsPost) return;
 
-        // Ignore small movements (head rotation etc.) to reduce event spam
-        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
-                && event.getFrom().getBlockY() == event.getTo().getBlockY()
-                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) {
-            return;
-        }
-
         RPlayer player = Rapunzel.players().require(event.getPlayer());
+        RLocation from = fromBukkit(event.getFrom());
+        RLocation to = fromBukkit(event.getTo());
 
-        bus.dispatchPost(new PlayerMovePost(player, fromBukkit(event.getFrom()), fromBukkit(event.getTo()), event.isCancelled()));
+        // Only dispatch a post for the move whose pre passed the throttle,
+        // keeping pre/post paired exactly.
+        if (!PlayerMoveThrottle.wasAccepted(player.uuid(), from, to)) return;
+
+        bus.dispatchPost(new PlayerMovePost(player, from, to, event.isCancelled()));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -1070,14 +1088,16 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
         RPlayer rPlayer = Rapunzel.players().require(player);
         int slot = event.getRawSlot();
-        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+        // Full combined menu view (top container + player inventory section):
+        // raw slots index the full menu, identical to getRawSlot() semantics.
+        RInventory rInventory = InventoryFeatures.install().require(event.getView());
         InventoryActionType actionType = mapBukkitAction(event.getClick());
 
-        // currentItem mirrors Bukkit's InventoryClickEvent#getCurrentItem
-        // (view.getItem(rawSlot) = the clicked menu slot). The top-inventory
-        // wrap cannot resolve the player's own CRAFTING view on 26.2 (the
-        // top is a CraftingInventory with 5 slots), where main/hotbar raw
-        // slots 9+ fall outside the wrap.
+        // currentItem = full-menu wrap's item at the raw slot
+        // (menu.getSlot(rawSlot).getItem()), guarded by 0 <= rawSlot < size.
+        // The wrap covers the FULL menu including the player's own CRAFTING
+        // view (26.2: top is a CraftingInventory with 5 slots, main/hotbar
+        // raw slots 9+ fall outside any top-inventory wrap).
         Integer hotbarButton = event.getHotbarButton() >= 0 ? event.getHotbarButton() : null;
         InventoryActionPre pre = new InventoryActionPre(
             rPlayer,
@@ -1085,7 +1105,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
             List.of(slot),
             actionType,
             wrapItemStack(event.getCursor()),
-            wrapItemStack(event.getCurrentItem()),
+            slotItem(rInventory, slot),
             hotbarButton,
             event.isCancelled()
         );
@@ -1102,12 +1122,11 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
 
         RPlayer rPlayer = Rapunzel.players().require(player);
         int slot = event.getRawSlot();
-        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+        RInventory rInventory = InventoryFeatures.install().require(event.getView());
         InventoryActionType actionType = mapBukkitAction(event.getClick());
 
-        // Same currentItem source as the pre-dispatch: Bukkit's
-        // getCurrentItem(), which resolves the player's own CRAFTING view
-        // main/hotbar slots that the top-inventory wrap cannot cover.
+        // Same currentItem source as the pre-dispatch: the full-menu wrap at
+        // the raw slot (Bukkit's getCurrentItem() equivalent).
         Integer hotbarButton = event.getHotbarButton() >= 0 ? event.getHotbarButton() : null;
         bus.dispatchPost(new InventoryActionPost(
             rPlayer,
@@ -1115,7 +1134,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
             List.of(slot),
             actionType,
             wrapItemStack(event.getCursor()),
-            wrapItemStack(event.getCurrentItem()),
+            slotItem(rInventory, slot),
             hotbarButton,
             event.isCancelled()
         ));
@@ -1127,7 +1146,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPreListeners(InventoryActionPre.class)) return;
 
         RPlayer rPlayer = Rapunzel.players().require(player);
-        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+        RInventory rInventory = InventoryFeatures.install().require(event.getView());
         List<Integer> slots = event.getRawSlots().stream().sorted().toList();
 
         InventoryActionPre pre = new InventoryActionPre(
@@ -1151,7 +1170,7 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
         if (!bus.hasPostListeners(InventoryActionPost.class)) return;
 
         RPlayer rPlayer = Rapunzel.players().require(player);
-        RInventory rInventory = InventoryFeatures.install().require(event.getInventory());
+        RInventory rInventory = InventoryFeatures.install().require(event.getView());
         List<Integer> slots = event.getRawSlots().stream().sorted().toList();
 
         bus.dispatchPost(new InventoryActionPost(
@@ -1164,6 +1183,107 @@ final class PaperGameEventsBridge implements Listener, GameEventBridge {
             null,
             event.isCancelled()
         ));
+    }
+
+    /**
+     * Dispatches {@link InventoryTransferPre} from
+     * {@link InventoryMoveItemEvent}, which Paper fires for every hopper /
+     * minecart-hopper / dropper inventory-to-inventory transfer in both
+     * directions (the payload's sourcePos is always the inventory the item
+     * leaves - {@code getSource()}).
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onInventoryTransferPre(InventoryMoveItemEvent event) {
+        if (!bus.hasPreListeners(InventoryTransferPre.class)) return;
+
+        org.bukkit.inventory.Inventory source = event.getSource();
+        org.bukkit.inventory.Inventory destination = event.getDestination();
+        org.bukkit.inventory.Inventory initiator = event.getInitiator();
+
+        RWorldRef world = inventoryWorld(source, destination, initiator);
+        if (world == null) return;
+
+        RItem item = wrapItemStack(event.getItem());
+        if (item == null) return;
+
+        InventoryTransferPre pre = new InventoryTransferPre(
+            world,
+            holderPos(source),
+            holderPos(destination),
+            item,
+            event.getItem().getAmount(),
+            transferSource(initiator),
+            event.isCancelled()
+        );
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Resolves the block position of a block-backed inventory (hoppers,
+     * droppers, chests, ...) from its holder, or null when the holder is not a
+     * block (hopper minecart - null per the position contract) or carries no
+     * position (unresolvable holders).
+     */
+    private static RBlockPos holderPos(org.bukkit.inventory.Inventory inventory) {
+        if (inventory == null) return null;
+        org.bukkit.inventory.InventoryHolder holder = inventory.getHolder();
+        if (holder == null) return null;
+        org.bukkit.Location loc;
+        if (holder instanceof org.bukkit.block.BlockState state) {
+            loc = state.getLocation();
+        } else if (holder instanceof org.bukkit.block.DoubleChest chest) {
+            loc = chest.getLocation();
+        } else {
+            return null;
+        }
+        return loc == null || loc.getWorld() == null ? null
+                : new RBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
+    }
+
+    /**
+     * Maps the moving carrier to the shared {@link TransferSource}: the
+     * initiator is always the hopper / minecart hopper / dropper that starts
+     * the move (Bukkit's {@code getInitiator()}).
+     */
+    private static TransferSource transferSource(org.bukkit.inventory.Inventory initiator) {
+        if (initiator == null) return TransferSource.HOPPER;
+        if (initiator.getHolder() instanceof org.bukkit.entity.minecart.HopperMinecart) {
+            return TransferSource.HOPPER_MINECART;
+        }
+        if (initiator.getType() == org.bukkit.event.inventory.InventoryType.DROPPER) {
+            return TransferSource.DROPPER;
+        }
+        return TransferSource.HOPPER;
+    }
+
+    /** Resolves the transfer world from the holders of the involved inventories (source first). */
+    private RWorldRef inventoryWorld(
+        org.bukkit.inventory.Inventory source,
+        org.bukkit.inventory.Inventory destination,
+        org.bukkit.inventory.Inventory initiator
+    ) {
+        org.bukkit.World world = holderWorld(source);
+        if (world == null) world = holderWorld(destination);
+        if (world == null) world = holderWorld(initiator);
+        return world == null ? null : worldRef(world);
+    }
+
+    private static org.bukkit.World holderWorld(org.bukkit.inventory.Inventory inventory) {
+        if (inventory == null) return null;
+        org.bukkit.inventory.InventoryHolder holder = inventory.getHolder();
+        if (holder instanceof org.bukkit.block.BlockState state) return state.getWorld();
+        if (holder instanceof org.bukkit.block.DoubleChest chest) return chest.getWorld();
+        if (holder instanceof org.bukkit.entity.Entity entity) return entity.getWorld();
+        return null;
+    }
+
+    /** Returns the item in a single raw slot of the full-menu wrap, or null when out of bounds. */
+    private static RItem slotItem(RInventory inventory, int slot) {
+        if (slot < 0 || slot >= inventory.size()) return null;
+        return inventory.item(slot).orElse(null);
     }
 
     /** Returns the item in the first in-bounds raw slot, or null. */

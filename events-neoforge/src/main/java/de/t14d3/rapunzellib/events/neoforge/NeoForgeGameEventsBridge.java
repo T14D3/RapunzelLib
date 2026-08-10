@@ -15,6 +15,7 @@ import de.t14d3.rapunzellib.events.entity.EntityHurtPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
+import de.t14d3.rapunzellib.events.entity.EntityTamePost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPre;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPost;
 import de.t14d3.rapunzellib.events.entity.EntityTeleportPre;
@@ -26,6 +27,9 @@ import de.t14d3.rapunzellib.events.item.BucketFillPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePost;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePre;
+import de.t14d3.rapunzellib.events.player.PlayerStatePost;
 import de.t14d3.rapunzellib.inventory.InventoryFeatures;
 import de.t14d3.rapunzellib.inventory.RInventory;
 import de.t14d3.rapunzellib.events.shared.SharedEntityDamageHooks;
@@ -35,6 +39,8 @@ import de.t14d3.rapunzellib.events.shared.SharedLifecycleEventHooks;
 import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import de.t14d3.rapunzellib.objects.RBlockPos;
+import de.t14d3.rapunzellib.objects.REntity;
+import de.t14d3.rapunzellib.objects.RGameMode;
 import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RPlayer;
 import de.t14d3.rapunzellib.objects.RWorld;
@@ -49,11 +55,15 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.GameType;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.CommandEvent;
+import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.EntityTeleportEvent;
+import net.neoforged.neoforge.event.entity.living.AnimalTameEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
@@ -70,6 +80,7 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 // #endif
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Set;
 import java.util.UUID;
 
 final class NeoForgeGameEventsBridge implements GameEventBridge {
@@ -116,6 +127,135 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
     public void onPlayerQuit(PlayerEvent.PlayerLoggedOutEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         SharedLifecycleEventHooks.dispatchPlayerQuitPost(bus, player);
+    }
+
+    // ---- EntityTamePost (native AnimalTameEvent) ----
+    // AnimalTameEvent fires from the per-animal tame roll (Wolf/Parrot/Cat/
+    // Ocelot tryToTame, horse RunAroundLikeCrazyGoal) right before
+    // TamableAnimal.tame() applies; it is cancellable, and when it is not
+    // cancelled the tame succeeds. Dispatch the Post only for non-cancelled
+    // events - the same "tame succeeded" semantics as Paper's EntityTameEvent
+    // and the Fabric tame mixin. The shared EntityTameMixin must NOT be
+    // registered on NeoForge (this native event is the single source).
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public void onAnimalTame(AnimalTameEvent event) {
+        if (!bus.hasPostListeners(EntityTamePost.class)) return;
+        if (event.isCanceled()) return;
+        if (!(event.getTamer() instanceof ServerPlayer tamer)) return;
+        if (!(event.getAnimal().level() instanceof ServerLevel)) return;
+
+        REntity tamed = Rapunzel.entities().require(event.getAnimal());
+        if (tamed == null) return;
+
+        bus.dispatchPost(new EntityTamePost(Rapunzel.players().require(tamer), tamed));
+    }
+
+    // ---- PlayerMessagePre/Post (native ServerChatEvent + CommandEvent) ----
+    // Chat: ServerChatEvent fires from CommonHooks.onServerChatSubmittedEvent
+    // (installed as the server chat decorator) before the message is
+    // broadcast; cancelling returns null and the message is dropped. Command:
+    // CommandEvent fires from Commands.performCommand before execution;
+    // cancelling skips the command. Pre at HIGHEST (deny -> cancel), Post at
+    // LOWEST when the event was not cancelled - mirroring the Fabric mixin's
+    // "Post fires only when the Pre was not denied" semantics.
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
+    public void onServerChatPre(ServerChatEvent event) {
+        if (!bus.hasPreListeners(PlayerMessagePre.class)) return;
+
+        PlayerMessagePre pre = new PlayerMessagePre(
+            Rapunzel.players().require(event.getPlayer()),
+            event.getMessage().getString(),
+            false,
+            event.isCanceled()
+        );
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public void onServerChatPost(ServerChatEvent event) {
+        if (!bus.hasPostListeners(PlayerMessagePost.class)) return;
+        if (event.isCanceled()) return;
+
+        bus.dispatchPost(new PlayerMessagePost(
+            Rapunzel.players().require(event.getPlayer()),
+            event.getMessage().getString(),
+            false,
+            false
+        ));
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
+    public void onCommandPre(CommandEvent event) {
+        if (!bus.hasPreListeners(PlayerMessagePre.class)) return;
+        ServerPlayer player = commandPlayer(event);
+        if (player == null) return;
+
+        // The parse reader carries the command without the leading '/';
+        // Paper's PlayerCommandPreprocessEvent content includes it.
+        String content = "/" + event.getParseResults().getReader().getString();
+        PlayerMessagePre pre = new PlayerMessagePre(
+            Rapunzel.players().require(player),
+            content,
+            true,
+            event.isCanceled()
+        );
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public void onCommandPost(CommandEvent event) {
+        if (!bus.hasPostListeners(PlayerMessagePost.class)) return;
+        if (event.isCanceled()) return;
+        ServerPlayer player = commandPlayer(event);
+        if (player == null) return;
+
+        bus.dispatchPost(new PlayerMessagePost(
+            Rapunzel.players().require(player),
+            "/" + event.getParseResults().getReader().getString(),
+            true,
+            false
+        ));
+    }
+
+    // ---- PlayerStatePost (native PlayerChangeGameModeEvent) ----
+    // Fires from CommonHooks.onChangeGameType (patched into
+    // ServerPlayer.setGameMode) only when the mode actually changes; the
+    // snapshot carries the new mode, mirroring Paper's
+    // PlayerGameModeChangeEvent payload. The shared PlayerGameModeMixin must
+    // NOT be registered on NeoForge (this native event is the single source).
+    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
+    public void onPlayerChangeGameMode(PlayerEvent.PlayerChangeGameModeEvent event) {
+        if (!bus.hasPostListeners(PlayerStatePost.class)) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        GameType newMode = event.getNewGameMode();
+
+        PlayerStatePost.PlayerStateSnapshot snapshot = new PlayerStatePost.PlayerStateSnapshot(
+            RGameMode.valueOf(newMode.name()),
+            player.isShiftKeyDown(),
+            player.getAbilities().flying,
+            player.isSprinting(),
+            player.getVehicle() != null
+        );
+        bus.dispatchPost(new PlayerStatePost(rPlayer, snapshot, Set.of(PlayerStatePost.StateField.GAMEMODE)));
+    }
+
+    /** Resolves the executing player from a CommandEvent, or null for non-player sources. */
+    private static ServerPlayer commandPlayer(CommandEvent event) {
+        Object source = event.getParseResults().getContext().getSource();
+        if (source instanceof net.minecraft.commands.CommandSourceStack stack
+            && stack.getEntity() instanceof ServerPlayer player) {
+            return player;
+        }
+        return null;
     }
 
     @SubscribeEvent
@@ -224,7 +364,7 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
 
         InteractBlockPre pre = new InteractBlockPre(
             rPlayer,
-            InteractBlockPre.Action.LEFT,
+            InteractBlockPre.Action.ATTACK,
             block,
             face,
             event.isCanceled()
@@ -252,7 +392,7 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         if (bus.hasPreListeners(InteractBlockPre.class)) {
             InteractBlockPre pre = new InteractBlockPre(
                 rPlayer,
-                InteractBlockPre.Action.RIGHT,
+                InteractBlockPre.Action.USE,
                 block,
                 face,
                 cancelled
@@ -280,7 +420,7 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         boolean cancelled = event.isCanceled();
 
         if (needsPost) {
-            bus.dispatchPost(new InteractBlockPost(rPlayer, InteractBlockPre.Action.RIGHT, block, face, cancelled));
+            bus.dispatchPost(new InteractBlockPost(rPlayer, InteractBlockPre.Action.USE, block, face, cancelled));
         }
         if (needsAsync) {
             bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), block, cancelled));
@@ -358,10 +498,15 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         if (!bus.hasPreListeners(EntityHurtPre.class)) return;
         if (!(event.getEntity().level() instanceof ServerLevel)) return;
 
+        // Player-caused damage is covered by AttackEntityPre everywhere
+        // (Paper skips EntityDamageByEntityEvent with a player damager);
+        // EntityHurtPre must NEVER fire for it on any platform.
+        net.minecraft.world.entity.Entity directDamager = event.getSource().getDirectEntity();
+        if (directDamager instanceof net.minecraft.world.entity.player.Player) return;
+
         var rEntity = Rapunzel.entities().require(event.getEntity());
         // Direct attacker (arrow, mob, TNT, ...) when entity-sourced; empty
         // for block/environmental damage.
-        net.minecraft.world.entity.Entity directDamager = event.getSource().getDirectEntity();
         de.t14d3.rapunzellib.objects.REntity damager = directDamager != null && directDamager != event.getEntity()
                 ? Rapunzel.entities().require(directDamager)
                 : null;
@@ -380,12 +525,18 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public void onEntityHurtCancelled(LivingIncomingDamageEvent event) {
         if (!event.isCanceled()) return;
+        // Mirror the pre-skip: player-caused damage never fires EntityHurt
+        // events (AttackEntityPre covers it).
+        if (event.getSource().getDirectEntity() instanceof net.minecraft.world.entity.player.Player) return;
 
         SharedEntityDamageHooks.dispatchHurtOutcome(bus, event.getEntity(), damageTypeKey(event.getSource()), true);
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onEntityHurtPost(LivingDamageEvent.Post event) {
+        // Mirror the pre-skip: player-caused damage never fires EntityHurt
+        // events (AttackEntityPre covers it).
+        if (event.getSource().getDirectEntity() instanceof net.minecraft.world.entity.player.Player) return;
         SharedEntityDamageHooks.dispatchHurtOutcome(bus, event.getEntity(), damageTypeKey(event.getSource()), false);
     }
 
@@ -417,8 +568,8 @@ final class NeoForgeGameEventsBridge implements GameEventBridge {
         String fromWorldId = ((ServerLevel) event.getEntity().level()).dimension().location().toString();
         // #endif
 
-        RWorldRef targetWorldRef = new RWorldRef(targetWorldId, targetWorldId);
-        RWorldRef fromWorldRef = new RWorldRef(fromWorldId, fromWorldId);
+        RWorldRef targetWorldRef = new RWorldRef(null, targetWorldId);
+        RWorldRef fromWorldRef = new RWorldRef(null, fromWorldId);
 
         RLocation from = new RLocation(fromWorldRef, prev.x, prev.y, prev.z);
         RLocation to = new RLocation(targetWorldRef, target.x, target.y, target.z);

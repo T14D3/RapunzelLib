@@ -180,8 +180,11 @@ public final class NeoForgePluginMessenger implements Messenger, AutoCloseable {
 
     public static void registerPayloadHandlers(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("rapunzellib_platform_neoforge");
-        registrar.playToClient(BridgePayload.TYPE, BridgePayload.CODEC);
-        registrar.playToServer(BridgePayload.TYPE, BridgePayload.CODEC, NeoForgePluginMessenger::handleServerbound);
+        // NeoForge keys payload registrations by channel per protocol: the same
+        // TYPE can be registered only once, so the bridge channel is registered
+        // bidirectionally (the client handler is registered via
+        // RegisterClientPayloadHandlersEvent on the client side).
+        registrar.playBidirectional(BridgePayload.TYPE, BridgePayload.CODEC, NeoForgePluginMessenger::handleServerbound);
     }
 
     private static void handleServerbound(BridgePayload payload, IPayloadContext context) {

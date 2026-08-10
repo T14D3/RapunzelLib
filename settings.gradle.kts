@@ -150,7 +150,16 @@ include(
 // NeoForge ModDev applies idea-ext on every subproject during sync. Only one can own
 // the root "settings" extension, so suppress the extra NeoForge subprojects.
 val originalIdeaSyncActive: String? = System.getProperty("idea.sync.active")
-val disableIdeaSyncForProjects = setOf(":commands-neoforge", ":events-neoforge", ":nbt-neoforge", ":gui-neoforge", ":inventory-neoforge")
+val disableIdeaSyncForProjects = setOf(
+    ":commands-neoforge",
+    ":events-neoforge",
+    ":nbt-neoforge",
+    ":gui-neoforge",
+    ":inventory-neoforge",
+    ":visuals-neoforge",
+    ":livetest-neoforge",
+    ":platform-neoforge",
+)
 val ideaSyncKey = "idea.sync.active"
 
 fun restoreIdeaSyncProperty() {

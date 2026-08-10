@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.context.RapunzelContext;
 import de.t14d3.rapunzellib.events.GameEventBridge;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.LifecycleOwnerGameEventBridgeInstaller;
+import de.t14d3.rapunzellib.events.player.PlayerMoveThrottle;
 import org.jetbrains.annotations.NotNull;
 import org.spongepowered.plugin.PluginContainer;
 
@@ -20,6 +21,7 @@ public final class SpongeGameEventBridgeInstaller extends LifecycleOwnerGameEven
         @NotNull Object owner
     ) {
         PluginContainer plugin = (PluginContainer) owner;
+        PlayerMoveThrottle.load(context);
         SpongeGameEventsBridge bridge = new SpongeGameEventsBridge(bus);
         bridge.register(plugin);
         return bridge;

@@ -9,3 +9,9 @@ displayName="RapunzelLib (NeoForge Events)"
 description="NeoForge event bridge for RapunzelLib events module."
 authors="t14d3"
 
+[[mixins]]
+config="rapunzellib-events-neoforge-shared.mixins.json"
+
+[[mixins]]
+config="rapunzellib-events-neoforge.mixins.json"
+

@@ -43,10 +43,15 @@ public final class SharedMapInput {
         if (session == null) {
             return;
         }
+        // Physical contact (pressure plates/tripwires) is not a deliberate map
+        // click; let it through untouched.
+        if (event.action() == InteractBlockPre.Action.STEP) {
+            return;
+        }
         // The merged interact event covers both the former InteractBlockPre and
         // UseBlockPre, so a single deny here cancels the block use as well.
         event.deny();
-        GuiMapClick.Action action = event.action() == InteractBlockPre.Action.LEFT
+        GuiMapClick.Action action = event.action() == InteractBlockPre.Action.ATTACK
             ? GuiMapClick.Action.LEFT
             : GuiMapClick.Action.RIGHT;
         session.activate(action);

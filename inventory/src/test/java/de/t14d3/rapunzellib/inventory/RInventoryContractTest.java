@@ -52,4 +52,42 @@ final class RInventoryContractTest {
         assertThrows(IndexOutOfBoundsException.class, () -> inventory.item(1));
         assertThrows(IndexOutOfBoundsException.class, () -> inventory.setItem(-1, RItem.of("minecraft:stone")));
     }
+
+    @Test
+    void playerInventoryStartFallsBackToSizeMinus36Invariant() {
+        // A plain wrap without a platform-specific computation uses the
+        // documented full-menu invariant: player section = last 36 slots.
+        RInventory inventory = new DefaultInventories(PlatformId.PAPER, List.of(TestSupport.testFactory(PlatformId.PAPER)))
+            .require(new TestSupport.TestNativeInventory(63)); // 27 top + 36 player
+
+        assertEquals(27, inventory.playerInventoryStart());
+    }
+
+    @Test
+    void playerInventoryStartUsesPlatformComputationWhenProvided() {
+        // An adapter with an explicit computation wins over the invariant -
+        // e.g. the player's own CRAFTING view, where the player section
+        // (armor + storage + hotbar + offhand) starts at the top size.
+        InventoryWrapperFactory<TestSupport.TestNativeInventory> factory =
+            InventoryFeatureInstallerSupport.slotInventoryFactory(
+                PlatformId.PAPER,
+                InventoryFeatureInstallerSupport.SlotInventoryAdapter
+                    .<TestSupport.TestNativeInventory, TestSupport.TestNativeItem>builder(
+                        TestSupport.TestNativeInventory.class,
+                        new TestSupport.TestItemStackAdapter()
+                    )
+                    .size(TestSupport.TestNativeInventory::size)
+                    .playerInventoryStart(inv -> 5) // exact top size of a CRAFTING view
+                    .getItem(TestSupport.TestNativeInventory::item)
+                    .setItem(TestSupport.TestNativeInventory::set)
+                    .isEmptyItem(TestSupport.TestNativeItem::isEmpty)
+                    .emptyItem(TestSupport.TestNativeItem::empty)
+                    .build()
+            );
+
+        RInventory inventory = new DefaultInventories(PlatformId.PAPER, List.of(factory))
+            .require(new TestSupport.TestNativeInventory(46));
+
+        assertEquals(5, inventory.playerInventoryStart());
+    }
 }

@@ -5,6 +5,7 @@ import de.t14d3.rapunzellib.events.GameEventBus;
 
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
+import de.t14d3.rapunzellib.events.player.PlayerMoveThrottle;
 import de.t14d3.rapunzellib.events.shared.mixin.SharedMixinEventsBridge;
 import de.t14d3.rapunzellib.objects.RKey;
 import de.t14d3.rapunzellib.objects.RLocation;
@@ -29,14 +30,22 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Dispatches {@link PlayerMovePre} (cancellable) and {@link PlayerMovePost}
  * on player movement via {@code Entity.move()}.
+ *
+ * <p>Dispatch is gated by the library-scope {@link PlayerMoveThrottle}
+ * ({@code events.player.move} config section): the throttle's
+ * {@code min-distance} replaces the former hardcoded 1.0 threshold, and
+ * {@code max-rate-ms} limits the per-player dispatch rate. When the pre-event
+ * is denied, the move is cancelled AND the player is teleported back to the
+ * pre-move position via {@code ServerPlayer.connection.teleport} - the client
+ * position packet + awaiting-teleport mechanism makes the denial effective
+ * (a plain cancel alone only suppresses one sub-tick move step and the player
+ * keeps walking on the client).</p>
  */
 @Mixin(Entity.class)
 public abstract class PlayerMoveMixin {
 
     @Unique
     private static final Map<UUID, Vec3> LAST_POSITIONS = new ConcurrentHashMap<>();
-    @Unique
-    private static final double THRESHOLD = 1.0;
 
     @Inject(method = "move", at = @At("HEAD"), cancellable = true)
     private void onPlayerMovePre(MoverType type, Vec3 movement, CallbackInfo ci) {
@@ -50,23 +59,22 @@ public abstract class PlayerMoveMixin {
         Vec3 from = self.position();
         Vec3 to = from.add(movement);
 
-        // Suppress noise below threshold
-        Vec3 last = LAST_POSITIONS.get(self.getUUID());
-        if (last != null) {
-            if (Math.abs(to.x - last.x) < THRESHOLD
-                    && Math.abs(to.y - last.y) < THRESHOLD
-                    && Math.abs(to.z - last.z) < THRESHOLD) {
-                return;
-            }
-        }
-
         RLocation rFrom = makeLocation(serverLevel, from, self.getYRot(), self.getXRot());
         RLocation rTo = makeLocation(serverLevel, to, self.getYRot(), self.getXRot());
+
+        // Library-config throttling (min-distance since last fire + rate limit).
+        if (!PlayerMoveThrottle.shouldDispatch(player.getUUID(), rFrom, rTo)) {
+            return;
+        }
 
         PlayerMovePre pre = new PlayerMovePre(Rapunzel.players().require(player), rFrom, rTo);
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
             ci.cancel();
+            // Effectively block the movement: revert the server position and
+            // force the client back via the teleport/awaiting-teleport flow.
+            // The player's rotation is preserved.
+            player.connection.teleport(from.x, from.y, from.z, player.getYRot(), player.getXRot());
         } else {
             // Record from so post know where we moved from
             LAST_POSITIONS.put(self.getUUID(), from);

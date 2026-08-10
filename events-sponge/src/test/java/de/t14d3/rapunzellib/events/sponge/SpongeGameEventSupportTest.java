@@ -16,8 +16,11 @@ import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePost;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
+import de.t14d3.rapunzellib.events.player.PlayerStatePost;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,5 +46,14 @@ final class SpongeGameEventSupportTest {
         assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryOpenPost.class).parity());
         assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryClosePost.class).parity());
         assertEquals(GameEventSupportParity.PARTIAL, manifest.support(InteractBlockPre.class).parity());
+    }
+
+    @Test
+    void manifestTracksMessageAndStateCoverage() {
+        GameEventSupportManifest manifest = new SpongeGameEventBridgeInstaller().supportManifest();
+
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(PlayerMessagePost.class).parity());
+        assertEquals(GameEventSupportParity.PARTIAL, manifest.support(PlayerMessagePre.class).parity());
+        assertEquals(GameEventSupportParity.PARTIAL, manifest.support(PlayerStatePost.class).parity());
     }
 }

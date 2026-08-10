@@ -23,6 +23,7 @@ import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
+import de.t14d3.rapunzellib.events.inventory.InventoryTransferPre;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
@@ -80,6 +81,7 @@ final class PaperGameEventSupport {
             InventoryClosePost.class,
             InventoryActionPre.class,
             InventoryActionPost.class,
+            InventoryTransferPre.class,
             ChunkUnloadPost.class,
             WorldLoadPost.class,
             ExplosionPre.class,

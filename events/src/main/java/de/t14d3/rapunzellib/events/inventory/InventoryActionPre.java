@@ -17,10 +17,24 @@ import java.util.Optional;
  *
  * <p>This event is cancellable. If denied, the action will not occur.</p>
  *
- * <p>{@link #slots()} carries the raw slots involved: a single-element list
- * for clicks, the full list of affected raw slots for drags. Raw slots may
- * index beyond {@link RInventory#size()} (the player inventory section of a
- * container view), so the list is not bounds-checked.</p>
+ * <p><b>Slot contract (unified across all platforms):</b> {@link #slots()}
+ * carries raw slot ids into the FULL combined menu - the top container plus
+ * the player inventory section - spanning {@code 0..inventory().size()-1}.
+ * This is identical to Bukkit's {@code InventoryClickEvent#getRawSlot()}.
+ * {@link #inventory()} wraps that same full menu, so
+ * {@code inventory().item(slotId)} resolves the slot for any raw id in
+ * range; out-of-range ids (e.g. the {@code -1} outside slot) yield
+ * {@link Optional#empty()} from {@link #currentItem()}.
+ * {@code inventory().playerInventoryStart()} is the canonical way to
+ * distinguish the top section from the player section: raw ids below it
+ * belong to the top container, raw ids at or beyond it belong to the
+ * player's own inventory (Bukkit {@code getClickedInventory()} being the
+ * player inventory).</p>
+ *
+ * <p>{@link #cursorItem()} is the menu's carried item
+ * (Bukkit {@code getCursor()}). {@link #currentItem()} is the item in the
+ * first affected raw slot ({@code menu.getSlot(slotId).getItem()}), guarded
+ * by {@code 0 <= slotId < inventory().size()}.</p>
  *
  * <p>{@link #hotbarButton()} carries the hotbar slot (0-8) for
  * {@link InventoryActionType#NUMBER_KEY} clicks - the slot whose item is
@@ -112,6 +126,10 @@ public final class InventoryActionPre extends BaseCancellablePreEvent {
      * Returns the raw slots involved in this action: a single-element list
      * for clicks, the full list of affected raw slots for drags.
      *
+     * <p>Per the slot contract, each id indexes the FULL combined menu
+     * ({@code 0..inventory().size()-1}), identical to Bukkit's
+     * {@code InventoryClickEvent#getRawSlot()}.</p>
+     *
      * @return the raw slots
      */
     public @NotNull List<Integer> slots() {
@@ -143,6 +161,12 @@ public final class InventoryActionPre extends BaseCancellablePreEvent {
 
     /**
      * Returns the item currently in the first affected slot, if any.
+     *
+     * <p>Resolved from the full-menu wrap
+     * ({@code inventory().item(firstSlot)} - the equivalent of
+     * {@code menu.getSlot(slotId).getItem()}), guarded by
+     * {@code 0 <= slotId < inventory().size()}; empty when the slot is empty
+     * or out of bounds.</p>
      *
      * @return the current item, or empty when the slot is empty or out of bounds
      */

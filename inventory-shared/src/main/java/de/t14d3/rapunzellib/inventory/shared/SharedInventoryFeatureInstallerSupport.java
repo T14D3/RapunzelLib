@@ -22,8 +22,6 @@ import java.util.Objects;
  * {@link de.t14d3.rapunzellib.inventory.RInventory} abstraction.
  */
 public final class SharedInventoryFeatureInstallerSupport {
-    private static final int PLAYER_MENU_SLOT_COUNT = 36;
-
     private SharedInventoryFeatureInstallerSupport() {
     }
 
@@ -94,7 +92,18 @@ public final class SharedInventoryFeatureInstallerSupport {
         return InventoryFeatureInstallerSupport.slotInventoryFactory(
             platformId,
             SlotInventoryAdapter.<AbstractContainerMenu, ItemStack>builder(AbstractContainerMenu.class, itemAdapter)
-                .size(menu -> Math.max(0, menu.slots.size() - PLAYER_MENU_SLOT_COUNT))
+                // The wrap covers the FULL combined menu: the top container plus
+                // the player inventory section. Slot ids therefore index the full
+                // menu slot list, matching Bukkit's InventoryClickEvent#getRawSlot()
+                // (the raw slot id in the combined menu, 0..slots.size()-1).
+                .size(menu -> menu.slots.size())
+                // The player section spans the last 36 slots of every vanilla
+                // container menu (27 main inventory + 9 hotbar slots), so the
+                // start is menuSlots - 36. Exact for all container menus; the
+                // player's own CRAFTING view (armor/offhand in the player
+                // section) is covered exactly on platforms that wrap the view
+                // (Paper), where the view adapter computes the top size.
+                .playerInventoryStart(menu -> menu.slots.size() - 36)
                 .getItem((menu, slot) -> menu.getSlot(slot).getItem())
                 .setItem((menu, slot, item) -> {
                     menu.getSlot(slot).set(item == null ? ItemStack.EMPTY : item);

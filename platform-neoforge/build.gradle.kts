@@ -43,6 +43,16 @@ dependencies {
     shadow(project(":inventory"))
     shadow(project(":inventory-shared"))
     shadow(project(":inventory-neoforge"))
+    // The platform bootstrap/messenger code references the network module
+    // (Messenger, NetworkEnvelope, SharedBackendBootstrap, ...); without it the
+    // mod entrypoint fails with NoClassDefFoundError at startup.
+    shadow(project(":network"))
+    // The platform bootstrap instantiates the shared scheduler/wrapper store
+    // (api dependency of platform-neoforge, not transitive of the shadow list).
+    shadow(project(":platform-shared"))
+    // NetworkQueueTransportDecorator (used by the platform bootstrap) lives in
+    // the database-spool module (implementation dependency of platform-neoforge).
+    shadow(project(":database-spool"))
 }
 
 // Configure the shadow configuration to use the runtime classpath attributes,
@@ -87,9 +97,34 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
     archiveClassifier.set("standalone")
     mergeServiceFiles()
     dependsOn(expandStandaloneModsToml)
+    dependencies {
+        // The NeoForge loader/game already provide these at runtime (sponge-mixin,
+        // gson, slf4j). Bundling them would split their packages across
+        // the fat jar and the loader's own modules and can ship stale versions
+        // (e.g. gson without Strictness) that break the game at startup.
+        exclude(dependency("org.spongepowered:mixin"))
+        exclude(dependency("com.google.code.gson:gson"))
+        exclude(dependency("org.slf4j:slf4j-api"))
+        exclude(dependency("org.jetbrains:annotations"))
+        // adventure-platform-neoforge is declared by gui-neoforge but never
+        // referenced by any RapunzelLib code. Flattening it (and its
+        // -services / -mod-shared siblings) into the fat jar without their
+        // neoforge.mods.toml (replaced by the merged standalone manifest)
+        // leaves @Mod entrypoint classes without a mod declaration, which FML
+        // rejects at startup. Only the adventure-api/text-* artifacts they
+        // pull in are used.
+        exclude(dependency("net.kyori:adventure-platform-neoforge"))
+        exclude(dependency("net.kyori:adventure-platform-neoforge-services"))
+        exclude(dependency("net.kyori:adventure-platform-mod-shared"))
+    }
     // Each bundled module ships its own neoforge.mods.toml; the standalone must
     // present a single merged manifest declaring all bundled mods and mixins.
     exclude("META-INF/neoforge.mods.toml")
+    // Dependency jars (e.g. adventure-platform-neoforge) ship their own nested
+    // jars under META-INF/jarjar. Shadow flattens their classes into the fat jar
+    // already, so keeping the nested jars would split identical packages across
+    // two modules and make FML's module resolution fail at startup.
+    exclude("META-INF/jarjar/**")
     transform(com.github.jengelman.gradle.plugins.shadow.transformers.IncludeResourceTransformer::class.java) {
         file.set(layout.buildDirectory.file("generated/standalone/resources/META-INF/neoforge.mods.toml"))
         resource.set("META-INF/neoforge.mods.toml")

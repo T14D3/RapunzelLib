@@ -10,3 +10,11 @@ dependencies {
     add("fabricImplementation", libs.fabric.networking.api.v1)
     add("fabricImplementation", libs.adventure.platform.fabric)
 }
+
+tasks.processResources {
+    val props = mapOf("version" to project.version.toString())
+    inputs.properties(props)
+    filesMatching("fabric.mod.json") {
+        expand(props)
+    }
+}

@@ -19,20 +19,26 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.inventory.ClickType;
 // #endif
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
 
 @Mixin(AbstractContainerMenu.class)
 public abstract class ContainerClickMixin {
+    // Tracks whether the Pre handler cancelled the current invocation,
+    // so the Post handler can report the correct cancelled flag.
+    @Unique
+    private static final ThreadLocal<Boolean> CANCELLED = new ThreadLocal<>();
+
     // #if VERSION >= 26
     // # @Inject(method = "doClick", at = @At("HEAD"), cancellable = true)
-    // # private void onContainerClickPre(int slotId, int button, ContainerInput clickType, Player player, CallbackInfoReturnable<Boolean> cir) {
+    // # private void onContainerClickPre(int slotId, int button, ContainerInput clickType, Player player, CallbackInfo ci) {
     // #else
     @Inject(method = "doClick", at = @At("HEAD"), cancellable = true)
-    private void onContainerClickPre(int slotId, int button, ClickType clickType, Player player, CallbackInfoReturnable<Boolean> cir) {
+    private void onContainerClickPre(int slotId, int button, ClickType clickType, Player player, CallbackInfo ci) {
     // #endif
         if (!(player instanceof ServerPlayer serverPlayer)) return;
         GameEventBus bus = SharedMixinEventsBridge.bus();
@@ -67,16 +73,17 @@ public abstract class ContainerClickMixin {
         );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
-            cir.setReturnValue(false);
+            CANCELLED.set(Boolean.TRUE);
+            ci.cancel();
         }
     }
 
     // #if VERSION >= 26
     // # @Inject(method = "doClick", at = @At("RETURN"))
-    // # private void onMouseClickPost(int slotId, int button, ContainerInput clickType, Player player, CallbackInfoReturnable<Boolean> cir) {
+    // # private void onMouseClickPost(int slotId, int button, ContainerInput clickType, Player player, CallbackInfo ci) {
     // #else
     @Inject(method = "doClick", at = @At("RETURN"))
-    private void onContainerClickPost(int slotId, int button, ClickType clickType, Player player, CallbackInfoReturnable<Boolean> cir) {
+    private void onContainerClickPost(int slotId, int button, ClickType clickType, Player player, CallbackInfo ci) {
     // #endif
         if (!(player instanceof ServerPlayer serverPlayer)) return;
         GameEventBus bus = SharedMixinEventsBridge.bus();
@@ -101,7 +108,8 @@ public abstract class ContainerClickMixin {
             case PICKUP_ALL -> InventoryActionType.DOUBLE_CLICK;
         };
 
-        boolean cancelled = !Boolean.TRUE.equals(cir.getReturnValue());
+        boolean cancelled = Boolean.TRUE.equals(CANCELLED.get());
+        CANCELLED.remove();
         // SWAP carries the hotbar slot in the button (0-8); the offhand swap
         // is button 40 and maps to SWAP_OFFHAND above.
         Integer hotbarButton = actionTypeMapped == InventoryActionType.NUMBER_KEY && button >= 0 && button < 9

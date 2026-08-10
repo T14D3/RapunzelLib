@@ -26,11 +26,6 @@ public final class DefaultNetworkRuntimeGateway implements NetworkRuntimeGateway
     private final Logger logger;
     private final RpcClient rpcClient;
     private final Set<ManagedSubscription> subscriptions = ConcurrentHashMap.newKeySet();
-    // Request ids currently being handled. The transport can deliver an
-    // envelope more than once (e.g. over both the TCP bridge and the plugin
-    // channel); without this a duplicated RPC request would run the handler
-    // multiple times and answer the caller with the first (possibly racy)
-    // response.
     private final Set<String> inFlightRequestIds = ConcurrentHashMap.newKeySet();
     private volatile boolean closed;
 

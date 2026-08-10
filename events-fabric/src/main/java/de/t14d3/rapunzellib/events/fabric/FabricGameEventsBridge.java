@@ -185,7 +185,7 @@ final class FabricGameEventsBridge implements GameEventBridge {
         if (needsInteractPre) {
             InteractBlockPre pre = new InteractBlockPre(
                     rPlayer,
-                    InteractBlockPre.Action.RIGHT,
+                    InteractBlockPre.Action.USE,
                     clickedBlock,
                     face
             );
@@ -229,7 +229,7 @@ final class FabricGameEventsBridge implements GameEventBridge {
             bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), clickedBlock, cancelled));
         }
         if (needsInteractPost) {
-            bus.dispatchPost(new InteractBlockPost(rPlayer, InteractBlockPre.Action.RIGHT, clickedBlock, face, cancelled));
+            bus.dispatchPost(new InteractBlockPost(rPlayer, InteractBlockPre.Action.USE, clickedBlock, face, cancelled));
         }
 
         return InteractionResult.PASS;
@@ -248,7 +248,7 @@ final class FabricGameEventsBridge implements GameEventBridge {
 
         InteractBlockPre pre = new InteractBlockPre(
             rPlayer,
-            InteractBlockPre.Action.LEFT,
+            InteractBlockPre.Action.ATTACK,
             block,
             direction.getName()
         );
@@ -257,12 +257,29 @@ final class FabricGameEventsBridge implements GameEventBridge {
     }
 
     private InteractionResult onUseEntity(Player player, Level world, InteractionHand hand, net.minecraft.world.entity.Entity entity, net.minecraft.world.phys.EntityHitResult hit) {
+        // Drop a stale denied-flag left behind by a previously denied
+        // interaction whose handleInteract was short-circuited before
+        // Player.interactOn (the mixin's RETURN post never consumed it).
+        // MUST run before the early returns: if the previous interaction was
+        // denied and this one has no pre-listeners registered, the stale flag
+        // would otherwise survive into interactOn and suppress the legitimate
+        // post for this interaction.
+        SharedEntityInteractionHooks.clearInteractDenied();
+
         if (world.isClientSide()) return InteractionResult.PASS;
         if (!(player instanceof ServerPlayer serverPlayer)) return InteractionResult.PASS;
         if (!(world instanceof ServerLevel serverLevel)) return InteractionResult.PASS;
         if (!bus.hasPreListeners(InteractEntityPre.class)) return InteractionResult.PASS;
 
         if (SharedEntityInteractionHooks.dispatchInteractPre(bus, serverPlayer, entity, false)) {
+            // Exactly one Pre and one Post per physical interaction, and the
+            // Post's cancelled flag reflects the real outcome. The denied Post
+            // MUST be dispatched here: fabric-api's UseEntityCallback hook
+            // cancels ServerGamePacketListenerImpl.handleInteract before
+            // Player.interactOn runs, so the InteractEntityMixin @RETURN post
+            // can never fire for a denied interaction. The flag lets the mixin
+            // skip when an (unexpected) path still reaches interactOn.
+            SharedEntityInteractionHooks.markInteractDenied();
             SharedEntityInteractionHooks.dispatchInteractPost(bus, serverPlayer, entity, true);
             return InteractionResult.FAIL;
         }

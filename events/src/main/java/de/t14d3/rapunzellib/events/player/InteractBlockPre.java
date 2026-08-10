@@ -14,21 +14,29 @@ import java.util.Optional;
 /**
  * Pre-event fired before a player interacts with a block or with air.
  *
- * <p>This is the single merged interact event covering both left and right
+ * <p>This is the single merged interact event covering left and right
  * clicks on blocks and on air (the former {@code UseBlockPre} /
- * {@code InteractBlockPre} split is gone).</p>
+ * {@code InteractBlockPre} split is gone), plus physical "step" interactions
+ * with blocks such as pressure plates and tripwires (Paper's
+ * {@code Action.PHYSICAL} / {@code BlockPhysicsEvent} counterpart).</p>
  *
  * <p>This event is cancellable. If denied, the interaction will not occur.
- * The payload carries the player, the click {@link Action}, and a
- * {@link #hasBlock()} flag: when the player clicked a block, {@link #block()}
- * is present together with the clicked {@link #face()}; when the player
- * clicked air, both are absent.</p>
+ * The payload carries the player, the interaction {@link Action}
+ * ({@code USE} for right-clicks, {@code ATTACK} for left-clicks, {@code STEP}
+ * for physical contact), and a {@link #hasBlock()} flag: when the player
+ * clicked a block, {@link #block()} is present together with the clicked
+ * {@link #face()}; when the player clicked air, both are absent. {@code STEP}
+ * interactions always carry a block and no face.</p>
  */
 public final class InteractBlockPre extends BaseCancellablePreEvent {
 
     public enum Action {
-        LEFT,
-        RIGHT,
+        /** Right-click on a block or air ({@code USE} item interaction). */
+        USE,
+        /** Left-click on a block or air (attack/dig intent). */
+        ATTACK,
+        /** Physical contact, e.g. stepping on a pressure plate or tripwire. */
+        STEP,
     }
 
     private final RPlayer player;
@@ -61,7 +69,7 @@ public final class InteractBlockPre extends BaseCancellablePreEvent {
      * Creates a block interaction event.
      *
      * @param player the interacting player
-     * @param action the click action
+     * @param action the interaction action ({@link Action#USE}, {@link Action#ATTACK} or {@link Action#STEP})
      * @param block  the clicked block, or {@code null} when the player clicked air
      * @param face   the clicked block face (platform face name), or {@code null}
      */

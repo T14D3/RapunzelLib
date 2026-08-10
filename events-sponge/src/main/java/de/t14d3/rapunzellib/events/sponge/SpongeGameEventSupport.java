@@ -32,9 +32,12 @@ import de.t14d3.rapunzellib.events.item.BucketEntityPre;
 import de.t14d3.rapunzellib.events.item.BucketFillPre;
 import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePost;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
 import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
+import de.t14d3.rapunzellib.events.player.PlayerStatePost;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
 import de.t14d3.rapunzellib.events.world.TntPrimePre;
@@ -101,9 +104,28 @@ final class SpongeGameEventSupport {
             BlockPhysicsPre.class
         )
         .partialSupport(
-            "Sponge only exposes primary block interaction here",
+            "Sponge only exposes primary/secondary block interaction here; the STEP kind (pressure plates/tripwires) is not expressible via the Sponge API",
             InteractBlockPre.class
         )
+        .nativeSupport(
+            "Sponge PlayerChatEvent.Submit / ExecuteCommandEvent bridge",
+            PlayerMessagePost.class
+        )
+        .partialSupport(
+            "Sponge chat Pre (PlayerChatEvent.Submit) is cancellable, but the command Pre (ExecuteCommandEvent) is not cancellable via the Sponge API - a deny cannot be honored for commands",
+            PlayerMessagePre.class
+        )
+        .partialSupport(
+            "Sponge API has no game-mode/state-change event; PlayerStatePost is not bridged on Sponge",
+            PlayerStatePost.class
+        )
+        // InventoryTransferPre: UNSUPPORTED on Sponge. Sponge does fire
+        // TransferInventoryEvent.Pre for hopper block/minecart push and pull
+        // (SpongeCommon HopperBlockEntityMixin_Inventory), but the event
+        // exposes only sourceInventory()/targetInventory() - no item, no
+        // amount, no slots. The RLib payload requires item + amount, and
+        // deriving them from the source inventory would be a guess ("do not
+        // fake it"), so the event stays unbridged on this platform.
         .build();
 
     private SpongeGameEventSupport() {

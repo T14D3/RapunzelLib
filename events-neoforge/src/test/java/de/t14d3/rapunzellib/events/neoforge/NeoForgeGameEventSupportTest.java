@@ -5,7 +5,10 @@ import de.t14d3.rapunzellib.events.GameEventSupportParity;
 import de.t14d3.rapunzellib.events.block.BlockDestroyPre;
 import de.t14d3.rapunzellib.events.block.BlockPhysicsPost;
 import de.t14d3.rapunzellib.events.block.BlockPhysicsPre;
+import de.t14d3.rapunzellib.events.block.PistonMovePre;
 import de.t14d3.rapunzellib.events.entity.AttackEntityPost;
+import de.t14d3.rapunzellib.events.entity.EntityDeathPost;
+import de.t14d3.rapunzellib.events.entity.EntityDeathPre;
 import de.t14d3.rapunzellib.events.entity.EntityHurtPost;
 import de.t14d3.rapunzellib.events.entity.EntityHurtPre;
 import de.t14d3.rapunzellib.events.entity.EntityHurtSnapshot;
@@ -13,14 +16,20 @@ import de.t14d3.rapunzellib.events.entity.EntityMovePost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPre;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnPost;
 import de.t14d3.rapunzellib.events.entity.EntitySpawnSnapshot;
+import de.t14d3.rapunzellib.events.entity.EntityTamePost;
 import de.t14d3.rapunzellib.events.entity.InteractEntityPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryActionPost;
 import de.t14d3.rapunzellib.events.inventory.InventoryActionPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryClosePost;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPre;
 import de.t14d3.rapunzellib.events.inventory.InventoryOpenPost;
+import de.t14d3.rapunzellib.events.player.PlayerJoinPost;
+import de.t14d3.rapunzellib.events.player.PlayerLoginPre;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePost;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
+import de.t14d3.rapunzellib.events.player.PlayerStatePost;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,6 +52,27 @@ final class NeoForgeGameEventSupportTest {
         assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryOpenPre.class).parity());
         assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryOpenPost.class).parity());
         assertEquals(GameEventSupportParity.NATIVE, manifest.support(InventoryClosePost.class).parity());
+    }
+
+    @Test
+    void manifestTracksNativeTameMessageAndStateParity() {
+        GameEventSupportManifest manifest = new NeoForgeGameEventBridgeInstaller().supportManifest();
+
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(EntityTamePost.class).parity());
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(PlayerMessagePre.class).parity());
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(PlayerMessagePost.class).parity());
+        assertEquals(GameEventSupportParity.NATIVE, manifest.support(PlayerStatePost.class).parity());
+    }
+
+    @Test
+    void manifestTracksSharedMixinDeathPistonAndLoginCoverage() {
+        GameEventSupportManifest manifest = new NeoForgeGameEventBridgeInstaller().supportManifest();
+
+        assertEquals(GameEventSupportParity.EMULATED, manifest.support(EntityDeathPre.class).parity());
+        assertEquals(GameEventSupportParity.EMULATED, manifest.support(EntityDeathPost.class).parity());
+        assertEquals(GameEventSupportParity.EMULATED, manifest.support(PistonMovePre.class).parity());
+        assertEquals(GameEventSupportParity.EMULATED, manifest.support(PlayerLoginPre.class).parity());
+        assertEquals(GameEventSupportParity.EMULATED, manifest.support(PlayerJoinPost.class).parity());
     }
 
     @Test

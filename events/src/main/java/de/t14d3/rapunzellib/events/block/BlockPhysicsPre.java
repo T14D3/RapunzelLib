@@ -11,7 +11,17 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 
 /**
- * Dispatched before block physics are applied (e.g., sand/gravel falling, redstone updates).
+ * Dispatched before a neighbor-physics update runs (e.g., sand/gravel
+ * checking its support, redstone reacting to a neighbor change).
+ *
+ * <p>This is the counterpart of Paper's {@code BlockPhysicsEvent} and fires
+ * at the same point: the {@code NeighborUpdater.executeUpdate} funnel, once
+ * per affected neighbor block, whenever a block change notifies its
+ * neighbors. It does NOT fire for plain {@code setBlock} calls that only
+ * update clients (the former {@code sendBlockUpdated} hook).</p>
+ *
+ * <p>Cancelling this event skips the neighbor's physics reaction entirely -
+ * the notified block behaves as if the neighbor had not changed.</p>
  *
  * <p>The {@link #block()} identifies the live block undergoing physics (the
  * neighbor being checked), while {@link #changedType()} identifies the block

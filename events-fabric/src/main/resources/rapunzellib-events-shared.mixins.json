@@ -15,15 +15,24 @@
     "ContainerClickMixin",
     "ContainerCloseMixin",
     "ContainerOpenMixin",
+    "EntityDeathMixin",
     "EntityHurtMixin",
     "EntityMoveMixin",
     "EntitySpawnMixin",
+    "EntityTameMixin",
     "EntityTeleportMixin",
     "ExplosionMixin",
-    "InteractEntityAtMixin",
+    "HopperTransferMixin",
     "InteractEntityMixin",
+    "PistonBaseBlockMixin",
+    "PlayerChatMixin",
+    "PlayerDeathMixin",
+    "PlayerGameModeMixin",
+    "PlayerLoginMixin",
     "PlayerMoveMixin",
-    "TntPrimeMixin"
+    "PressurePlateStepMixin",
+    "TntPrimeMixin",
+    "TripWireStepMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -15,12 +15,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Entity.class)
 public abstract class EntityTeleportMixin {
     @Inject(method = "teleportTo", at = @At("HEAD"), cancellable = true)
-    private void onEntityTeleportPre(double x, double y, double z, CallbackInfoReturnable<Boolean> cir) {
+    private void onEntityTeleportPre(double x, double y, double z, CallbackInfo ci) {
         GameEventBus bus = SharedMixinEventsBridge.bus();
         if (bus == null) return;
         if (!bus.hasPreListeners(EntityTeleportPre.class)) return;
@@ -37,7 +36,7 @@ public abstract class EntityTeleportMixin {
         // #else
         String worldId = serverLevel.dimension().location().toString();
         // #endif
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
+        RWorldRef worldRef = new RWorldRef(null, worldId);
 
         RLocation to = new RLocation(worldRef, x, y, z, self.getYRot(), self.getXRot());
         RLocation from = new RLocation(worldRef, self.xo, self.yo, self.zo, self.yRotO, self.xRotO);
@@ -51,7 +50,7 @@ public abstract class EntityTeleportMixin {
         );
         bus.dispatchPre(pre);
         if (pre.isDenied()) {
-            cir.setReturnValue(false);
+            ci.cancel();
         }
     }
 
@@ -73,7 +72,7 @@ public abstract class EntityTeleportMixin {
         // #else
         String worldId = serverLevel.dimension().location().toString();
         // #endif
-        RWorldRef worldRef = new RWorldRef(worldId, worldId);
+        RWorldRef worldRef = new RWorldRef(null, worldId);
 
         RLocation to = new RLocation(worldRef, x, y, z, self.getYRot(), self.getXRot());
 

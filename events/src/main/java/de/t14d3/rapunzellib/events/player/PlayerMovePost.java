@@ -10,6 +10,10 @@ import java.util.UUID;
 /**
  * Post-event fired after a player has moved.
  *
+ * <p>Fires only for moves whose pre-event passed the library-scope throttle
+ * ({@code events.player.move} config section, see {@link PlayerMoveThrottle}),
+ * so pre/post stay paired exactly.</p>
+ *
  * <p>This event is immutable and contains information about the completed movement.
  * It can be used for logging, region entries/exits, and other post-movement processing.
  */

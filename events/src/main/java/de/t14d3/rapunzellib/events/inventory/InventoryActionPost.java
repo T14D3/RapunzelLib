@@ -16,14 +16,20 @@ import java.util.Optional;
  * drag).
  *
  * <p>Carries the same payload as {@link InventoryActionPre} plus the final
- * cancelled state. See {@link InventoryActionPre} for the raw-slot semantics
- * of {@link #slots()}.</p>
+ * cancelled state. See {@link InventoryActionPre} for the slot contract:
+ * {@link #slots()} ids index the FULL combined menu
+ * ({@code 0..inventory().size()-1}, Bukkit {@code getRawSlot()} semantics),
+ * {@link #inventory()} wraps that full menu, {@link #cursorItem()} is the
+ * menu's carried item and {@link #currentItem()} is
+ * {@code inventory().item(firstSlot)} guarded by the wrap bounds.
+ * {@code inventory().playerInventoryStart()} is the canonical way to
+ * distinguish the top section from the player section of the menu.</p>
  *
  * @param player       the acting player
- * @param inventory    the inventory the action targeted
+ * @param inventory    the FULL combined menu (top container + player inventory section) the action targeted
  * @param slots        the raw slots involved (single-element for clicks, full list for drags)
  * @param actionType   the action type
- *  @param cursorItem   the item on the cursor, or {@code null} when empty or unknown
+ *  @param cursorItem   the item on the cursor (the menu's carried item), or {@code null} when empty or unknown
  *  @param currentItem  the item in the first affected slot, or {@code null} when empty or out of bounds
  *  @param hotbarButton the hotbar slot (0-8) for NUMBER_KEY clicks, or {@code null} otherwise
  *  @param cancelled    whether the action was cancelled

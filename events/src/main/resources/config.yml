@@ -1,0 +1,17 @@
+# RapunzelLib library configuration (events module).
+#
+# This file is created with these defaults on first load; user edits are
+# preserved on subsequent loads (missing keys are merged from the defaults).
+
+events:
+  player:
+    move:
+      # Master toggle for PlayerMovePre / PlayerMovePost dispatch.
+      # false = no player-move events are dispatched at all.
+      enabled: true
+      # Minimum displacement (blocks, Euclidean) since the last dispatched
+      # move event. Shorter moves (head rotation, micro-steps) are suppressed.
+      min-distance: 0.5
+      # Minimum interval (milliseconds) between dispatched move events per
+      # player. 0 disables the rate limit.
+      max-rate-ms: 250

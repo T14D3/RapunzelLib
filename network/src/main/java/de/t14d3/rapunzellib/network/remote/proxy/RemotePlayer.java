@@ -19,7 +19,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 public class RemotePlayer extends RemoteEntity implements RServerPlayer {
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(5);
@@ -63,74 +62,50 @@ public class RemotePlayer extends RemoteEntity implements RServerPlayer {
     @Override
     public boolean hasPermission(@NotNull String permission) {
         Objects.requireNonNull(permission, "permission");
-        try {
-            Requests.PermissionResult result = gateway().callServer(serverName(), PlayerServiceMethods.HAS_PERMISSION,
-                new Requests.PermissionRequest(uuid(), permission), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            return result != null && result.hasPermission();
-        } catch (Exception ignored) {
-            return false;
-        }
+        Requests.PermissionResult result = awaitRpc("hasPermission",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.HAS_PERMISSION,
+                new Requests.PermissionRequest(uuid(), permission), DEFAULT_TIMEOUT));
+        return result != null && result.hasPermission();
     }
 
     @Override
     public double health() {
-        try {
-            Requests.HealthResult result = gateway().callServer(serverName(), PlayerServiceMethods.GET_HEALTH,
-                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            return result != null ? result.health() : 0.0;
-        } catch (Exception ignored) {
-            return 0.0;
-        }
+        Requests.HealthResult result = awaitRpc("health",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.GET_HEALTH,
+                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT));
+        return result != null ? result.health() : 0.0;
     }
 
     @Override
     public double maxHealth() {
-        try {
-            Requests.HealthResult result = gateway().callServer(serverName(), PlayerServiceMethods.GET_HEALTH,
-                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            return result != null ? result.maxHealth() : 20.0;
-        } catch (Exception ignored) {
-            return 20.0;
-        }
+        Requests.HealthResult result = awaitRpc("maxHealth",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.GET_HEALTH,
+                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT));
+        return result != null ? result.maxHealth() : 20.0;
     }
 
     @Override
     public int remainingAir() {
-        try {
-            Requests.AirResult result = gateway().callServer(serverName(), PlayerServiceMethods.GET_AIR,
-                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            return result != null ? result.remainingAir() : 300;
-        } catch (Exception ignored) {
-            return 300;
-        }
+        Requests.AirResult result = awaitRpc("remainingAir",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.GET_AIR,
+                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT));
+        return result != null ? result.remainingAir() : 300;
     }
 
     @Override
     public int maxAir() {
-        try {
-            Requests.AirResult result = gateway().callServer(serverName(), PlayerServiceMethods.GET_AIR,
-                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            return result != null ? result.maxAir() : 300;
-        } catch (Exception ignored) {
-            return 300;
-        }
+        Requests.AirResult result = awaitRpc("maxAir",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.GET_AIR,
+                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT));
+        return result != null ? result.maxAir() : 300;
     }
 
     @Override
     public boolean isAlive() {
-        try {
-            Requests.AliveResult result = gateway().callServer(serverName(), PlayerServiceMethods.IS_ALIVE,
-                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            return result != null && result.alive();
-        } catch (Exception ignored) {
-            return false;
-        }
+        Requests.AliveResult result = awaitRpc("isAlive",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.IS_ALIVE,
+                new Requests.PlayerRef(uuid()), DEFAULT_TIMEOUT));
+        return result != null && result.alive();
     }
 
     @Override
@@ -140,14 +115,10 @@ public class RemotePlayer extends RemoteEntity implements RServerPlayer {
 
     @Override
     public boolean damage(double amount) {
-        try {
-            Requests.BooleanResult result = gateway().callServer(serverName(), PlayerServiceMethods.DAMAGE,
-                new Requests.DamageRequest(uuid(), amount), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            return result != null && result.success();
-        } catch (Exception ignored) {
-            return false;
-        }
+        Requests.BooleanResult result = awaitRpc("damage",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.DAMAGE,
+                new Requests.DamageRequest(uuid(), amount), DEFAULT_TIMEOUT));
+        return result != null && result.success();
     }
 
     @Override
@@ -157,14 +128,10 @@ public class RemotePlayer extends RemoteEntity implements RServerPlayer {
 
     @Override
     public boolean heal(double amount) {
-        try {
-            Requests.BooleanResult result = gateway().callServer(serverName(), PlayerServiceMethods.HEAL,
-                new Requests.HealRequest(uuid(), amount), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-            return result != null && result.success();
-        } catch (Exception ignored) {
-            return false;
-        }
+        Requests.BooleanResult result = awaitRpc("heal",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.HEAL,
+                new Requests.HealRequest(uuid(), amount), DEFAULT_TIMEOUT));
+        return result != null && result.success();
     }
 
     @Override
@@ -175,21 +142,17 @@ public class RemotePlayer extends RemoteEntity implements RServerPlayer {
     @Override
     public void sendMessage(@NotNull Component message) {
         Objects.requireNonNull(message, "message");
-        try {
-            gateway().callServer(serverName(), PlayerServiceMethods.SEND_MESSAGE,
-                new Requests.SendMessageRequest(uuid(), componentSerializer.serializeToTree(message)), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (Exception ignored) {}
+        awaitRpc("sendMessage",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.SEND_MESSAGE,
+                new Requests.SendMessageRequest(uuid(), componentSerializer.serializeToTree(message)), DEFAULT_TIMEOUT));
     }
 
     @Override
     public void sendActionBar(@NotNull Component message) {
         Objects.requireNonNull(message, "message");
-        try {
-            gateway().callServer(serverName(), PlayerServiceMethods.SEND_ACTION_BAR,
-                new Requests.SendMessageRequest(uuid(), componentSerializer.serializeToTree(message)), DEFAULT_TIMEOUT)
-                .get(DEFAULT_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (Exception ignored) {}
+        awaitRpc("sendActionBar",
+            () -> gateway().callServer(serverName(), PlayerServiceMethods.SEND_ACTION_BAR,
+                new Requests.SendMessageRequest(uuid(), componentSerializer.serializeToTree(message)), DEFAULT_TIMEOUT));
     }
 
     @Override

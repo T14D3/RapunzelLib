@@ -1,6 +1,10 @@
 package de.t14d3.rapunzellib.events.shared.mixin;
 
+import de.t14d3.rapunzellib.Rapunzel;
+import de.t14d3.rapunzellib.objects.RBlockPos;
 import de.t14d3.rapunzellib.objects.RKey;
+import de.t14d3.rapunzellib.objects.RPlayer;
+import de.t14d3.rapunzellib.objects.block.RBlock;
 import de.t14d3.rapunzellib.events.GameEventBus;
 import de.t14d3.rapunzellib.events.block.BlockDestroyPre;
 import de.t14d3.rapunzellib.events.block.BlockDestroyUtil;
@@ -13,9 +17,11 @@ import de.t14d3.rapunzellib.events.block.BlockSpreadPre;
 import de.t14d3.rapunzellib.events.block.BlockSpreadUtil;
 import de.t14d3.rapunzellib.events.block.BlockTransformPre;
 import de.t14d3.rapunzellib.events.block.BlockTransformUtil;
+import de.t14d3.rapunzellib.events.player.InteractBlockPre;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
@@ -261,10 +267,15 @@ public final class SharedBlockMixinHooks {
     /**
      * Dispatches a block physics neighbor pre-event.
      *
+     * <p>Mirrors Paper's {@code BlockPhysicsEvent} fire point (the
+     * {@code NeighborUpdater.executeUpdate} neighbor-physics funnel): fires
+     * once per affected neighbor block when a neighbor notification is about
+     * to run. Cancelling skips the neighbor's physics reaction.</p>
+     *
      * @param bus          the game event bus
      * @param level        the server level
-     * @param pos          the block position
-     * @param changedBlock the block that changed
+     * @param pos          the block position being updated (the affected neighbor)
+     * @param changedBlock the block that changed, triggering this physics update
      * @return {@code true} if the event was cancelled
      */
     public static boolean dispatchBlockPhysicsNeighborPre(
@@ -302,8 +313,8 @@ public final class SharedBlockMixinHooks {
      *
      * @param bus          the game event bus
      * @param level        the server level
-     * @param pos          the block position
-     * @param changedBlock the block that changed
+     * @param pos          the block position that was updated
+     * @param changedBlock the block that changed, triggering this physics update
      */
     public static void dispatchBlockPhysicsNeighborPost(
         @NotNull GameEventBus bus,
@@ -333,48 +344,40 @@ public final class SharedBlockMixinHooks {
     }
 
     /**
-     * Dispatches a block physics state change pre-event (same block type, different state).
+     * Dispatches an {@link InteractBlockPre} of kind {@code STEP} for a player
+     * physically entering a block (pressure plates, tripwires).
      *
-     * @param bus      the game event bus
-     * @param level    the server level
-     * @param pos      the block position
-     * @param oldState the old block state
-     * @param newState the new block state
-     * @return {@code true} if the event was cancelled
+     * <p>Mirrors Paper's {@code PlayerInteractEvent} {@code Action.PHYSICAL}
+     * dispatch. Cancelling the event prevents the plate/tripwire activation -
+     * the caller must short-circuit the block's {@code entityInside} path.</p>
+     *
+     * @param bus    the game event bus
+     * @param level  the server level
+     * @param pos    the stepped-on block position
+     * @param player the stepping player
+     * @return {@code true} if the event was cancelled (activation must not happen)
      */
-    public static boolean dispatchBlockPhysicsStateChangePre(
+    public static boolean dispatchInteractBlockStepPre(
         @NotNull GameEventBus bus,
         @NotNull ServerLevel level,
         @NotNull BlockPos pos,
-        @NotNull BlockState oldState,
-        @NotNull BlockState newState
+        @NotNull ServerPlayer player
     ) {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(level, "level");
         Objects.requireNonNull(pos, "pos");
-        Objects.requireNonNull(oldState, "oldState");
-        Objects.requireNonNull(newState, "newState");
-        if (oldState.getBlock() != newState.getBlock()) {
+        Objects.requireNonNull(player, "player");
+        if (!bus.hasPreListeners(InteractBlockPre.class)) {
             return false;
         }
 
-        boolean needsPre = bus.hasPreListeners(BlockPhysicsPre.class);
-        boolean needsPost = bus.hasPostListeners(BlockPhysicsPost.class);
-        if (!needsPre && !needsPost) {
-            return false;
-        }
+        RPlayer rPlayer = Rapunzel.players().require(player);
+        RBlockPos rPos = new RBlockPos(pos.getX(), pos.getY(), pos.getZ());
+        RBlock block = Rapunzel.blocks().at(Rapunzel.worlds().require(level), rPos);
 
-        return BlockEventDispatchUtil.dispatchBlockPhysicsPre(
-            bus,
-            needsPre,
-            needsPost,
-            worldKey(level),
-            pos.getX(),
-            pos.getY(),
-            pos.getZ(),
-            blockKey(newState),
-            blockKey(newState.getBlock())
-        );
+        InteractBlockPre pre = new InteractBlockPre(rPlayer, InteractBlockPre.Action.STEP, block);
+        bus.dispatchPre(pre);
+        return pre.isDenied();
     }
 
     private static @NotNull RKey worldKey(@NotNull ServerLevel level) {

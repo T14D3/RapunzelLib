@@ -9,7 +9,12 @@ import de.t14d3.rapunzellib.registry.RBlockType;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Post-event fired after block physics have been applied.
+ * Post-event fired after a neighbor-physics update has run.
+ *
+ * <p>Fires at the same point as {@link BlockPhysicsPre}: the
+ * {@code NeighborUpdater.executeUpdate} funnel, once per affected neighbor
+ * block. {@code cancelled} is {@code true} when a pre-listener denied the
+ * update (in which case the physics reaction was skipped).</p>
  *
  * <p>Components are the live {@link #block()} undergoing physics, the
  * {@link #changedType()} that triggered the update, and the cancellation flag.

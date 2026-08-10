@@ -40,8 +40,11 @@ import de.t14d3.rapunzellib.events.item.BucketEntityPre;
 import de.t14d3.rapunzellib.events.item.BucketFillPre;
 import de.t14d3.rapunzellib.events.player.InteractBlockPost;
 import de.t14d3.rapunzellib.events.player.InteractBlockPre;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePost;
+import de.t14d3.rapunzellib.events.player.PlayerMessagePre;
 import de.t14d3.rapunzellib.events.player.PlayerMovePost;
 import de.t14d3.rapunzellib.events.player.PlayerMovePre;
+import de.t14d3.rapunzellib.events.player.PlayerMoveThrottle;
 import de.t14d3.rapunzellib.events.player.PlayerQuitPost;
 import de.t14d3.rapunzellib.events.world.ChunkUnloadPost;
 import de.t14d3.rapunzellib.events.world.ExplosionPre;
@@ -61,6 +64,7 @@ import de.t14d3.rapunzellib.objects.REntity;
 import de.t14d3.rapunzellib.registry.REntityType;
 import de.t14d3.rapunzellib.registry.RItemType;
 import de.t14d3.rapunzellib.registry.RBlockType;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.spongepowered.api.ResourceKey;
 import org.spongepowered.api.Sponge;
 import org.spongepowered.api.block.BlockSnapshot;
@@ -80,6 +84,7 @@ import org.spongepowered.api.event.block.NotifyNeighborBlockEvent;
 import org.spongepowered.api.event.entity.AttackEntityEvent;
 import org.spongepowered.api.event.entity.DamageEntityEvent;
 import org.spongepowered.api.event.cause.entity.damage.source.DamageSource;
+import org.spongepowered.api.event.command.ExecuteCommandEvent;
 import org.spongepowered.api.event.entity.InteractEntityEvent;
 import org.spongepowered.api.event.entity.ChangeEntityWorldEvent;
 import org.spongepowered.api.event.entity.MoveEntityEvent;
@@ -87,6 +92,7 @@ import org.spongepowered.api.event.entity.SpawnEntityEvent;
 import org.spongepowered.api.event.entity.explosive.PrimeExplosiveEvent;
 import org.spongepowered.api.event.filter.IsCancelled;
 import org.spongepowered.api.event.filter.cause.First;
+import org.spongepowered.api.event.message.PlayerChatEvent;
 import org.spongepowered.api.event.network.ServerSideConnectionEvent;
 import org.spongepowered.api.event.world.ExplosionEvent;
 import org.spongepowered.api.event.world.LoadWorldEvent;
@@ -388,7 +394,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
         InteractBlockPre pre = new InteractBlockPre(
             rPlayer,
-            InteractBlockPre.Action.LEFT,
+            InteractBlockPre.Action.ATTACK,
             block
         );
         bus.dispatchPre(pre);
@@ -407,7 +413,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
 
         InteractBlockPre pre = new InteractBlockPre(
             rPlayer,
-            InteractBlockPre.Action.RIGHT,
+            InteractBlockPre.Action.USE,
             block,
             null,
             event.isCancelled()
@@ -430,7 +436,7 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         boolean cancelled = event.isCancelled();
 
         if (needsPost) {
-            bus.dispatchPost(new InteractBlockPost(rPlayer, InteractBlockPre.Action.RIGHT, block, null, cancelled));
+            bus.dispatchPost(new InteractBlockPost(rPlayer, InteractBlockPre.Action.USE, block, null, cancelled));
         }
         if (needsAsync) {
             bus.dispatchAsync(UseBlockSnapshot.capture(rPlayer.uuid(), block, cancelled));
@@ -614,6 +620,88 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         bus.dispatchPost(new PlayerQuitPost(uuid, name));
     }
 
+    // ---- PlayerMessagePre/Post ----
+    // Chat: PlayerChatEvent.Submit fires before the message is broadcast and
+    // is cancellable - denying drops the message (Paper's AsyncChatEvent
+    // semantics). Post fires from the same event at LAST order when it was
+    // not cancelled (the outcome is decided; the broadcast follows).
+    // Command: ExecuteCommandEvent fires before the command executes; the
+    // Sponge API does NOT make it cancellable, so a deny cannot be honored for
+    // commands (PlayerMessagePre is PARTIAL on Sponge for that reason). The
+    // Post still fires for observation, mirroring the Paper bridge's
+    // pre-execution Post semantics.
+
+    @Listener(order = Order.FIRST)
+    @IsCancelled(value = Tristate.UNDEFINED)
+    public void onPlayerChatPre(PlayerChatEvent.Submit event) {
+        if (!bus.hasPreListeners(PlayerMessagePre.class)) return;
+        Optional<ServerPlayer> playerOpt = event.player();
+        if (playerOpt.isEmpty()) return;
+
+        PlayerMessagePre pre = new PlayerMessagePre(
+            Rapunzel.players().require(playerOpt.get()),
+            PlainTextComponentSerializer.plainText().serialize(event.message()),
+            false,
+            event.isCancelled()
+        );
+        bus.dispatchPre(pre);
+        if (pre.isDenied()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @Listener(order = Order.LAST)
+    @IsCancelled(value = Tristate.FALSE)
+    public void onPlayerChatPost(PlayerChatEvent.Submit event) {
+        if (!bus.hasPostListeners(PlayerMessagePost.class)) return;
+        Optional<ServerPlayer> playerOpt = event.player();
+        if (playerOpt.isEmpty()) return;
+
+        bus.dispatchPost(new PlayerMessagePost(
+            Rapunzel.players().require(playerOpt.get()),
+            PlainTextComponentSerializer.plainText().serialize(event.message()),
+            false,
+            false
+        ));
+    }
+
+    @Listener(order = Order.FIRST)
+    public void onCommandExecutePre(ExecuteCommandEvent event) {
+        if (!bus.hasPreListeners(PlayerMessagePre.class)) return;
+        Optional<ServerPlayer> playerOpt = event.commandCause().first(ServerPlayer.class);
+        if (playerOpt.isEmpty()) return;
+
+        PlayerMessagePre pre = new PlayerMessagePre(
+            Rapunzel.players().require(playerOpt.get()),
+            commandContent(event),
+            true,
+            false
+        );
+        bus.dispatchPre(pre);
+        // ExecuteCommandEvent is not cancellable via the Sponge API; a deny
+        // is advisory only (documented in the support manifest as PARTIAL).
+    }
+
+    @Listener(order = Order.LAST)
+    public void onCommandExecutePost(ExecuteCommandEvent event) {
+        if (!bus.hasPostListeners(PlayerMessagePost.class)) return;
+        Optional<ServerPlayer> playerOpt = event.commandCause().first(ServerPlayer.class);
+        if (playerOpt.isEmpty()) return;
+
+        bus.dispatchPost(new PlayerMessagePost(
+            Rapunzel.players().require(playerOpt.get()),
+            commandContent(event),
+            true,
+            false
+        ));
+    }
+
+    /** Full command line with the leading '/' (Sponge exposes name and args separately). */
+    private static String commandContent(ExecuteCommandEvent event) {
+        String args = event.arguments();
+        return "/" + event.command() + (args == null || args.isEmpty() ? "" : " " + args);
+    }
+
     @Listener(order = Order.FIRST)
     @IsCancelled(value = Tristate.UNDEFINED)
     public void onExplosionDetonate(ExplosionEvent.Detonate event) {
@@ -726,7 +814,12 @@ final class SpongeGameEventsBridge implements GameEventBridge {
     }
 
     @Listener(order = Order.FIRST)
-    @IsCancelled(value = Tristate.UNDEFINED)
+    // @IsCancelled(UNDEFINED) = receive every move regardless of cancellation,
+    // the exact equivalent of Paper's ignoreCancelled=false pre handlers: the
+    // payload reports any pre-existing cancellation via event.isCancelled().
+    // Do NOT switch to FALSE - that would suppress pre-cancelled moves and
+    // diverge from Paper (and would always report cancelled=false in the
+    // payload, losing the real initial state).
     public void onPlayerMovePre(MoveEntityEvent event) {
         if (!bus.hasPreListeners(PlayerMovePre.class)) return;
         if (!(event.entity() instanceof ServerPlayer player)) return;
@@ -734,17 +827,15 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         Vector3d fromPos = event.originalPosition();
         Vector3d toPos = event.destinationPosition();
 
-        // Ignore rotation-only and tiny movements to reduce event spam
-        if (Math.abs(fromPos.x() - toPos.x()) < 1.0
-                && Math.abs(fromPos.y() - toPos.y()) < 1.0
-                && Math.abs(fromPos.z() - toPos.z()) < 1.0) {
-            return;
-        }
-
         RPlayer rPlayer = Rapunzel.players().require(player);
         RWorldRef worldRef = Rapunzel.worlds().require(player.world()).ref();
         RLocation from = new RLocation(worldRef, fromPos.x(), fromPos.y(), fromPos.z());
         RLocation to = new RLocation(worldRef, toPos.x(), toPos.y(), toPos.z());
+
+        // Library-scope throttle (events.player.move config): min-distance
+        // since the last dispatched move + per-player rate limit. Replaces the
+        // former 1.0-block difference filter.
+        if (!PlayerMoveThrottle.shouldDispatch(rPlayer.uuid(), from, to)) return;
 
         PlayerMovePre pre = new PlayerMovePre(rPlayer, from, to, event.isCancelled());
         bus.dispatchPre(pre);
@@ -754,7 +845,11 @@ final class SpongeGameEventsBridge implements GameEventBridge {
     }
 
     @Listener(order = Order.LAST)
-    @IsCancelled(value = Tristate.TRUE)
+    // No @IsCancelled filter: the Post fires for EVERY move (cancelled or
+    // not) and reports the real cancelled state via event.isCancelled(),
+    // matching Paper's PlayerMoveEvent MONITOR handler. Previously annotated
+    // @IsCancelled(TRUE), which restricted delivery to CANCELLED moves only -
+    // RLib PlayerMovePost then fired solely for denied moves.
     public void onPlayerMovePost(MoveEntityEvent event) {
         if (!bus.hasPostListeners(PlayerMovePost.class)) return;
         if (!(event.entity() instanceof ServerPlayer player)) return;
@@ -762,23 +857,21 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         Vector3d fromPos = event.originalPosition();
         Vector3d toPos = event.destinationPosition();
 
-        // Ignore tiny movements to reduce event spam
-        if (Math.abs(fromPos.x() - toPos.x()) < 1.0
-                && Math.abs(fromPos.y() - toPos.y()) < 1.0
-                && Math.abs(fromPos.z() - toPos.z()) < 1.0) {
-            return;
-        }
-
         RPlayer rPlayer = Rapunzel.players().require(player);
         RWorldRef worldRef = Rapunzel.worlds().require(player.world()).ref();
         RLocation from = new RLocation(worldRef, fromPos.x(), fromPos.y(), fromPos.z());
         RLocation to = new RLocation(worldRef, toPos.x(), toPos.y(), toPos.z());
 
+        // Only dispatch a post for the move whose pre passed the throttle,
+        // keeping pre/post paired exactly.
+        if (!PlayerMoveThrottle.wasAccepted(rPlayer.uuid(), from, to)) return;
+
         bus.dispatchPost(new PlayerMovePost(rPlayer, from, to, event.isCancelled()));
     }
 
     @Listener(order = Order.LAST)
-    @IsCancelled(value = Tristate.TRUE)
+    // No @IsCancelled filter: EntityMovePost fires for every move, not only
+    // cancelled ones (see onPlayerMovePost for the same fix).
     public void onEntityMove(MoveEntityEvent event) {
         if (!bus.hasPostListeners(EntityMovePost.class)) return;
         // Player movement is published via onPlayerMovePost; skip here to avoid duplicates
@@ -1075,8 +1168,9 @@ final class SpongeGameEventsBridge implements GameEventBridge {
         if (Sponge.isServerAvailable()) {
             return Sponge.server().worldManager().world(worldKey)
                 .map(w -> Rapunzel.worlds().require(w).ref())
-                .orElseGet(() -> new RWorldRef(worldKey.asString(), worldKey.asString()));
+                // Name unknown - only the world key is available.
+                .orElseGet(() -> new RWorldRef(null, worldKey.asString()));
         }
-        return new RWorldRef(worldKey.asString(), worldKey.asString());
+        return new RWorldRef(null, worldKey.asString());
     }
 }

@@ -21,7 +21,41 @@ public interface RInventory extends RContainer {
     int size();
 
     /**
-     * Retrieves the item in the specified slot, if present.
+     * Returns the raw slot index where the player's own inventory section
+     * starts in this (combined) inventory.
+     *
+     * <p>Only meaningful for wraps of a FULL combined menu - the top
+     * container plus the player inventory section - such as the ones exposed
+     * by {@code InventoryActionPre#inventory()} /
+     * {@code InventoryActionPost#inventory()}. Raw slots below the returned
+     * index belong to the top container, raw slots at or beyond it belong to
+     * the player's own inventory (the "bottom" section, e.g. Bukkit's
+     * {@code InventoryClickEvent#getClickedInventory()} being the player
+     * inventory). This is the canonical way to distinguish the top section
+     * from the player section of a menu payload.</p>
+     *
+     * <p>For vanilla container menus the player section always spans the
+     * last 36 slots (27 main inventory + 9 hotbar), so the default
+     * implementation returns {@code size() - 36}. Wrappers that know the
+     * platform view may override this with an exact computation - e.g. the
+     * Paper bridge computes it from the Bukkit view's top inventory size,
+     * which also covers the player's own CRAFTING view (where the player
+     * section starts before {@code size() - 36} because armor and the
+     * offhand are part of it).</p>
+     *
+     * <p>For wraps that do not cover a combined menu (plain containers,
+     * single inventories) this value is not defined; consumers must only
+     * call it on full-menu wraps.</p>
+     *
+     * @return the raw slot index of the first player-inventory slot, or
+     *         {@code size() - 36} when the platform-specific start is unknown
+     */
+    default int playerInventoryStart() {
+        return size() - 36;
+    }
+
+    /**
+     * Retrieves the item in the specified slot, if any.
      *
      * @param slot the slot index (0-based)
      * @return an {@link Optional} containing the item, or empty if the slot is empty
