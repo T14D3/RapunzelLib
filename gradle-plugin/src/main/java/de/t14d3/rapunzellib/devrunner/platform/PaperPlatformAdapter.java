@@ -109,6 +109,16 @@ public final class PaperPlatformAdapter extends FillV3PlatformAdapter {
             process.destroy();
             process.waitFor(5_000L);
         }
+        // A lingering bootstrap process must never survive into the real server start. Paper's
+        // graceful shutdown can hang (e.g. Moonrise worker-pool waits, or a failed /stop dispatch),
+        // and two live clients with the same server name connecting to the proxy RPC server
+        // livelock: the proxy closes the "old" connection, the closed client reconnects, forever.
+        if (process.isAlive()) {
+            System.err.println("[devrunner] Bootstrap instance for " + serverName
+                    + " did not exit after stop/SIGTERM; force-killing it");
+            process.destroyForcibly();
+            process.waitFor(5_000L);
+        }
 
         // Remove world data created by bootstrap so the real server starts fresh
         deleteDirectoryRecursive(instanceDir.resolve("world"));

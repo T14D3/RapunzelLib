@@ -91,6 +91,12 @@ val hasExplicitMinecraftTarget =
 
 val collectedJarVersion = activeMinecraftTarget.get()
 
+// Fabric-style versioned artifacts: every Minecraft target publishes under
+// "<version>+mc<target>" so all targets can coexist in the same Maven
+// repository (e.g. 0.3.1+mc26.2, 0.3.1+mc1.21.11). There is no plain version.
+// The MC-independent gradle-plugin artifact keeps its own plain version.
+val effectiveBuildVersion = "$buildVersion+mc${activeMinecraftTarget.get()}"
+
 fun multiversionDependencyVersion(alias: String): String? {
     val target = activeMinecraftTarget.orNull ?: return null
     providers.gradleProperty("rapunzellib.version.$target.$alias").orNull?.let { return it }
@@ -146,7 +152,7 @@ val activeFabricDefaults = minecraftTargetMatrix.targetProperties(activeMinecraf
 
 allprojects {
     group = "de.t14d3.rapunzellib"
-    version = buildVersion
+    version = effectiveBuildVersion
 
     activeTargetVersionDefaults.forEach { (alias, version) ->
         setDefaultProjectProperty("rapunzellib.version.$alias", version)
@@ -280,78 +286,163 @@ minecraftTargetVersions.get().forEach { minecraftVersion ->
     }
 }
 
+/**
+ * Sequentially runs the given Gradle task name in a fresh subprocess for every
+ * configured Minecraft target, forwarding all project properties except the
+ * target override. Fails fast on the first non-zero exit code.
+ */
+fun runVersionSubprocesses(subprocessTaskName: String, verb: String) {
+    val versions = minecraftTargetVersions.get()
+    if (versions.isEmpty()) {
+        logger.warn("No Minecraft target versions configured.")
+        return
+    }
+
+    val wrapperFile = file(
+        if (System.getProperty("os.name").lowercase().contains("windows")) "gradlew.bat" else "gradlew"
+    )
+
+    val forwardedProps = gradle.startParameter.projectProperties
+        .filterKeys { it != "rapunzellib.minecraftTarget" }
+        .flatMap { (key, value) -> listOf("-P$key=$value") }
+
+    val results = mutableListOf<Pair<String, Int>>()
+
+    logger.lifecycle("═══ Sequential multi-version $verb ═══")
+    for (version in versions) {
+        val logDir = rootProject.layout.buildDirectory.dir("logs").get().asFile
+        logDir.mkdirs()
+        val logFile = File(logDir, "$version.log")
+
+        val command = listOf(
+            wrapperFile.absolutePath, subprocessTaskName
+        ) + forwardedProps + listOf(
+            "-Prapunzellib.minecraftTarget=$version"
+        )
+
+        logger.lifecycle("${verb.replaceFirstChar { it.uppercase() }} for Minecraft $version -> see build/logs/$version.log")
+
+        val pb = ProcessBuilder(command)
+            .directory(rootProject.rootDir)
+            .redirectOutput(logFile)
+            .redirectErrorStream(true)
+
+        pb.environment()["JAVA_HOME"] =
+            System.getenv("JAVA_HOME")
+                ?.takeIf { it.isNotBlank() }
+                ?: System.getProperty("java.home")
+
+        val exitCode = pb.start().waitFor()
+
+        results.add(version to exitCode)
+
+        if (exitCode != 0) {
+            logger.error("${verb.replaceFirstChar { it.uppercase() }} for Minecraft $version FAILED (exit $exitCode)")
+            logFile.useLines { lines ->
+                lines.toList().takeLast(20).forEach { logger.error("  $it") }
+            }
+            throw GradleException(
+                "$verb for Minecraft $version failed with exit code $exitCode"
+            )
+        }
+        logger.lifecycle("${verb.replaceFirstChar { it.uppercase() }} for Minecraft $version completed successfully")
+    }
+
+    // ── Summary ─────────────────────────────────────────────────────
+    logger.lifecycle("")
+    logger.lifecycle("═══════════════════════════════════════")
+    logger.lifecycle("  Multi-version $verb summary:")
+    val passCount = results.count { it.second == 0 }
+    for ((version, exitCode) in results) {
+        logger.lifecycle("  ${if (exitCode == 0) "✓" else "✗"}  Minecraft $version  " +
+            if (exitCode == 0) "PASS" else "FAIL (exit $exitCode)")
+    }
+    logger.lifecycle("  $passCount / ${results.size} versions passed")
+    logger.lifecycle("═══════════════════════════════════════")
+}
+
 tasks.register("buildAllMinecraftVersions") {
     group = "verification"
     description = "Builds RapunzelLib for each configured Minecraft target version sequentially."
 
     doLast {
-        val versions = minecraftTargetVersions.get()
-        if (versions.isEmpty()) {
-            logger.warn("No Minecraft target versions configured.")
-            return@doLast
+        runVersionSubprocesses("build", "build")
+    }
+}
+
+/**
+ * Publishes the given publish task in a fresh subprocess for every configured
+ * Minecraft target. The parent invocation itself never publishes: its own
+ * compile/publish tasks are disabled, so the subprocesses are the single
+ * publish path (same as the build matrix).
+ */
+fun registerPublishOrchestrator(taskName: String, subprocessTaskName: String, description: String) =
+    tasks.register(taskName) {
+        group = "publishing"
+        this.description = description
+        doLast {
+            runVersionSubprocesses(subprocessTaskName, subprocessTaskName)
         }
+    }
 
-        val wrapperFile = file(
-            if (System.getProperty("os.name").lowercase().contains("windows")) "gradlew.bat" else "gradlew"
-        )
+val publishAllMinecraftVersions = registerPublishOrchestrator(
+    "publishAllMinecraftVersions",
+    "publishToMavenLocal",
+    "Publishes every Minecraft target's artifacts to Maven Local sequentially."
+)
 
-        val forwardedProps = gradle.startParameter.projectProperties
-            .filterKeys { it != "rapunzellib.minecraftTarget" }
-            .flatMap { (key, value) -> listOf("-P$key=$value") }
+// ── Parent invocation = pure orchestrator ─────────────────────────────────────
+// Without an explicit rapunzellib.minecraftTarget the parent build never compiles,
+// tests, or publishes itself: those all happen in the per-version subprocesses.
+// This removes the duplicated core-version build (parent + subprocess) and keeps
+// exactly one build path per version to debug.
+val parentOrchestratesOnly = !hasExplicitMinecraftTarget.get()
 
-        val results = mutableListOf<Pair<String, Int>>()
+if (parentOrchestratesOnly) {
+    // Reporting/IDE tasks stay usable in the parent; everything else is skipped.
+    val parentKeptTasks = setOf(
+        "help", "projects", "tasks", "properties", "dependencies", "components",
+        "model", "javaToolchains", "buildEnvironment", "outgoingVariants",
+        "clean", "idea", "ideaProject", "ideaModule", "cleanIdea", "openIdea",
+    )
 
-        logger.lifecycle("═══ Sequential multi-version build ═══")
-        for (version in versions) {
-            val logDir = rootProject.layout.buildDirectory.dir("logs").get().asFile
-            logDir.mkdirs()
-            val logFile = File(logDir, "$version.log")
-
-            val command = listOf(
-                wrapperFile.absolutePath, "build"
-            ) + forwardedProps + listOf(
-                "-Prapunzellib.minecraftTarget=$version"
-            )
-
-            logger.lifecycle("Building for Minecraft $version -> see build/logs/$version.log")
-
-            val pb = ProcessBuilder(command)
-                .directory(rootProject.rootDir)
-                .redirectOutput(logFile)
-                .redirectErrorStream(true)
-
-            pb.environment()["JAVA_HOME"] =
-                System.getenv("JAVA_HOME")
-                    ?.takeIf { it.isNotBlank() }
-                    ?: System.getProperty("java.home")
-
-            val exitCode = pb.start().waitFor()
-
-            results.add(version to exitCode)
-
-            if (exitCode != 0) {
-                logger.error("Build for Minecraft $version FAILED (exit $exitCode)")
-                logFile.useLines { lines ->
-                    lines.toList().takeLast(20).forEach { logger.error("  $it") }
-                }
-                throw GradleException(
-                    "Build for Minecraft $version failed with exit code $exitCode"
-                )
+    gradle.projectsEvaluated {
+        subprojects {
+            tasks.configureEach {
+                val kept = name in parentKeptTasks || name.startsWith("rapunzellibGenerate")
+                if (!kept) enabled = false
             }
-            logger.lifecycle("Build for Minecraft $version completed successfully")
         }
+        // Root-level documentation/verification tasks also need compiled inputs;
+        // they belong to the per-version subprocess runs.
+        tasks.configureEach {
+            if (name.startsWith("dokka") || name == "javadoc" || name == "checkParity"
+                || name.startsWith("publishAggregationToCentral")
+            ) {
+                enabled = false
+            }
+        }
+    }
 
-        // ── Summary ─────────────────────────────────────────────────────
-        logger.lifecycle("")
-        logger.lifecycle("═══════════════════════════════════════")
-        logger.lifecycle("  Multi-version build summary:")
-        val passCount = results.count { it.second == 0 }
-        for ((version, exitCode) in results) {
-            logger.lifecycle("  ${if (exitCode == 0) "✓" else "✗"}  Minecraft $version  " +
-                if (exitCode == 0) "PASS" else "FAIL (exit $exitCode)")
-        }
-        logger.lifecycle("  $passCount / ${results.size} versions passed")
-        logger.lifecycle("═══════════════════════════════════════")
+    // Parent-level publish entry points forward to the per-version orchestrators.
+    tasks.register("publishToMavenLocal") {
+        group = "publishing"
+        description = "Publishes every Minecraft target's artifacts to Maven Local (orchestrated)."
+        dependsOn(publishAllMinecraftVersions)
+    }
+    tasks.named("publishToCentralPortal") {
+        dependsOn(registerPublishOrchestrator(
+            "publishToCentralPortalAllMinecraftVersions",
+            "publishToCentralPortal",
+            "Publishes every Minecraft target to Maven Central Portal sequentially."
+        ))
+    }
+    tasks.named("publishToReposilite") {
+        dependsOn(registerPublishOrchestrator(
+            "publishToReposiliteAllMinecraftVersions",
+            "publishToReposilite",
+            "Publishes every Minecraft target to Reposilite sequentially."
+        ))
     }
 }
 
@@ -425,7 +516,7 @@ dependencies {
 dokka {
     dokkaPublications.html {
         moduleName.set("RapunzelLib")
-        moduleVersion.set(buildVersion)
+        moduleVersion.set(effectiveBuildVersion)
         outputDirectory.set(layout.buildDirectory.dir("dokka"))
     }
 }

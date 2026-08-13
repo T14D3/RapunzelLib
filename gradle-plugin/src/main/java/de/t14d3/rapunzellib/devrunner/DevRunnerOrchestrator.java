@@ -9,7 +9,6 @@ import de.t14d3.rapunzellib.devrunner.service.ServiceRegistry;
 import de.t14d3.rapunzellib.serverrunner.FillV3Client;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -58,11 +57,13 @@ public final class DevRunnerOrchestrator {
         // can connect as soon as the plugin initializes.
         int botTcpPort = startBotTcpServer();
 
-        // Fail loudly BEFORE any server starts when the velocity forced-host
-        // DNS entries the bot harness relies on are missing (see /etc/hosts).
-        if (!verifyForcedHosts()) {
-            return 2;
-        }
+        // Feed every child-process log line to the bot manager: the proxy's
+        // "[server connection] <bot> -> <server> has connected" lines and the
+        // backends' "<bot> joined the game" lines reveal the ACTUAL backend a
+        // bot landed on after an unannounced proxy transfer (portal
+        // walk-through), which the bot client itself cannot observe.
+        console.addLineListener((sourceName, line, isError) ->
+                botManager.observeServerLog(sourceName, line));
 
         String mysqlJdbc = cfg.mysqlJdbc(null);
         Map<String, Path> resolvedJars = resolveJars();
@@ -469,52 +470,6 @@ public final class DevRunnerOrchestrator {
     }
 
     /**
-     * Verifies that the velocity forced-host DNS names used to route bots to
-     * backends ({@code <server>.example.com}) resolve before any server starts.
-     *
-     * <p>The bot harness connects every bot through the velocity proxy using
-     * these hostnames (see {@link #startBotTcpServer()}); when the corresponding
-     * /etc/hosts entries (or DNS records) are missing, every backend bot fails
-     * with "Unknown host" and the whole devrun dies slowly and confusingly.
-     * This check fails fast with an actionable message instead.</p>
-     *
-     * @return true when the forced hosts resolve (or no velocity proxy is used)
-     */
-    private boolean verifyForcedHosts() {
-        boolean hasVelocity = cfg.servers().values().stream()
-                .anyMatch(spec -> "velocity".equals(spec.platform()));
-        if (!hasVelocity) {
-            return true;
-        }
-
-        List<String> missing = new ArrayList<>();
-        for (var entry : cfg.servers().entrySet()) {
-            String name = entry.getKey();
-            if ("velocity".equals(entry.getValue().platform())) continue;
-            String host = forcedHostFor(name);
-            try {
-                InetAddress.getAllByName(host);
-            } catch (Exception e) {
-                missing.add(host);
-            }
-        }
-
-        if (missing.isEmpty()) {
-            return true;
-        }
-
-        System.err.println("[devrunner] FATAL: velocity topology requires forced-host DNS entries that do NOT resolve:");
-        for (String host : missing) {
-            System.err.println("  - " + host);
-        }
-        System.err.println("Add the following lines to /etc/hosts (or configure DNS), then re-run:");
-        for (String host : missing) {
-            System.err.println("  127.0.0.1 " + host);
-        }
-        return false;
-    }
-
-    /**
      * Verifies the velocity-proxy requirement.
      *
      * <p>Per project policy every player (dev bot) must connect through the
@@ -540,11 +495,6 @@ public final class DevRunnerOrchestrator {
         return false;
     }
 
-    /** Returns the velocity forced-host name used for the given backend server. */
-    private static String forcedHostFor(String serverName) {
-        return serverName + ".example.com";
-    }
-
     // ── Bot management ─────────────────────────────────────────────────────
 
     private int startBotTcpServer() {
@@ -559,7 +509,11 @@ public final class DevRunnerOrchestrator {
                     .findFirst()
                     .orElse(null);
             botTcpServer = new BotTcpServer(botManager, 0, serverName ->
-                    resolveBotAddress(servers, serverName, velocitySpec, cfg.allowDirectConnections()));
+                    resolveBotAddress(servers, serverName, velocitySpec, cfg.allowDirectConnections()),
+                    (botName, serverName) -> {
+                        // Route the freshly joined bot to its requested backend.
+                        console.routeInput("-velocity send " + botName + " " + serverName);
+                    });
             int port = botTcpServer.start();
             System.out.println("[devrunner] Bot TCP server started on port " + port);
             return port;
@@ -573,12 +527,15 @@ public final class DevRunnerOrchestrator {
      * Resolves the connection address the bot harness should use for the given
      * backend server.
      *
-     * <p>Bots always connect through the velocity proxy (policy): the backend
-     * is addressed by its velocity forced-host hostname on the proxy's port.
-     * When no proxy is configured the topology must have opted out via
-     * {@code allowDirectConnections}; the backend is then addressed directly
-     * on its own port. Returns {@code null} for unknown servers and for the
-     * proxy itself.</p>
+     * <p>Bots always connect through the velocity proxy (policy), addressed
+     * directly as {@code 127.0.0.1:<proxy-port>}. No forced-host hostnames are
+     * used: the bot initially lands on the proxy's default backend and is then
+     * routed to the requested server with the velocity {@code send} command
+     * (see {@link BotTcpServer.BotServerRouter}) - no /etc/hosts or DNS setup
+     * required. When no proxy is configured the topology must have opted out
+     * via {@code allowDirectConnections}; the backend is then addressed
+     * directly on its own port. Returns {@code null} for unknown servers and
+     * for the proxy itself.</p>
      *
      * @param servers              the configured server specs
      * @param serverName           the backend to connect to
@@ -609,7 +566,7 @@ public final class DevRunnerOrchestrator {
             }
             return "127.0.0.1:" + spec.port();
         }
-        return forcedHostFor(serverName) + ":" + velocitySpec.port();
+        return "127.0.0.1:" + velocitySpec.port();
     }
 
     private ServiceAdapter.ServiceSpec toServiceSpec(DevRunnerConfig.ServiceSpec spec, String name) {

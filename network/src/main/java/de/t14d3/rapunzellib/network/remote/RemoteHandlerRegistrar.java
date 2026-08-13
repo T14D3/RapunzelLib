@@ -6,6 +6,9 @@ import de.t14d3.rapunzellib.network.remote.handler.EntityRpcHandler;
 import de.t14d3.rapunzellib.network.remote.handler.PlayerRpcHandler;
 import de.t14d3.rapunzellib.network.remote.resolution.NetworkedEntities;
 import de.t14d3.rapunzellib.network.remote.resolution.NetworkedPlayers;
+import de.t14d3.rapunzellib.network.remote.rpc.ProxyServiceMethods;
+import de.t14d3.rapunzellib.network.remote.rpc.Requests;
+import de.t14d3.rapunzellib.network.runtime.NetworkNodeRole;
 import de.t14d3.rapunzellib.network.runtime.NetworkRuntimeGateway;
 import de.t14d3.rapunzellib.objects.Entities;
 import de.t14d3.rapunzellib.objects.Players;
@@ -31,6 +34,19 @@ public final class RemoteHandlerRegistrar {
 
         playerHandler.register(gateway);
         entityHandler.register(gateway);
+
+        // Default connector on backends: forward the FULL request (including the
+        // destination location) to the proxy, which stores the deferred teleport
+        // and performs the actual connect. Works with zero consumer code; the
+        // installed handler is exposed as a service so consumers can override
+        // the connector via setServerConnector if they need a local strategy.
+        if (gateway.runtime().localRole() == NetworkNodeRole.BACKEND) {
+            playerHandler.setServerConnector((playerUuid, request) ->
+                gateway.callProxy(ProxyServiceMethods.PROXY_CONNECT_PLAYER, request)
+                    .thenApply(Requests.BooleanResult::success));
+            logger.info("[Remote] Backend default server connector installed (forwards to proxy)");
+        }
+        context.registerIfAbsent(PlayerRpcHandler.class, playerHandler);
 
         if (context.runtime().hasCapability(RuntimeCapability.ENTITIES)) {
             NetworkInfoService networkInfo = context.services().find(NetworkInfoService.class).orElse(null);

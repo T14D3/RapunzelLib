@@ -198,6 +198,19 @@ cd RapunzelLib
 
 Target versions are configured in `gradle/minecraft-targets.properties`. Build artifacts land in `build/libs/<version>/`.
 
+### Versioned artifacts
+
+RapunzelLib publishes fabric-style multi-version artifacts. **Every** Minecraft target appends a `+mc<target>` suffix so all targets can coexist in the same Maven repository. There is no plain version:
+
+| Minecraft target | Artifact version |
+|---|---|
+| 26.2 (core/default) | `0.3.1+mc26.2` / `0.3.1-SNAPSHOT+mc26.2` |
+| 26.1.2 | `0.3.1+mc26.1.2` |
+| 1.21.11 | `0.3.1+mc1.21.11` |
+| 1.21.10 | `0.3.1+mc1.21.10` |
+
+The MC-independent Gradle plugin artifact (`de.t14d3.rapunzellib.gradle:gradle-plugin`) keeps its own plain version. Publishing a specific target requires an explicit target: `./gradlew build publishToCentralPortal -Prapunzellib.minecraftTarget=1.21.11`. The default build produces the core (26.2) versioned artifacts.
+
 ## Trade-offs
 
 - There is exactly one global context, bootstrapped by the companion plugin. Consumers borrow a view - do not call `bootstrap()` unless you are the companion.

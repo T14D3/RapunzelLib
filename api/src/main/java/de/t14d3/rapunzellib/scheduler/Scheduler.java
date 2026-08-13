@@ -26,6 +26,29 @@ public interface Scheduler {
     @NotNull ScheduledTask runLater(@NotNull Duration delay, @NotNull Runnable task);
 
     /**
+     * Schedules a task to run once after the specified delay, asynchronously
+     * (off the primary thread).
+     *
+     * <p>Platform schedulers override this with a native delayed-async schedule.
+     * The default implementation emulates the behavior via a self-cancelling
+     * {@link #runRepeatingAsync} so lightweight test doubles stay source-compatible.</p>
+     *
+     * @param delay the delay before the task runs
+     * @param task  the task to execute
+     * @return a {@link ScheduledTask} handle for the scheduled task
+     */
+    @NotNull
+    default ScheduledTask runLaterAsync(@NotNull Duration delay, @NotNull Runnable task) {
+        java.util.concurrent.atomic.AtomicReference<ScheduledTask> holder = new java.util.concurrent.atomic.AtomicReference<>();
+        ScheduledTask handle = runRepeatingAsync(delay, delay, () -> {
+            holder.get().cancel();
+            task.run();
+        });
+        holder.set(handle);
+        return handle;
+    }
+
+    /**
      * Schedules a task to run repeatedly on the primary thread with an initial delay and period.
      *
      * @param initialDelay the delay before the first execution

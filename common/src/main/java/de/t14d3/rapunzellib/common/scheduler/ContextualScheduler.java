@@ -55,6 +55,11 @@ public final class ContextualScheduler implements Scheduler, AutoCloseable {
     }
 
     @Override
+    public @NotNull ScheduledTask runLaterAsync(@NotNull Duration delay, @NotNull Runnable task) {
+        return delegate.runLaterAsync(delay, task);
+    }
+
+    @Override
     public @NotNull ScheduledTask runRepeating(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
         return delegate.runRepeating(initialDelay, period, task);
     }

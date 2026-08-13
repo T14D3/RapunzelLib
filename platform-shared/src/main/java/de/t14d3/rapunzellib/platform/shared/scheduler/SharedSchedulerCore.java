@@ -50,6 +50,13 @@ public abstract class SharedSchedulerCore implements Scheduler, AutoCloseable {
     }
 
     @Override
+    public @NotNull ScheduledTask runLaterAsync(@NotNull Duration delay, @NotNull Runnable task) {
+        Objects.requireNonNull(task, "task");
+        long ms = Math.max(0L, (delay != null) ? delay.toMillis() : 0L);
+        return createTaskHandle(timer.schedule(task, ms, TimeUnit.MILLISECONDS));
+    }
+
+    @Override
     public @NotNull ScheduledTask runRepeating(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
         Objects.requireNonNull(task, "task");
         long initialMs = Math.max(0L, (initialDelay != null) ? initialDelay.toMillis() : 0L);

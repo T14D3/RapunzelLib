@@ -153,6 +153,19 @@ public class BotClient {
     private String gameMode = "unknown";
     private int actionSequence;
     private final AtomicInteger interactionSequence = new AtomicInteger();
+    // Teleport-settle tracking. The server silently skips use-item-on packets
+    // while a teleport is awaiting client confirmation (awaitingPositionFromClient
+    // in ServerGamePacketListenerImpl.handleUseItemOn), and the confirmation only
+    // arrives after a full round trip. A physical action therefore must never be
+    // sent while a teleport triggered by a recently sent serverbound command may
+    // still be in flight, or the packet is dropped without any error or kick.
+    // lastCommandNanos is stamped whenever a chat/command packet is sent,
+    // lastTeleportNanos whenever a ClientboundPlayerPositionPacket is received
+    // (its accept is sent immediately afterwards).
+    private static final long TELEPORT_SETTLE_TIMEOUT_MS = 750L;
+    private volatile long lastCommandNanos = Long.MIN_VALUE;
+    private volatile long lastTeleportNanos = Long.MIN_VALUE;
+    private final Object teleportLock = new Object();
     private volatile int openContainerId = -1;
     private final java.util.Map<Integer, EntitySnapshot> entitySnapshots = new java.util.concurrent.ConcurrentHashMap<>();
     private int botEntityId = -1;
@@ -277,6 +290,11 @@ public class BotClient {
         if (!connected.get() || session == null) {
             throw new IllegalStateException("Bot '" + name + "' is not connected");
         }
+        // Commands (and plugin commands) may teleport the player; from this
+        // moment until the teleport is confirmed the server will silently drop
+        // use-item-on packets (awaitingPositionFromClient). See
+        // awaitTeleportSettled().
+        lastCommandNanos = System.nanoTime();
         if (message.startsWith("/")) {
             String command = message.substring(1);
             System.out.println("[devrunner] Bot '" + name + "' SENDING command: /" + command);
@@ -299,28 +317,35 @@ public class BotClient {
             return;
         }
 
-        confirmPosition();
+        Runnable action = () -> {
+            if (!connected.get() || session == null) return;
+            confirmPosition();
 
-        session.send(new ServerboundSwingPacket(Hand.MAIN_HAND));
+            session.send(new ServerboundSwingPacket(Hand.MAIN_HAND));
 
-        Vector3i pos = Vector3i.from(x, y, z);
-        Direction dir = Direction.values()[direction];
+            Vector3i pos = Vector3i.from(x, y, z);
+            Direction dir = Direction.values()[direction];
 
-        int startSeq = interactionSequence.getAndIncrement();
-        session.send(new ServerboundPlayerActionPacket(
-                PlayerAction.START_DIGGING,
-                pos,
-                dir,
-                startSeq
-        ));
+            int startSeq = interactionSequence.getAndIncrement();
+            session.send(new ServerboundPlayerActionPacket(
+                    PlayerAction.START_DIGGING,
+                    pos,
+                    dir,
+                    startSeq
+            ));
 
-        int finishSeq = interactionSequence.getAndIncrement();
-        session.send(new ServerboundPlayerActionPacket(
-                PlayerAction.FINISH_DIGGING,
-                pos,
-                dir,
-                finishSeq
-        ));
+            int finishSeq = interactionSequence.getAndIncrement();
+            session.send(new ServerboundPlayerActionPacket(
+                    PlayerAction.FINISH_DIGGING,
+                    pos,
+                    dir,
+                    finishSeq
+            ));
+        };
+        // Like every other physical action, digs are silently dropped while the
+        // server's "client loaded" timeout is running AND while a teleport is
+        // awaiting confirmation - defer until both have cleared.
+        runWhenClientReady(action);
     }
 
     public void useItemOn(int x, int y, int z, int hand, int direction) {
@@ -492,6 +517,10 @@ public class BotClient {
         openContainerId = -1;
         abilities = null;
         dead = false;
+        synchronized (teleportLock) {
+            lastCommandNanos = Long.MIN_VALUE;
+            lastTeleportNanos = Long.MIN_VALUE;
+        }
         // The new backend re-sends its own inventory; without clearing the
         // per-container state here the client would keep serving the PREVIOUS
         // server's snapshots (e.g. the source server's inventory right after a
@@ -804,7 +833,76 @@ public class BotClient {
      */
     private void confirmPosition() {
         if (!connected.get() || session == null || !hasPosition) return;
+        // Physical actions must not race a pending teleport (see
+        // awaitTeleportSettled): a use-item-on processed while
+        // awaitingPositionFromClient is set is silently dropped.
+        awaitTeleportSettled();
         session.send(new ServerboundMovePlayerPosRotPacket(true, false, x, y, z, yaw, pitch));
+    }
+
+    /**
+     * True while a teleport triggered by a recently sent serverbound command
+     * may still be awaiting client confirmation. The server sets
+     * awaitingPositionFromClient when it teleports the player and only clears
+     * it once {@code ServerboundAcceptTeleportationPacket} with the matching id
+     * is processed; a use-item-on packet processed in between is silently
+     * skipped. The window is bounded: a command older than
+     * {@link #TELEPORT_SETTLE_TIMEOUT_MS} either produced a position packet
+     * (confirmed) or did not teleport at all.
+     */
+    private boolean teleportMayBePending() {
+        long cmd = lastCommandNanos;
+        if (cmd == Long.MIN_VALUE) return false;
+        if (cmd <= lastTeleportNanos) return false; // confirmed
+        return (System.nanoTime() - cmd) / 1_000_000L < TELEPORT_SETTLE_TIMEOUT_MS;
+    }
+
+    /**
+     * Blocks (bounded by {@link #TELEPORT_SETTLE_TIMEOUT_MS}) until no
+     * teleport from a recently sent command can still be awaiting client
+     * confirmation. Waits for the server's {@code ClientboundPlayerPositionPacket}
+     * and its immediate accept, so the accept is enqueued on the connection
+     * before the caller's action packet - the server then processes the accept
+     * first and the action is no longer gated by {@code awaitingPositionFromClient}.
+     *
+     * <p>Never blocks the channel's event loop: it must stay free to receive the
+     * very position packet whose arrival resolves the wait. In the deferred-action
+     * path this is moot anyway - a deferred action runs at least
+     * {@link #CLIENT_READY_DELAY_MS} after join/respawn, by which time any
+     * teleport from a command sent before it has long been confirmed.</p>
+     */
+    private void awaitTeleportSettled() {
+        if (!connected.get() || session == null) return;
+        if (!teleportMayBePending()) return;
+        io.netty.channel.Channel ch = session.getChannel();
+        if (ch != null && ch.eventLoop() != null && ch.eventLoop().inEventLoop()) {
+            return;
+        }
+        synchronized (teleportLock) {
+            long deadline = System.nanoTime() + TELEPORT_SETTLE_TIMEOUT_MS * 1_000_000L;
+            while (teleportMayBePending()) {
+                long remainingMs = (deadline - System.nanoTime()) / 1_000_000L;
+                if (remainingMs <= 0) break;
+                try {
+                    teleportLock.wait(remainingMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Records that the server's most recent teleport has been confirmed
+     * client-side (the accept packet was already sent by the caller) and wakes
+     * up any thread waiting in {@link #awaitTeleportSettled()}.
+     */
+    private void markTeleportConfirmed() {
+        synchronized (teleportLock) {
+            lastTeleportNanos = System.nanoTime();
+            teleportLock.notifyAll();
+        }
     }
 
     // ── Inventory ──────────────────────────────────────────────────────────
@@ -1116,6 +1214,9 @@ public class BotClient {
                 pitch = posPacket.getXRot();
                 hasPosition = true;
                 session.send(new ServerboundAcceptTeleportationPacket(posPacket.getId()));
+                // The accept is now enqueued; wake any thread waiting in
+                // awaitTeleportSettled() so its action is sent after the accept.
+                markTeleportConfirmed();
                 return;
             }
             if (packet instanceof ClientboundSetHealthPacket healthPacket) {

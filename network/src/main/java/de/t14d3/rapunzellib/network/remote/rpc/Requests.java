@@ -3,6 +3,7 @@ package de.t14d3.rapunzellib.network.remote.rpc;
 import com.google.gson.JsonElement;
 import de.t14d3.rapunzellib.network.runtime.RpcMethod;
 import de.t14d3.rapunzellib.objects.RKey;
+import de.t14d3.rapunzellib.objects.RLocation;
 import de.t14d3.rapunzellib.objects.RWorldRef;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -60,6 +61,21 @@ public final class Requests {
                                           double x, double y, double z,
                                           float yaw, float pitch,
                                           boolean hasLocation) {}
+
+    /**
+     * Claims a deferred teleport for a player that has just joined a backend.
+     * The proxy stores the destination when it connects the player to a server
+     * (see {@code ProxyRpcHandlerRegistrar}); the backend polls it once the
+     * player is present locally. Polling consumes the entry.
+     */
+    public record PollDeferredTeleportRequest(@NotNull UUID playerId) {}
+
+    /**
+     * Reply to {@link PollDeferredTeleportRequest}: {@code location} is the
+     * deferred teleport destination if one was pending for the player, or null
+     * when nothing was pending (the entry is consumed by the poll).
+     */
+    public record PollDeferredTeleportResult(@Nullable RLocation location) {}
 
     public record SlotEntry(int slot, @Nullable String itemNbt) {}
     public record InventorySnapshotRequest(@NotNull UUID uuid) {}

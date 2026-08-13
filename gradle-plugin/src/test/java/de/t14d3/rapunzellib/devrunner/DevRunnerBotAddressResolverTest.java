@@ -39,9 +39,12 @@ final class DevRunnerBotAddressResolverTest {
     void routesThroughProxyWhenVelocityConfigured() {
         var servers = topology(velocity(25577), server("paper", 26565), server("paper", 26566));
 
-        assertEquals("backend-1.example.com:25577",
+        // Bots connect to the proxy directly (127.0.0.1) and are routed to the
+        // requested backend with the velocity `send` command afterwards - no
+        // forced-host hostnames or /etc/hosts entries involved.
+        assertEquals("127.0.0.1:25577",
                 DevRunnerOrchestrator.resolveBotAddress(servers, "backend-1", velocity(25577), false));
-        assertEquals("backend-2.example.com:25577",
+        assertEquals("127.0.0.1:25577",
                 DevRunnerOrchestrator.resolveBotAddress(servers, "backend-2", velocity(25577), true));
     }
 

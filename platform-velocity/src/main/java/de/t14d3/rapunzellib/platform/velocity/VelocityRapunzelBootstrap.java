@@ -1,5 +1,6 @@
 package de.t14d3.rapunzellib.platform.velocity;
 
+import com.velocitypowered.api.proxy.ConnectionRequestBuilder;
 import com.velocitypowered.api.proxy.ProxyServer;
 import de.t14d3.rapunzellib.PlatformId;
 import de.t14d3.rapunzellib.Rapunzel;
@@ -20,6 +21,7 @@ import de.t14d3.rapunzellib.network.bootstrap.TransportBootstrapResultApplier;
 import de.t14d3.rapunzellib.network.info.NetworkInfoService;
 import de.t14d3.rapunzellib.network.NetworkDefaults;
 import de.t14d3.rapunzellib.network.queue.NetworkQueueTransportDecorator;
+import de.t14d3.rapunzellib.network.remote.handler.ProxyRpcHandlerRegistrar;
 import de.t14d3.rapunzellib.network.runtime.DefaultNetworkRuntimeGateway;
 import de.t14d3.rapunzellib.network.runtime.NetworkLinkKind;
 import de.t14d3.rapunzellib.network.runtime.NetworkRuntime;
@@ -43,6 +45,7 @@ import org.slf4j.Logger;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class VelocityRapunzelBootstrap {
@@ -232,6 +235,23 @@ public final class VelocityRapunzelBootstrap {
                 proxy
             );
             ctx.registerLinked(VelocityNetworkInfoService.class, networkInfo, NetworkInfoService.class);
+
+            // Cross-server player connects are answered on the proxy:
+            // proxy/connectPlayer executes the actual connect (storing the
+            // deferred teleport location) and proxy/pollDeferredTeleport lets
+            // backends claim that location once the player joined. Registered
+            // here so consumers never register these handlers themselves - a
+            // second registration on the shared gateway would silently shadow
+            // the first. Closed with the context on shutdown.
+            NetworkRuntimeGateway.Subscription proxyRpcHandlers = ProxyRpcHandlerRegistrar.register(
+                responderGateway,
+                (uuid, target) -> proxy.getPlayer(uuid)
+                    .flatMap(player -> proxy.getServer(target)
+                        .map(server -> player.createConnectionRequest(server).connect()
+                            .thenApply(ConnectionRequestBuilder.Result::isSuccessful)))
+                    .orElseGet(() -> CompletableFuture.completedFuture(false))
+            );
+            ctx.registerCloseable(proxyRpcHandlers);
 
         return ctx;
     }

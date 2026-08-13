@@ -49,9 +49,21 @@ public class BotTcpServer implements AutoCloseable {
         String resolve(String serverName);
     }
 
+    /**
+     * Routes a freshly connected bot to its target backend. Implementations
+     * typically issue the velocity {@code send <bot> <server>} console command.
+     * Invoked after the bot's join-game packet arrived (i.e. the player is
+     * registered with the proxy), with a small grace delay.
+     */
+    @FunctionalInterface
+    public interface BotServerRouter {
+        void route(String botName, String server);
+    }
+
     private final BotManager botManager;
     private final int port;
     private final ServerAddressResolver addressResolver;
+    private final BotServerRouter serverRouter;
     private final ExecutorService executor;
     private ServerSocket serverSocket;
     private volatile boolean running;
@@ -59,10 +71,12 @@ public class BotTcpServer implements AutoCloseable {
     /** Currently open client connections (so we can broadcast events). */
     private final List<ClientConn> clients = new CopyOnWriteArrayList<>();
 
-    public BotTcpServer(BotManager botManager, int port, ServerAddressResolver addressResolver) {
+    public BotTcpServer(BotManager botManager, int port, ServerAddressResolver addressResolver,
+                        BotServerRouter serverRouter) {
         this.botManager = botManager;
         this.port = port;
         this.addressResolver = addressResolver;
+        this.serverRouter = serverRouter;
         this.executor = Executors.newCachedThreadPool(r -> {
             Thread t = new Thread(r, "bot-tcp-server");
             t.setDaemon(true);
@@ -170,6 +184,7 @@ public class BotTcpServer implements AutoCloseable {
                     // genuine login events (initial join + proxy switches).
                     if (newSession) {
                         broadcast(event("server", botName, server, "message", server));
+                        routeBotToTarget(botName, server);
                     }
                     return ok(id);
                 }
@@ -464,6 +479,33 @@ public class BotTcpServer implements AutoCloseable {
     }
 
     // ── Event broadcasting ─────────────────────────────────────────────────
+
+    /**
+     * Moves a freshly connected bot to its requested backend. Bots connect to
+     * the proxy directly (no forced-host hostnames), so they initially land on
+     * the proxy's default server; a small grace delay before the {@code send}
+     * makes the routing reliable without any /etc/hosts or DNS setup.
+     *
+     * <p>When the proxy's log observation already shows the bot on the
+     * requested backend (e.g. it IS the default server), the {@code send} is
+     * skipped entirely - sending to the current server only produces a
+     * confusing "already connected to this server" message.</p>
+     */
+    private void routeBotToTarget(String botName, String server) {
+        if (serverRouter == null || server == null || server.isBlank()) return;
+        try {
+            Thread.sleep(500);
+            String landed = botManager.lastLandingServer(botName);
+            if (server.equals(landed)) {
+                System.out.println("[devrunner] Bot '" + botName + "' already on target server '"
+                        + server + "'; skipping send");
+                return;
+            }
+            serverRouter.route(botName, server);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
 
     private static JsonObject event(String type, String botName, String server, String key, String value) {
         JsonObject o = new JsonObject();

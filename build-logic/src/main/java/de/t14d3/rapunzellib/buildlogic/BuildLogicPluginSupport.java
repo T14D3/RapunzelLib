@@ -517,7 +517,7 @@ public final class BuildLogicPluginSupport {
         if (baseUrl == null) {
             baseUrl = DEFAULT_REPOSILITE_BASE_URL;
         }
-        String repository = project.getVersion().toString().endsWith("SNAPSHOT") ? "snapshots" : "releases";
+        String repository = project.getVersion().toString().contains("-SNAPSHOT") ? "snapshots" : "releases";
         return baseUrl.replaceAll("/+$", "") + "/" + repository;
     }
 

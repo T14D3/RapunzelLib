@@ -23,7 +23,13 @@ dependencies {
     testImplementation(gradleTestKit())
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
-    testImplementation(libs.paper.api)
+    // The catalog's paper-api entry intentionally carries no version (it is
+    // pinned per MC target by the composite build). The plugin's own tests run
+    // outside that pinning, so resolve a target-aware version here with a
+    // default that tracks the latest supported Paper line.
+    testImplementation("io.papermc.paper:paper-api:" +
+        providers.gradleProperty("rapunzellib.version.paper-api")
+            .orElse("26.2.build.+").get())
 }
 
 tasks.withType<Test>().configureEach {

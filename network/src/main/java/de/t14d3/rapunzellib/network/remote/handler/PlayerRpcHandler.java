@@ -17,12 +17,21 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
 
 public final class PlayerRpcHandler {
     private static final Logger logger = LoggerFactory.getLogger(PlayerRpcHandler.class);
     private final GsonComponentSerializer componentSerializer = GsonComponentSerializer.gson();
-    private volatile BiFunction<java.util.UUID, String, CompletableFuture<Boolean>> serverConnector;
+    private volatile ServerConnector serverConnector;
+
+    /**
+     * Connects a player to another server. Receives the full
+     * {@link Requests.ConnectToServerRequest} so the connector can act on the
+     * destination location, not just the target server name.
+     */
+    @FunctionalInterface
+    public interface ServerConnector {
+        CompletableFuture<Boolean> connect(java.util.UUID playerUuid, Requests.ConnectToServerRequest request);
+    }
 
     public void register(@NotNull NetworkRuntimeGateway gateway) {
         Objects.requireNonNull(gateway, "gateway");
@@ -84,11 +93,14 @@ public final class PlayerRpcHandler {
         );
 
         gateway.register(PlayerServiceMethods.CONNECT_TO_SERVER, (req, source) -> {
+            if (req == null || req.uuid() == null || req.targetServer() == null) {
+                return CompletableFuture.completedFuture(new Requests.BooleanResult(false));
+            }
             if (serverConnector == null) {
                 logger.warn("No ServerConnector registered for connectToServer; proxy support not installed");
                 return CompletableFuture.completedFuture(new Requests.BooleanResult(false));
             }
-            return serverConnector.apply(req.uuid(), req.targetServer())
+            return serverConnector.connect(req.uuid(), req)
                 .thenApply(success -> {
                     if (success && req.hasLocation() && req.world() != null) {
                         DeferredTeleportStore.store(req.uuid(), new RLocation(
@@ -161,7 +173,7 @@ public final class PlayerRpcHandler {
         logger.info("[Remote] Registered player RPC handlers");
     }
 
-    public void setServerConnector(@NotNull BiFunction<java.util.UUID, String, CompletableFuture<Boolean>> connector) {
+    public void setServerConnector(@NotNull ServerConnector connector) {
         this.serverConnector = Objects.requireNonNull(connector, "connector");
     }
 

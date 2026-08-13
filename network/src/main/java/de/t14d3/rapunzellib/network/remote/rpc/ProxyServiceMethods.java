@@ -7,4 +7,7 @@ public final class ProxyServiceMethods {
 
     public static final RpcMethod<Requests.ConnectToServerRequest, Requests.BooleanResult> PROXY_CONNECT_PLAYER =
         RpcMethod.of("proxy", "connectPlayer", Requests.ConnectToServerRequest.class, Requests.BooleanResult.class);
+
+    public static final RpcMethod<Requests.PollDeferredTeleportRequest, Requests.PollDeferredTeleportResult> PROXY_POLL_DEFERRED_TELEPORT =
+        RpcMethod.of("proxy", "pollDeferredTeleport", Requests.PollDeferredTeleportRequest.class, Requests.PollDeferredTeleportResult.class);
 }

@@ -34,6 +34,12 @@ public final class VelocityScheduler implements Scheduler {
     }
 
     @Override
+    public @NotNull ScheduledTask runLaterAsync(@NotNull Duration delay, @NotNull Runnable task) {
+        // Velocity tasks are already async by default.
+        return schedule(task, delay, null);
+    }
+
+    @Override
     public @NotNull ScheduledTask runRepeating(@NotNull Duration initialDelay, @NotNull Duration period, @NotNull Runnable task) {
         return schedule(task, initialDelay, period);
     }

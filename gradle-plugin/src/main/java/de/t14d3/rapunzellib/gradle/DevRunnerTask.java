@@ -114,9 +114,23 @@ public abstract class DevRunnerTask extends DefaultTask {
 
         // LiveTests
         DevRunnerExtension.LiveTestsConfig lt = extension.getLiveTests();
+        // Manual-run escape hatch: -Drapunzellib.livetestsEnabled=true|false (or the
+        // same gradle property) overrides BOTH the enabled and autoRun build-script
+        // settings, so a test run can be toggled without editing build files.
+        Boolean ltOverride = livetestsOverride();
+        if (ltOverride != null) {
+            getLogger().lifecycle("rapunzellib.livetestsEnabled={} overrides liveTests.enabled/autoRun",
+                    ltOverride);
+        }
+        boolean ltEnabled = ltOverride != null
+                ? ltOverride
+                : Boolean.TRUE.equals(lt.getEnabled().getOrElse(false));
+        boolean ltAutoRun = ltOverride != null
+                ? ltOverride
+                : Boolean.TRUE.equals(lt.getAutoRun().getOrElse(true));
         DevRunnerConfig.LiveTestConfig liveTests = new DevRunnerConfig.LiveTestConfig(
-            Boolean.TRUE.equals(lt.getEnabled().getOrElse(false)),
-            Boolean.TRUE.equals(lt.getAutoRun().getOrElse(true)),
+            ltEnabled,
+            ltAutoRun,
             lt.getTestSourceDir().isPresent() ? lt.getTestSourceDir().get().getAsFile().toPath() : null,
             lt.getTestPackages().getOrElse(List.of()),
             lt.getTimeoutMs().getOrElse(30_000L),
@@ -131,6 +145,14 @@ public abstract class DevRunnerTask extends DefaultTask {
             servers, services, liveTests, List.of(), fileOverrides, jfrEnabled, jfrSettings,
             allowDirectConnections
         );
+    }
+
+    private Boolean livetestsOverride() {
+        String raw = getProject().getProviders().systemProperty("rapunzellib.livetestsEnabled")
+                .orElse(getProject().getProviders().gradleProperty("rapunzellib.livetestsEnabled"))
+                .getOrNull();
+        if (raw == null || raw.isBlank()) return null;
+        return Boolean.parseBoolean(raw.trim());
     }
 
     private void wirePluginJars(Map<String, DevRunnerConfig.ServerSpec> servers) {

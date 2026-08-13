@@ -96,7 +96,7 @@ public final class EntityRpcHandler {
             REntity found = entity.get();
             String type = found.typeKey().asString();
             String world = found.worldRef().map(RWorldRef::identifier).orElse(null);
-            logger.info("[Remote] Entity presence {} found={} type={} world={}",
+            logger.debug("[Remote] Entity presence {} found={} type={} world={}",
                 req.uuid(), true, type, world);
             return CompletableFuture.completedFuture(new Requests.EntityPresenceResult(true, type, world));
         });

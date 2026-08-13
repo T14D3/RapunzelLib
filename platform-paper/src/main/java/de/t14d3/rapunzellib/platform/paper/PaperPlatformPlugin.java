@@ -27,6 +27,9 @@ public final class PaperPlatformPlugin extends JavaPlugin {
     public void onEnable() {
         // Bootstrap the shared platform context with all service registrations
         PaperRapunzelBootstrap.bootstrapPlatform(this);
+        // Consume deferred cross-server teleports (stored on the proxy) once a
+        // player joins this backend. No-op when networking is absent.
+        DeferredTeleportJoinListener.install(this);
     }
 
     @Override

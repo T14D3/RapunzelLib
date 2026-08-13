@@ -40,7 +40,7 @@ public final class RootPublishingConventionsPlugin implements Plugin<Project> {
 
                 // Wire to the Nmcp aggregation task (handles both releases and SNAPSHOTs)
                 task.dependsOn(target.provider(() -> {
-                    String nmcpTaskName = target.getVersion().toString().endsWith("-SNAPSHOT")
+                    String nmcpTaskName = target.getVersion().toString().contains("-SNAPSHOT")
                         ? "publishAggregationToCentralSnapshots"
                         : "publishAggregationToCentralPortal";
                     Task nmcpTask = target.getTasks().findByName(nmcpTaskName);
@@ -56,7 +56,7 @@ public final class RootPublishingConventionsPlugin implements Plugin<Project> {
                     target.getLogger().lifecycle("");
                     target.getLogger().lifecycle("═══════════════════════════════════════════════════════════════");
                     target.getLogger().lifecycle("  Central Portal publish submitted.");
-                    if (target.getVersion().toString().endsWith("-SNAPSHOT")) {
+                    if (target.getVersion().toString().contains("-SNAPSHOT")) {
                         target.getLogger().lifecycle("  Deployment type: SNAPSHOT");
                         target.getLogger().lifecycle("  It may take a few minutes to appear at:");
                         target.getLogger().lifecycle("  https://central.sonatype.com/repository/maven-snapshots/");

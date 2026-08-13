@@ -47,6 +47,26 @@ public class BotManager {
     private final Map<String, Long> lastDisconnectAt = new ConcurrentHashMap<>();
     private static final long RECONNECT_GRACE_MS = 800L;
 
+    /**
+     * Observed landing server per bot name, derived from the devrunner's own
+     * child-process logs (see {@link #observeServerLog}). A velocity transfer
+     * looks to the bot client like a second login packet on the existing
+     * session - the client cannot observe the new backend's name. The proxy,
+     * however, logs "[server connection] &lt;bot&gt; -&gt; &lt;server&gt; has
+     * connected" for every backend connection, and the backend itself logs
+     * "&lt;bot&gt; joined the game". Both lines are visible to the devrunner
+     * through the {@code DevRunnerConsole} line listener, so unannounced
+     * transfers (e.g. a portal walk-through) can still be tagged with the
+     * ACTUAL landing server instead of the bot's logical server.
+     */
+    private final Map<String, String> lastLandingByBot = new ConcurrentHashMap<>();
+    private final Map<String, Long> lastLandingNanos = new ConcurrentHashMap<>();
+    /** How long to wait for a landing observation after an unannounced login. */
+    private static final long LANDING_WAIT_TIMEOUT_MS = 2_000L;
+    /** Landing lines may precede the client-visible login by up to this much. */
+    private static final long LANDING_LEAD_MS = 500L;
+    private static final long LANDING_POLL_INTERVAL_MS = 20L;
+
     /** Tri-consumer carrying (botName, serverName, payload). */
     @FunctionalInterface
     public interface BotEventConsumer<T> {
@@ -142,7 +162,22 @@ public class BotManager {
     private void recordDisconnect(String name) {
         if (name != null) {
             lastDisconnectAt.put(name, System.currentTimeMillis());
+            // A reconnect must not see the previous session's landing record:
+            // routing decisions are only valid for the current connection.
+            lastLandingByBot.remove(name);
+            lastLandingNanos.remove(name);
         }
+    }
+
+    /**
+     * Returns the backend a bot most recently landed on (from the proxy's
+     * "[server connection]" log lines), or {@code null} when the current
+     * session's landing has not been observed yet. Used to skip the velocity
+     * {@code send} when the bot already sits on the requested server.
+     */
+    public String lastLandingServer(String botName) {
+        if (botName == null) return null;
+        return lastLandingByBot.get(botName);
     }
 
     private void wireEventListeners(String name, String server, BotClient client, String host) {
@@ -195,6 +230,18 @@ public class BotManager {
             // logical server.
             client.addJoinListener(() -> {
                 String landing = pendingTransfers.remove(name);
+                if (landing == null || landing.isBlank()) {
+                    // Unannounced proxy transfer (e.g. a cross-server portal
+                    // walk-through): the bot client cannot observe the new
+                    // backend, but the devrunner can - from the proxy's
+                    // server-connection lines and the backends' join messages
+                    // (see observeServerLog). Wait briefly for that observation
+                    // before falling back to the bot's logical server.
+                    String resolved = resolveUnannouncedLanding(name);
+                    if (resolved != null) {
+                        landing = resolved;
+                    }
+                }
                 String evtServer = landing != null && !landing.isBlank() ? landing : server;
                 joins.accept(name, evtServer, host);
             });
@@ -209,6 +256,98 @@ public class BotManager {
         if (name == null || targetServer == null || targetServer.isBlank()) return;
         pendingTransfers.put(name, targetServer);
         System.out.println("[devrunner] Announced transfer: bot '" + name + "' -> " + targetServer);
+    }
+
+    /**
+     * Observes one raw log line from a devrunner child process (velocity or a
+     * backend). Two line shapes reveal which backend a bot actually landed on:
+     * <ul>
+     *   <li>the proxy's own server-connection line
+     *       {@code [server connection] <bot> -> <server> has connected}, and</li>
+     *   <li>the backend's join broadcast {@code <bot> joined the game}, where
+     *       the landing server is the process source name.</li>
+     * </ul>
+     * Both are generic platform log lines (no plugin-specific strings). The
+     * records feed {@link #resolveUnannouncedLanding(String)} so unannounced
+     * transfers (portal walk-throughs) can be tagged with the real backend.
+     */
+    public void observeServerLog(String sourceName, String line) {
+        if (line == null || line.isBlank()) return;
+        String botName = null;
+        String landing = null;
+        int idx = line.indexOf("[server connection] ");
+        if (idx >= 0) {
+            // "<bot> -> <server> has connected" - velocity, one line per backend
+            // connection (also for the initial connect).
+            String rest = line.substring(idx + "[server connection] ".length());
+            if (rest.endsWith(" has connected")) {
+                String pair = rest.substring(0, rest.length() - " has connected".length());
+                int arrow = pair.indexOf(" -> ");
+                if (arrow > 0) {
+                    botName = pair.substring(0, arrow).trim();
+                    landing = pair.substring(arrow + 4).trim();
+                }
+            }
+        } else if (sourceName != null) {
+            // "<bot> joined the game" - backend join broadcast; the landing
+            // server is the backend process that printed it.
+            String clean = stripAnsi(line);
+            if (clean.endsWith(" joined the game")) {
+                String head = clean.substring(0, clean.length() - " joined the game".length()).trim();
+                int sp = head.lastIndexOf(' ');
+                botName = head.substring(sp + 1).trim();
+                landing = sourceName;
+            }
+        }
+        if (botName == null || botName.isEmpty() || landing == null || landing.isEmpty()) {
+            return;
+        }
+        lastLandingByBot.put(botName, landing);
+        lastLandingNanos.put(botName, System.nanoTime());
+    }
+
+    /**
+     * Waits (bounded) for a landing observation made for the given bot after
+     * an unannounced login, and returns the ACTUAL backend it landed on, or
+     * {@code null} when nothing was observed in time. The observation may
+     * slightly precede the client-visible login (the proxy logs its backend
+     * connection before the backend's login packet reaches the client), so
+     * records within {@link #LANDING_LEAD_MS} before the login are accepted -
+     * but older records from a previous hop are not.
+     */
+    private String resolveUnannouncedLanding(String name) {
+        long loginNanos = System.nanoTime();
+        long deadline = loginNanos + LANDING_WAIT_TIMEOUT_MS * 1_000_000L;
+        long oldestAcceptable = loginNanos - LANDING_LEAD_MS * 1_000_000L;
+        while (System.nanoTime() < deadline) {
+            Long seenAt = lastLandingNanos.get(name);
+            if (seenAt != null && seenAt >= oldestAcceptable) {
+                return lastLandingByBot.get(name);
+            }
+            try {
+                Thread.sleep(LANDING_POLL_INTERVAL_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static String stripAnsi(String line) {
+        StringBuilder sb = new StringBuilder(line.length());
+        boolean inEscape = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (inEscape) {
+                if (c == 'm') inEscape = false;
+            } else if (c == '\u001b') {
+                inEscape = true;
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     public void disconnectBot(String name, String server) {
